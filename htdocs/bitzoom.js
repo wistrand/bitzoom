@@ -47,7 +47,9 @@ class BitZoom {
     this.zoom = 1;
     this.baseLevel = 0;
     this.sizeBy = 'edges';
-    this.labelProp = 'auto';
+    this.labelProps = new Set(); // checked label properties; empty = auto (dominant)
+    this.edgeMode = 'curves'; // 'curves', 'lines', 'none'
+    this.sizeLog = false;    // log scale for size/heatmap
     this.heatmapMode = 'density';
     this.selectedIds = new Set();  // multi-select via ctrl+click
     this._primarySelectedId = null;
@@ -172,7 +174,7 @@ class BitZoom {
 
   // Cached dominant prop — recalculated only when weights change
   _cachedDominant = 'label';
-  _cachedLabelProp = 'label';
+  _cachedLabelProps = ['label']; // array of active label properties
   _cachedColorMap = null;
 
   _refreshPropCache() {
@@ -184,19 +186,37 @@ class BitZoom {
       }
     }
     this._cachedDominant = best;
-    this._cachedLabelProp = this.labelProp === 'auto' ? best : this.labelProp;
+    this._cachedLabelProps = this.labelProps.size > 0 ? [...this.labelProps] : [best];
     this._cachedColorMap = this.propColors[best] || {};
-    // Invalidate level cache since colors/labels changed
     this.levels = new Array(ZOOM_LEVELS.length).fill(null);
   }
 
   get _dominantProp() { return this._cachedDominant; }
-  get _labelProp() { return this._cachedLabelProp; }
+  get _labelProp() { return this._cachedLabelProps[0]; } // primary for supernodeLabel fallback
 
   // ─── Node property accessors (used by renderer) ───────────────────────────
 
-  _nodeLabel(n) { return getNodePropValue(n, this._cachedLabelProp, this.adjList); }
-  _supernodeLabel(sn) { return getSupernodeDominantValue(sn, this._cachedLabelProp, this.adjList); }
+  _nodeLabel(n) {
+    const props = this._cachedLabelProps;
+    if (props.length === 1) return getNodePropValue(n, props[0], this.adjList);
+    const parts = [];
+    for (const p of props) {
+      const v = getNodePropValue(n, p, this.adjList);
+      if (v && v !== 'unknown' && v !== n.id) parts.push(v);
+    }
+    return parts.length > 0 ? parts.join(' · ') : n.label || n.id;
+  }
+
+  _supernodeLabel(sn) {
+    const props = this._cachedLabelProps;
+    if (props.length === 1) return getSupernodeDominantValue(sn, props[0], this.adjList);
+    const parts = [];
+    for (const p of props) {
+      const v = getSupernodeDominantValue(sn, p, this.adjList);
+      if (v && v !== 'unknown') parts.push(v);
+    }
+    return parts.length > 0 ? parts.join(' · ') : sn.repName;
+  }
 
   _nodeColorVal(n) { return getNodePropValue(n, this._cachedDominant, this.adjList); }
   _nodeColor(n) {
@@ -226,12 +246,11 @@ class BitZoom {
   getLevel(idx) {
     if (!this.levels[idx]) {
       const colorProp = this._dominantProp;
-      const labelProp = this._labelProp;
       const propColors = this.propColors[colorProp];
       this.levels[idx] = buildLevel(
         ZOOM_LEVELS[idx], this.nodes, this.edges, this.nodeIndexFull,
         n => getNodePropValue(n, colorProp, this.adjList),
-        n => getNodePropValue(n, labelProp, this.adjList),
+        n => this._nodeLabel(n),
         val => (propColors && propColors[val]) || '#888888'
       );
       // New supernodes need screen positions computed
@@ -243,7 +262,20 @@ class BitZoom {
   // ─── Layout & render delegates ─────────────────────────────────────────────
 
   layoutAll() { layoutAll(this); }
-  render() { render(this); this._scheduleHashUpdate(); }
+
+  _renderPending = false;
+  render() {
+    if (this._renderPending) return;
+    this._renderPending = true;
+    requestAnimationFrame(() => {
+      this._renderPending = false;
+      render(this);
+      this._scheduleHashUpdate();
+    });
+  }
+
+  // Force immediate render (for animations that manage their own rAF)
+  renderNow() { render(this); }
   worldToScreen(wx, wy) { return worldToScreen(this, wx, wy); }
   screenToWorld(sx, sy) { return screenToWorld(this, sx, sy); }
   hitTest(sx, sy) { return hitTest(this, sx, sy); }
@@ -309,12 +341,12 @@ class BitZoom {
       this.zoom = startZoom + (targetZoom - startZoom) * e;
       this.pan.x = startPan.x + (targetPan.x - startPan.x) * e;
       this.pan.y = startPan.y + (targetPan.y - startPan.y) * e;
-      this.render();
+      this.renderNow();
       if (t < 1) {
         requestAnimationFrame(animate);
       } else {
         this._checkAutoLevel();
-        this.render();
+        this.renderNow();
       }
     };
     requestAnimationFrame(animate);
@@ -350,7 +382,7 @@ class BitZoom {
       this.zoom = startZoom + (targetZoom - startZoom) * e;
       this.pan.x = startPan.x + (targetPan.x - startPan.x) * e;
       this.pan.y = startPan.y + (targetPan.y - startPan.y) * e;
-      this.render();
+      this.renderNow();
       if (t < 1) {
         requestAnimationFrame(animate);
       } else {
@@ -359,7 +391,7 @@ class BitZoom {
         if (this.currentLevel !== prevLevel && this._zoomTargetMembers) {
           this._reselectAfterLevelChange();
         }
-        this.render();
+        this.renderNow();
       }
     };
     requestAnimationFrame(animate);
@@ -698,32 +730,24 @@ class BitZoom {
       const row = document.createElement('div');
       row.className = 'weight-row';
       row.innerHTML = `
+        <input type="checkbox" id="lbl-${key}" title="Include in label">
         <span class="weight-label">${key}</span>
         <input class="weight-slider" type="range" id="w-${key}" min="1" max="10" step="1" value="${this.propWeights[key]}">
         <span class="weight-val" id="wv-${key}">${this.propWeights[key]}</span>`;
       sliderContainer.appendChild(row);
-      row.querySelector('input').addEventListener('input', e => {
+      row.querySelector('.weight-slider').addEventListener('input', e => {
         this.propWeights[key] = parseInt(e.target.value);
         document.getElementById(`wv-${key}`).textContent = this.propWeights[key];
         document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
         this._scheduleRebuild();
       });
+      row.querySelector('input[type=checkbox]').addEventListener('change', e => {
+        if (e.target.checked) this.labelProps.add(key);
+        else this.labelProps.delete(key);
+        this._refreshPropCache();
+        this.render();
+      });
     }
-
-    // Label source selector
-    const sel = document.getElementById('labelSource');
-    sel.innerHTML = '';
-    const autoOpt = document.createElement('option');
-    autoOpt.value = 'auto';
-    autoOpt.textContent = 'auto';
-    sel.appendChild(autoOpt);
-    for (const g of this.groupNames) {
-      const opt = document.createElement('option');
-      opt.value = g;
-      opt.textContent = g;
-      sel.appendChild(opt);
-    }
-    sel.value = this.labelProp;
   }
 
   _scheduleRebuild() {
@@ -982,10 +1006,34 @@ class BitZoom {
     sizeMemBtn.addEventListener('click', () => { this.sizeBy = 'members'; updateSizeButtons(); this.render(); });
     sizeEdgBtn.addEventListener('click', () => { this.sizeBy = 'edges'; updateSizeButtons(); this.render(); });
 
-    // Label source selector
-    document.getElementById('labelSource').addEventListener('change', (e) => {
-      this.labelProp = e.target.value;
-      this._refreshPropCache();
+    const sizeLogBtn = document.getElementById('sizeLogBtn');
+    const updateLogBtn = () => {
+      sizeLogBtn.style.background = this.sizeLog ? 'var(--accent)' : '';
+      sizeLogBtn.style.color = this.sizeLog ? '#fff' : '';
+    };
+    updateLogBtn();
+    sizeLogBtn.addEventListener('click', () => {
+      this.sizeLog = !this.sizeLog;
+      updateLogBtn();
+      this.render();
+    });
+
+    // Label checkboxes are wired in _buildDynamicUI
+
+    // Edge mode toggle
+    const edgeBtn = document.getElementById('edgeModeBtn');
+    const EDGE_MODES = ['curves', 'lines', 'none'];
+    const EDGE_LABELS = { curves: 'E:C', lines: 'E:L', none: 'E:—' };
+    const updateEdgeBtn = () => {
+      edgeBtn.textContent = EDGE_LABELS[this.edgeMode];
+      edgeBtn.style.background = this.edgeMode !== 'none' ? '' : 'var(--accent)';
+      edgeBtn.style.color = this.edgeMode !== 'none' ? '' : '#fff';
+    };
+    updateEdgeBtn();
+    edgeBtn.addEventListener('click', () => {
+      const idx = EDGE_MODES.indexOf(this.edgeMode);
+      this.edgeMode = EDGE_MODES[(idx + 1) % EDGE_MODES.length];
+      updateEdgeBtn();
       this.render();
     });
 
@@ -1043,15 +1091,15 @@ class BitZoom {
         if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; }
         const r = canvas.getBoundingClientRect();
         const p = { x: e.clientX - r.left, y: e.clientY - r.top };
-        clickCtrl = e.ctrlKey || e.metaKey;
+        const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
         clickTimer = setTimeout(() => {
           clickTimer = null;
           const hit = this.hitTest(p.x, p.y);
           if (hit) {
             const id = hit.type === 'node' ? hit.item.id : hit.item.bid;
-            if (clickCtrl) { this.toggleSelection(id); } else { this.selectedId = id; }
+            if (isMulti) { this.toggleSelection(id); } else { this.selectedId = id; }
             this._showDetail(hit);
-          } else if (!clickCtrl) {
+          } else if (!isMulti) {
             this.selectedId = null;
             document.getElementById('node-panel').classList.remove('open');
           }

@@ -354,6 +354,38 @@
     gap: 6px;
     padding: 3px 0;
   }
+  .weight-row input[type=checkbox] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.12s;
+  }
+  .weight-row input[type=checkbox]:hover {
+    border-color: var(--accent);
+  }
+  .weight-row input[type=checkbox]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .weight-row input[type=checkbox]:checked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 1px;
+    width: 4px;
+    height: 7px;
+    border: solid #fff;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+  }
   .weight-label {
     font-size: 10px;
     color: var(--text-dim);
@@ -532,19 +564,6 @@
   .dataset-btn:hover { border-color: var(--accent); color: var(--accent); }
   .dataset-btn:disabled { opacity: 0.3; cursor: default; }
 
-  #labelSource {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
-    padding: 2px 4px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    letter-spacing: 0.04em;
-  }
-  #labelSource:hover { border-color: var(--accent); }
-  #labelSource option { background: var(--surface); color: var(--text); }
 
   progress {
     -webkit-appearance: none;

@@ -45,9 +45,24 @@ function rgba(r, g, b, a) {
   return s;
 }
 
+// ─── Size scaling ────────────────────────────────────────────────────────────
+
+function scaleSize(val, bz) {
+  return bz.sizeLog ? Math.log2(val + 1) : val;
+}
+
 // ─── Edge drawing ────────────────────────────────────────────────────────────
 
+let _edgeMode = 'curves';
+
+function setEdgeMode(mode) { _edgeMode = mode; }
+
 function drawEdge(ctx, ax, ay, bx, by) {
+  if (_edgeMode === 'lines') {
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    return;
+  }
   const dx = bx - ax, dy = by - ay;
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 1) { ctx.moveTo(ax, ay); ctx.lineTo(bx, by); return; }
@@ -148,12 +163,16 @@ export function render(bz) {
   ctx.stroke();
 
   // Layer order: edges → heatmap → hilited edges → circles → labels/counts
+  setEdgeMode(bz.edgeMode);
   const isRaw = bz.currentLevel === RAW_LEVEL - 1;
   const renderFn = isRaw ? renderNodes : renderSupernodes;
-  renderFn(bz, 'edges');
+  if (bz.edgeMode !== 'none') renderFn(bz, 'edges');
   if (bz.heatmapMode === 'splat') renderHeatmapSplat(bz);
   else if (bz.heatmapMode === 'density') renderHeatmapDensity(bz);
+  const savedMode = _edgeMode;
+  if (_edgeMode === 'none') setEdgeMode('lines'); // hilite edges always visible
   renderFn(bz, 'hilite');
+  setEdgeMode(savedMode);
   renderFn(bz, 'circles');
   renderFn(bz, 'labels');
 }
@@ -247,7 +266,7 @@ function renderSupernodes(bz, pass) {
     const sx = sn.x * rz + bz.pan.x, sy = sn.y * rz + bz.pan.y;
     if (sx >= -margin && sx <= bz.W + margin && sy >= -margin && sy <= bz.H + margin) {
       visibleCount++;
-      const sv = bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length;
+      const sv = scaleSize(bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length, bz);
       if (sv > maxSizeVal) maxSizeVal = sv;
     }
   }
@@ -258,7 +277,8 @@ function renderSupernodes(bz, pass) {
     const rMax = Math.max(1.5, Math.min(cellPx * 0.42, 40));
     if (px < -rMax || px > bz.W + rMax || py < -rMax || py > bz.H + rMax) continue;
 
-    const sizeVal = bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length;
+    const rawSizeVal = bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length;
+    const sizeVal = scaleSize(rawSizeVal, bz);
     const r = Math.max(1.5, Math.min(rMax, 1.5 + Math.sqrt(sizeVal) * 1.2));
     const col = sn.cachedColor;
     const isSelected = selIds.has(sn.bid);
@@ -300,7 +320,7 @@ function renderSupernodes(bz, pass) {
         ctx.font = fontStr(fs, true);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length, px, py);
+        ctx.fillText(rawSizeVal, px, py);
       }
 
       // Label above node
@@ -425,7 +445,7 @@ function renderNodes(bz, pass) {
     const rMaxRaw = Math.max(1, Math.min(cellPxRaw * 0.40, 20));
     if (px < -rMaxRaw || px > bz.W + rMaxRaw || py < -rMaxRaw || py > bz.H + rMaxRaw) continue;
 
-    const sizeVal = bz.sizeBy === 'edges' ? n.degree : 1;
+    const sizeVal = scaleSize(bz.sizeBy === 'edges' ? n.degree : 1, bz);
     const r = Math.max(1, Math.min(rMaxRaw, 1 + Math.sqrt(sizeVal) * 1.0));
     const col = bz._nodeColor(n);
     const isSelected = selIds.has(n.id);
@@ -501,9 +521,9 @@ function renderHeatmapSplat(bz) {
 
     let weight;
     if (isRaw) {
-      weight = bz.sizeBy === 'edges' ? (n.degree + 1) : 1;
+      weight = scaleSize(bz.sizeBy === 'edges' ? (n.degree + 1) : 1, bz);
     } else {
-      weight = bz.sizeBy === 'edges' ? (n.totalDegree + 1) : n.members.length;
+      weight = scaleSize(bz.sizeBy === 'edges' ? (n.totalDegree + 1) : n.members.length, bz);
     }
     const r = Math.max(50, Math.min(maxR, 50 + Math.sqrt(weight) * 25));
 
@@ -572,9 +592,9 @@ function renderHeatmapDensity(bz) {
 
     let weight;
     if (isRaw) {
-      weight = bz.sizeBy === 'edges' ? (n.degree + 1) : 1;
+      weight = scaleSize(bz.sizeBy === 'edges' ? (n.degree + 1) : 1, bz);
     } else {
-      weight = bz.sizeBy === 'edges' ? (n.totalDegree + 1) : n.members.length;
+      weight = scaleSize(bz.sizeBy === 'edges' ? (n.totalDegree + 1) : n.members.length, bz);
     }
 
     const hexCol = isRaw ? bz._nodeColor(n) : n.cachedColor;
