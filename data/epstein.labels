@@ -1,0 +1,515 @@
+# NodeId	Label	Group
+person_001	Jeffrey Edward Epstein	Person
+person_010	Alan Greenberg	Person
+person_003	Leslie Wexner	Person
+person_006	Michael Stroll	Person
+person_024	Steven Hoffenberg	Person
+person_008	Robert Massey	Person
+person_009	Xenophon A. Galinas	Person
+person_011	Bruce King	Person
+person_025	Bill Clinton	Person
+person_027	Prince Andrew	Person
+person_028	Donald Trump	Person
+person_059	Bradley J. Edwards	Person
+person_016	Scott Rothstein	Person
+person_017	Dianya Nida	Person
+person_002	Ghislaine Noelle Maxwell	Person
+person_021	Doug Bands	Person
+person_022	Virginia Roberts Giuffre	Person
+person_023	Brett Jaffe	Person
+person_029	Aline Weber	Person
+person_030	Ginta Lapina	Person
+person_031	Rebecca Romijn-Stamos	Person
+person_032	Estella Warren	Person
+person_033	Christy Turlington	Person
+person_034	Liu Dan	Person
+person_035	Sessilee Lopez	Person
+person_036	Anastasia Lagune	Person
+person_037	Eve Doll	Person
+person_038	Alina Olegnova	Person
+person_054	A. Alfred Taubman	Person
+person_055	Ariel Sharon	Person
+person_056	Martin Trust	Person
+person_057	Dennis Hersch	Person
+person_058	Arthur Shapiro	Person
+person_004	Robert Maxwell	Person
+person_041	Herr Springer	Person
+person_042	Robert Hallandale	Person
+person_043	Rupert Murdoch	Person
+person_044	Saul Sternberg	Person
+person_045	Conchita Sarnoff	Person
+person_046	Larry Trachtenberg	Person
+person_047	Adnan Khashoggi	Person
+person_067	Sarah Lynelle Kellen	Person
+person_068	Story Cowles	Person
+person_069	Brian Vickers	Person
+person_070	Mr. Goldsmith	Person
+person_007	Virginia Louise Roberts Giuffre	Person
+person_060	Ron Eppinger	Person
+person_061	Alan Dershowitz	Person
+person_062	Paul Cassell	Person
+person_063	Robert Josephsberg	Person
+person_064	Marie Villafaña	Person
+person_065	Wilfredo Ferrer	Person
+person_066	Jack Scarola	Person
+person_073	Nadia Marcinkova	Person
+person_072	Johanna Sjoberg	Person
+person_074	Nicole Junkermann	Person
+person_075	Andrea Mitrovitch	Person
+person_076	Cindy Lopez	Person
+person_077	B.B.	Person
+person_078	S.R.	Person
+person_079	Juliana Barbosa	Person
+person_080	Amanda Venaro	Person
+person_081	Juliette Bryant	Person
+person_082	Andrea Metrovich	Person
+person_083	Tila Davies Jeletzia Claire Hazel Zinta Braukis	Person
+person_084	Vanessa	Person
+person_085	Melissa Hanes	Person
+person_086	Carolyn Andriano	Person
+person_087	Elena Weber	Person
+person_088	Dainya Nida Mohini	Person
+person_089	Lauren Murphy	Person
+person_090	Michelle Tagliani	Person
+person_091	Haley Robson	Person
+person_092	Rachel Chandler	Person
+person_093	Maximila Cordero	Person
+person_094	Adriana Ross Muscinska	Person
+person_095	Emmy Taylor	Person
+person_096	Alfredo Rodriguez	Person
+person_ref_99460	Sara Kellen	Person
+person_ref_98321	Jack Goldberger	Person
+person_097	Gregory B. Taylor	Person
+person_098	Lawrence Visoski Jr.	Person
+person_099	Maritza Vasquez	Person
+person_101	Frederick Rudd	Person
+person_102	Kim Rudd	Person
+person_103	Cecile de Jongh	Person
+person_104	Janusz Banasiak	Person
+person_105	Jo-Jo Fontanella	Person
+person_106	Lynn Fontanella	Person
+person_107	Igor Zinoviev	Person
+person_108	Brent Tyndall	Person
+person_109	Eva Andersson	Person
+person_110	Dana Burns	Person
+person_111	Cecilia Stein	Person
+person_112	Luis Font	Person
+person_113	Simon Parra	Person
+person_114	Evelyn Valenzeula	Person
+person_115	Amanda Grant	Person
+person_116	Michael Friedman	Person
+person_117	Edward Tuttle	Person
+person_118	Paula Heil Fisher	Person
+person_119	Mark Zeff	Person
+person_120	Daniel Estes	Person
+person_121	Douglas Schoettle	Person
+person_122	Sergio Cordero	Person
+person_123	Mike Sanka	Person
+person_124	David Mullen	Person
+person_125	Khalid Monroe	Person
+person_126	Eric Gany	Person
+person_127	Khalid Salaam	Person
+person_128	Dr. Stephen Alexander	Person
+person_129	Dr. Steve Strumwasser	Person
+person_130	Louella Rabuyo	Person
+person_131	James Cayne	Person
+person_ref_60464	Ann Greenberg	Person
+person_ref_50716	Lynne Koeppel	Person
+person_ref_50533	Allison Frey	Person
+person_ref_87970	Melissa Frey	Person
+person_ref_43714	Ted Greenberg	Person
+person_132b	Alan Schwartz	Person
+person_ref_63923	Patricia Denner	Person
+person_ref_67366	Allison Cayne Schneider	Person
+person_005	Les Wexner	Person
+person_054a	Milton Petrie	Person
+person_132	Douglas Leese	Person
+person_133a	John Mitchell	Person
+person_012	Bill Clinton	Person
+person_ref_86002	Maria Santiago	Person
+person_133	Gary Kenneth King	Person
+person_134	George John Mitchell Jr.	Person
+person_134a	Edmund S. Muskie	Person
+person_134b	Newt Gingrich	Person
+person_134c	Hillary Clinton	Person
+person_ref_43422	George John Mitchell Sr.	Person
+person_ref_9449	Mary Saad	Person
+person_ref_10568	Andrea Mitchell	Person
+person_ref_92504	Andrew Mitchell	Person
+person_ref_31266	Claire Mitchell	Person
+person_135	Robert A. Meister	Person
+person_135a	Nicky Hilton Rothschild	Person
+person_ref_58643	Todd Meister	Person
+person_ref_36090	Keith Meister	Person
+person_ref_73329	Lisa Schad	Person
+person_136	Flavio Briatore	Person
+person_136a	Luciano Benetton	Person
+person_136b	Roy Speer	Person
+person_137	Arnold Paul Prosperi	Person
+person_146	Barry Krischer	Person
+person_015	Bradley J. Edwards	Person
+person_061a	Virginia Roberts	Person
+person_061b	Jack Scarola	Person
+person_151	David Boies	Person
+person_061c	Alan Burstein	Person
+person_061d	Abdelbaset al-Megrahi	Person
+person_ref_19801	Sue Barlach	Person
+person_ref_1864	Carolyn Cohen	Person
+person_ref_20043	Ella Dershowitz	Person
+person_ref_87058	Jamin Dershowitz	Person
+person_ref_86128	Elon Dershowitz	Person
+person_147	Donald Hafele	Person
+person_148	Jay Lefkowitz	Person
+person_149	Kenneth Starr	Person
+person_148a	George W. Bush	Person
+person_148b	Pat Robertson	Person
+person_148c	Herbert Neuman	Person
+person_ref_29981	Jerome Lefkowitz	Person
+person_ref_37821	Elena Neuman	Person
+person_ref_32282	Talia Lefkowitz	Person
+person_ref_69944	Danielle Lefkowitz	Person
+person_ref_3307	Jacob Lefkowitz	Person
+person_191	Gerald Lefcourt	Person
+person_150	Guy Fronstin	Person
+person_150a	Jack A. Goldberger	Person
+person_138	Kenneth Starr	Person
+person_142	Bruce E. Reinhart	Person
+person_153	Louis Freeh	Person
+person_154	Darren Indyke	Person
+person_155	Kenneth Marra	Person
+person_155a	Prince Andrew	Person
+person_156	R. Alexander Acosta	Person
+person_156a	Samuel Alito	Person
+person_157	Bob Josefsberg	Person
+person_157a	Bob Graham	Person
+person_158a	John V. Lindsay	Person
+person_158b	Eliot Spitzer	Person
+person_158c	Max Abramovitz	Person
+person_158d	Lloyd Taft	Person
+person_158e	John J Gilhooley	Person
+person_158f	Louis Lefkowitz	Person
+person_ref_75664	Lois Clapp	Person
+person_ref_73506	Robert Sweet Jr.	Person
+person_ref_54833	Deborah Sweet	Person
+person_ref_71517	Ames Sweet	Person
+person_ref_14286	Eliza Sweet	Person
+person_ref_49042	James Sweet	Person
+person_ref_12736	George Sweet	Person
+person_ref_42800	grandfather (name unknown)	Person
+person_159	Donald Trump	Person
+person_160	David Copperfield	Person
+person_161	Bill Richardson	Person
+person_151a	Al Gore	Person
+person_151b	Karen Dunn	Person
+person_151c	Hillary Clinton	Person
+person_162	Spencer Kuvin	Person
+person_163	Adam Langino	Person
+person_162a	B.B.	Person
+person_064a	Elena Weber	Person
+person_064b	L.M.	Person
+person_064c	Eric Holder	Person
+person_164	Daliah Weiss	Person
+person_165	Drew Oosterbaan	Person
+person_166	Lara Belohlavek	Person
+person_152	Katie Johnson	Person
+person_167	Tim O'Meilia	Person
+person_168	Larry Keller	Person
+person_169	Elisa Cramer	Person
+person_170	Jane Musgrave	Person
+person_171	Shannon Donnelly	Person
+person_172	Dan Mangan	Person
+person_173	Nigel Rosser	Person
+person_174	Nick Denton	Person
+person_175	Lilach Weissman	Person
+person_blackbook_circled_003	Courtney Love	Person
+person_blackbook_circled_004	Peter Soros	Person
+person_blackbook_circled_006	Alberto Pinto	Person
+person_blackbook_circled_007	Ehud Barak	Person
+person_blackbook_circled_011	Larry Visoski	Person
+person_blackbook_circled_013	Christopher Gaie	Person
+person_blackbook_circled_015	Bill Richardson	Person
+person_blackbook_001	Alec Baldwin	Person
+person_blackbook_003	David Blaine	Person
+person_blackbook_004	Tony Blair	Person
+person_blackbook_005	Mike Bloomberg	Person
+person_blackbook_006	Edgar Bronfman Jr	Person
+person_blackbook_007	Candace Bushnell	Person
+person_blackbook_008	William Carey	Person
+person_blackbook_009	Carina Carey	Person
+person_blackbook_010	Sophie Dahl	Person
+person_blackbook_011	Jeff Davies	Person
+person_blackbook_012	Isabel Goldsmith	Person
+person_blackbook_013	Barry Josephson	Person
+person_blackbook_014	Nancy Jarecki	Person
+person_blackbook_015	Andrew Jarecki	Person
+person_blackbook_016	Nick Jarecki	Person
+person_blackbook_017	Lal Dalamel	Person
+person_blackbook_018	Doug Liman	Person
+person_blackbook_019	Carol Mack	Person
+person_blackbook_020	Earl Mack	Person
+person_blackbook_021	Kevin Maxwell	Person
+person_blackbook_022	Pandora Maxwell	Person
+person_blackbook_023	John Mayhew	Person
+person_blackbook_025	Joel Pashcow	Person
+person_blackbook_026	Jessica Rothschild	Person
+person_blackbook_027	Hannah Rothschild	Person
+person_blackbook_028	Edouard de Rothschild	Person
+person_blackbook_029	Evelyn de Rothschild	Person
+person_blackbook_030	Simon Sebag-Montefiore	Person
+person_blackbook_031	Bobby Shriver	Person
+person_blackbook_032	Andrew Solomon	Person
+person_blackbook_033	Allison Stern	Person
+person_blackbook_034	Leonard Stern	Person
+person_blackbook_035	Brett Tollman	Person
+person_blackbook_036	Blaine Trump	Person
+person_blackbook_037	Robert Trump	Person
+person_blackbook_038	Ivana Trump	Person
+person_blackbook_039	Ivanka Trump	Person
+person_blackbook_040	Steve Wynn	Person
+person_blackbook_041	Andrew Yates	Person
+person_blackbook_042	Robert Goldberg	Person
+person_blackbook_043	Frederic Adler	Person
+person_blackbook_044	Cath Adler	Person
+person_blackbook_046	Eileen Guggenheim	Person
+person_blackbook_047	Walter Isaacson	Person
+person_blackbook_049	Lesley Wexner	Person
+person_blackbook_050	Joe Pagano	Person
+person_blackbook_051	Michael Ovitz	Person
+person_blackbook_052	David Rockefeller	Person
+person_201	E.W.	Person
+person_202	A.H.	Person
+person_071	Nadia Marcinkova	Person
+person_203	Chauntae Davies	Person
+person_204	Tatiania Kovylinda	Person
+person_205	Annie Farmer	Person
+person_206	Natalya Malychev	Person
+person_207	Jane Doe 43	Person
+person_208	Nadia Bjorlin	Person
+org_001	Trilateral Commission	Organization
+org_002	Council on Foreign Relations	Organization
+org_003	Lafayette High School	Organization
+org_004	Cooper Union	Organization
+org_005	Dalton School	Organization
+org_006	New York University	Organization
+org_007	Bear Stearns	Organization
+org_008	International Assets Group Inc.	Organization
+org_009	Williams Electronics Inc.	Organization
+org_010	Pan American World Airways	Organization
+org_011	Emery Air Freight Corp.	Organization
+org_012	Ohio Higher Education Trust	Organization
+org_013	Wexner Foundation	Organization
+org_014	Wexner Heritage Foundation	Organization
+org_015	Office of Foreign Missions	Organization
+org_016	Zorro Development Corp.	Organization
+org_017	Rockefeller University	Organization
+org_018	Harvard University	Organization
+org_019	Radar.com	Organization
+org_020	Financial Trust Co of St. Thomas, VI	Organization
+org_021	Citibank	Organization
+org_022	Palm Beach Police	Organization
+org_023	FBI	Organization
+org_024	Herman and Mermelstein	Organization
+org_025	Palm Beach County Stockade	Organization
+org_026	Zorro Trust	Organization
+org_027	Oxford University	Organization
+org_028	The TerraMar Project	Organization
+org_029	Clinton Global Initiative	Organization
+org_030	Ellmax	Organization
+org_031	Cohen and Gresser	Organization
+org_032	United Nations	Organization
+org_033	Karin Models	Organization
+org_034	Karin Models of America	Organization
+org_035	MC2 Model Management	Organization
+org_036	60 Minutes	Organization
+org_037	Next Model Management	Organization
+org_038	Scouting I International Co.	Organization
+org_039	Daily Beast	Organization
+org_040	U.S. District Court for the Southern District of Florida	Organization
+org_063	The Limited	Organization
+org_064	Victoria's Secret	Organization
+org_065	Bath & Body Works	Organization
+org_066	Henri Bendel	Organization
+org_067	Lane Bryant	Organization
+org_068	Abercrombie & Fitch	Organization
+org_069	Lerner New York	Organization
+org_070	The Limited Too	Organization
+org_071	Express	Organization
+org_072	Mast Industries	Organization
+org_041	Hambro's Bank London	Organization
+org_042	Butterworth's	Organization
+org_043	Pergamon Press	Organization
+org_044	Lange Maxwell & Springer Inc	Organization
+org_045	Simpkin Marshall	Organization
+org_046	British Parliament	Organization
+org_047	Leasco	Organization
+org_048	Board of Trade	Organization
+org_049	Price Waterhouse	Organization
+org_050	British Printing and Communications Corporation	Organization
+org_051	Daily Mirror	Organization
+org_052	Sunday Mirror	Organization
+org_053	Macmillan Publishers	Organization
+org_054	Maxwell Communications Corporation	Organization
+org_055	Daily News	Organization
+org_056	Mossad	Organization
+org_057	Lehman Brothers	Organization
+org_058	Goldman Sachs	Organization
+org_059	Coopers & Lybrand	Organization
+org_060	FBI	Organization
+org_061	News of the World	Organization
+org_062	The Sun	Organization
+org_077	SLK Designs LLC	Organization
+org_073	Mar-a-Lago	Organization
+org_074	Podhurst Orseck	Organization
+org_075	Daily Mail	Organization
+org_076	Victims Refuse Silence	Organization
+org_084	Viacom	Organization
+org_085	JPMorgan Chase	Organization
+org_086	Woodward & Lothrop	Organization
+org_087	Sotheby's	Organization
+org_088	Taubman Company	Organization
+org_089	Federated Department Stores	Organization
+org_090	Towers Corp	Organization
+org_091	New York Post	Organization
+org_093	Leading Minds International	Organization
+org_094	MyGivingTree	Organization
+org_095	Mariner International Bank	Organization
+org_096	British Aerospace	Organization
+org_097	Bank of NT Butterfield	Organization
+org_098	Hambros Bank	Organization
+org_100	U.S. Department of Energy	Organization
+org_141	Palm Beach Police Department	Organization
+org_142	Florida's Crimes Against Children Unit	Organization
+org_143	US Commission of Civil Rights	Organization
+org_092	Nine East 71st Street Corp	Organization
+org_099	Jeffrey Epstein VI Foundation	Organization
+equipment_001	Gulfstream II-B	Equipment
+equipment_002	Boeing 727	Equipment
+equipment_003	Sikorsky S-76B helicopter	Equipment
+equipment_004	Cessna 172-XP	Equipment
+equipment_005	Hawker	Equipment
+claim_1_1_1	Jeffrey Epstein was born in 1953	Claim
+claim_1_1_2	Epstein graduated from Lafayette High School in 1969, at age 16, having skipped 	Claim
+claim_1_1_3	Epstein attended Cooper Union from 1969 to 1971	Claim
+claim_1_1_4	Epstein transferred to Courant Institute at NYU 1971-1974 but did not complete d	Claim
+claim_1_1_5	Despite lack of college degree, Epstein taught physics and mathematics at Dalton	Claim
+claim_1_1_6	Epstein sexually abused minors while a teacher at Dalton	Claim
+claim_1_1_7	Epstein was hired by Bear Stearns in 1976	Claim
+claim_1_1_8	Epstein was brought on by CEO Alan 'Ace' Greenberg after tutoring Greenberg's so	Claim
+claim_1_1_9	Epstein's tenure at Bear Stearns lasted until 1981	Claim
+claim_1_1_10	Epstein left Bear Stearns due to mysterious circumstances surrounding insider tr	Claim
+claim_1_1_11	Epstein was a Member of the Trilateral Commission and CFR	Claim
+claim_1_2_1	Ghislaine Noelle Maxwell was born in 1961	Claim
+claim_1_2_2	Ghislaine Maxwell is youngest child of Robert Maxwell and Elisabeth 'Betty' Maxw	Claim
+claim_1_2_3	Ghislaine Maxwell was educated at Oxford University	Claim
+claim_1_2_4	Maxwell moved to New York City in 1992 following death of father in November 199	Claim
+claim_1_2_5	Maxwell founded The TerraMar Project in 2012	Claim
+claim_1_2_6	The TerraMar Project announced closure on July 12, 2019, shortly after Epstein's	Claim
+claim_1_3_1	Leslie H. 'Les' Wexner was close friend & mentor to Epstein who managed Wexner's	Claim
+claim_1_3_2	In 1991, Wexner made Epstein trustee of Ohio Higher Education Trust ($230M phila	Claim
+claim_1_3_3	Epstein and Wexner met at Bear Stearns where Epstein worked 1976-1981	Claim
+claim_1_4_1	Jean-Luc Brunel began career at Karin Models in 1976, later purchased it	Claim
+claim_1_4_2	Brunel established MC2 Model Management in 2005 with $1 million line of credit f	Claim
+claim_2_1_1	After leaving Bear Stearns, Epstein started International Assets Group Inc. (I.A	Claim
+claim_2_1_2	In 1982, Michael Stroll filed lawsuit against Epstein. Case is Stroll v. Epstein	Claim
+claim_2_1_3	Stroll lost the suit against Epstein personally	Claim
+claim_2_1_4	I.A.G. received $450,000 investment from Stroll which Epstein put into oil. Epst	Claim
+claim_2_2_1	In early 80's Epstein met Steven Hoffenberg. In 1987 Hoffenberg and Epstein part	Claim
+claim_2_2_2	Towers Financial was one of largest Ponzi schemes in US history. Hoffenberg conv	Claim
+claim_2_2_3	Epstein was Hoffenberg's 'uncharged co-conspirator' and 'architect of the scam'.	Claim
+claim_2_3_1	In 1993 Epstein bought Zorro Ranch in New Mexico from Bruce King with Zorro Deve	Claim
+claim_2_3_2	In 2008, Epstein's company Zorro Trust won over $29 million in Oklahoma state lo	Claim
+claim_2_4_1	In 2004 Epstein d/b/a Financial Trust Co of St. Thomas, VI, sues Citibank	Claim
+claim_3_1_1	In March 2005 Palm Beach Police first start investigating Epstein based on call 	Claim
+claim_3_1_2	In 2006, PB police alerted FBI who began to investigate Epstein	Claim
+claim_3_2_1	Epstein enters guilty plea for one count 'procuring a minor for prostitution' an	Claim
+claim_3_2_2	Epstein served 13 months of 18-month state sentence in vacant wing at Palm Beach	Claim
+claim_4_1_1	NPA guarantees federal government will not prosecute Epstein	Claim
+claim_4_1_2	NPA grants immunity to all Epstein's alleged co-conspirators	Claim
+claim_4_2_1	NPA requires Epstein consent to allow victims to seek damages. Epstein must offe	Claim
+claim_4_3_1	Bruce E. Reinhart was Asst US District Attorney before leaving government to def	Claim
+claim_5_1_1	L.M. aka Jane Doe #1 hires Edwards to represent her in federal suit claiming her	Claim
+claim_5_1_2	E.W. aka Courtney Wild hired Edwards for CVRA case	Claim
+claim_5_2_1	September 21 2015 Roberts sued Ghislaine Maxwell for slander: Virginia L Giuffre	Claim
+claim_5_2_2	Giuffre testified in May 2016 deposition she was 'lent out for purposes of sex t	Claim
+claim_5_3_1	Sarah Kellen, Nadia Marcinkova, and Jeffrey Epstein invoked Fifth Amendment when	Claim
+claim_5_3_2	Kellen and Marcinkova used aliases (Sarah Kensington, Nadia Marcinko) and ran bu	Claim
+claim_5_4_1	Alfredo Rodriguez, house manager, after deposition attempted to sell 97-page doc	Claim
+claim_5_5_1	On March 8 and 9 2010 Epstein was deposed for lawsuit he filed against Bradley J	Claim
+claim_6_1_1	Epstein met Clinton as early as 1995 when he paid tens of thousands to join him 	Claim
+claim_6_1_2	Epstein and Clinton first met in 1993 at White House donors' reception	Claim
+claim_6_1_3	Introduction to Clinton was made via Doug Bands	Claim
+claim_6_2_1	Epstein traveled in 2001 with Prince Andrew to Thailand	Claim
+claim_6_3_1	In 2004 Epstein bid on residential estate at 513 N. Country Road in Palm Beach b	Claim
+cite_002	Jeffrey Epstein \- Wikipedia, accessed November 12, 2025,	Citation
+cite_003	Jeffrey Epstein | Death, Island, List, Sex Crimes, & Facts | Britannica, accesse	Citation
+cite_004	Jeffrey Epstein | Research Starters \- EBSCO, accessed November 12, 2025,	Citation
+cite_005	Annual Report \- Council on Foreign Relations, accessed November 12, 2025,	Citation
+cite_006	COUNCIL ON FOREIGN RELATIONS, accessed November 12, 2025,	Citation
+cite_007	People in the News: Jeffrey E. Epstein \- The Harvard Crimson, accessed November	Citation
+cite_008	Ghislaine Maxwell \- Wikipedia, accessed November 12, 2025,	Citation
+cite_009	The murky life and death of Robert Maxwell – and how it shaped his daughter Ghis	Citation
+cite_010	The TerraMar Project \- Wikipedia, accessed November 12, 2025,	Citation
+cite_011	TerraMar Project \- InfluenceWatch, accessed November 12, 2025,	Citation
+cite_012	Learn About Efforts to Protect High Seas at Free, Public Seminar \- UTD News Cen	Citation
+cite_013	Leslie H. Wexner \- The Ohio State University Board of Trustees, accessed Novemb	Citation
+cite_014	Leslie H. Wexner | Research Starters \- EBSCO, accessed November 12, 2025,	Citation
+cite_015	Leslie H. Wexner, accessed November 12, 2025,	Citation
+cite_016	Les Wexner \- Wikipedia, accessed November 12, 2025,	Citation
+cite_017	Jean-Luc Brunel \- Wikipedia, accessed November 12, 2025,	Citation
+cite_018	Runway to Ruin: Jean-Luc Brunel's Role in the Epstein Network (8/3/25) \- Apple 	Citation
+cite_019	Jean-Luc Brunel: The French Modeling Honcho at the Center of Jeffrey Epstein's W	Citation
+cite_020	Stroll v. Epstein, 818 F. Supp. 640 (S.D.N.Y. 1993\) \- Justia Law, accessed Nov	Citation
+cite_021	Jeffrey Epstein worked at financial firm that engaged in massive Ponzi scheme in	Citation
+cite_022	Jeffrey Epstein's fortune is built on fraud, a former mentor says \- Quartz, acc	Citation
+cite_023	Towers Financial Corporation \- Wikipedia, accessed November 12, 2025,	Citation
+cite_024	Steven Hoffenberg \- Wikipedia, accessed November 12, 2025,	Citation
+cite_025	In Re Towers Financial Corp. Noteholders Litigation, 996 F. Supp. 266 (S.D.N.Y. 	Citation
+cite_026	As focus turns to Jeffrey Epstein's ranch, official says: "There is a ..., acces	Citation
+cite_027	Lottery Ticket Sold in Altus for $85 Million Claimed \- KCCU Radio, accessed Nov	Citation
+cite_028	Prize Claimed \- Public Radio Tulsa, accessed November 12, 2025,	Citation
+cite_029	Financial Trust Co., Inc. v. CITIBANK NA, 268 F. Supp. 2d 561 (D.V.I. 2003\) \- 	Citation
+cite_030	DEPARTMENT OF JUSTICE OFFICE OF PROFESSIONAL ..., accessed November 12, 2025,	Citation
+cite_031	Statement on DOJ Office of Professional Responsibility Report on Jeffrey Epstein	Citation
+cite_032	07/26/17 Page 1 of 100 Public Records Request No., accessed November 12, 2025,	Citation
+cite_033	FEDERAL BUREAU OF INVESTIGATION \- FOI/PA \- DELETED PAGE INFORMATION SHEET Civi	Citation
+cite_034	cr• q3 \- Palm Beach County State Attorney's Office, accessed November 12, 2025,	Citation
+cite_035	Understanding the Epstein Case \- North Carolina Criminal Law, accessed November	Citation
+cite_036	June 30, 2008: Jeffrey Epstein pleads guilty, goes to jail \- YouTube, accessed 	Citation
+cite_037	Understanding the Epstein Case | UNC School of Government, accessed November 12,	Citation
+cite_038	Jeffrey Epstein struck a secret deal in 2008\. Here's what it means for the curr	Citation
+cite_039	Dec. 15, 2008: Epstein's work-release arrangement shocks critics \- YouTube, acc	Citation
+cite_040	Supreme Court of the United States, accessed November 12, 2025,	Citation
+cite_041	Circumventing the Crime Victims' Rights Act: A Critical Analysis of the Eleventh	Citation
+cite_042	Case: 19-13843 Date Filed: 04/14/2020 Page: 1 of 120 SEALED \- United States Cou	Citation
+cite_043	APPENDIX \- Supreme Court, accessed November 12, 2025,	Citation
+cite_044	\[PUBLISH\] IN THE UNITED STATES COURT OF APPEALS FOR THE ELEVENTH CIRCUIT No. 1	Citation
+cite_045	Judge who approved FBI's Mar-a-Lago search represented clients linked to Jeffrey	Citation
+cite_046	Judge who allowed Mar-a-Lago search represented Epstein's alleged accomplices, n	Citation
+cite_047	Case 1:15-cv-07433-LAP Document 1137-19 Filed 10/22/20 Page 1 of 32 \- Free Law 	Citation
+cite_048	Giuffre v. Maxwell, No. 24-182 (2d Cir. 2025\) \- Justia Law, accessed November 	Citation
+cite_049	composite exhibit 1 (file under seal) \- Public Intelligence, accessed November 	Citation
+cite_050	Final\_Epstein\_documents.pdf \- guim.co.uk, accessed November 12, 2025,	Citation
+cite_051	Case 18-2868, Document 280, 08/09/2019, 2628232, Page1 of 74, accessed November 	Citation
+cite_052	Case 1:15-cv-07433-LAP Document 1330 Filed 01/05/24 Page 1 of 1 \- Public Intell	Citation
+cite_053	EXHIBIT D \- Newsweek, accessed November 12, 2025,	Citation
+cite_054	Giuffre-Exhibits.pdf \- Courthouse News Service, accessed November 12, 2025,	Citation
+cite_055	Maxwell-deposition-2016.pdf \- Courthouse News Service, accessed November 12, 20	Citation
+cite_056	exhibit 6 \- Public Intelligence, accessed November 12, 2025,	Citation
+cite_057	jeffrey-epstein-documents-full.pdf \- Newsweek, accessed November 12, 2025,	Citation
+cite_058	Jeffrey Epstein scandal: women with new identities run firms from ..., accessed 	Citation
+cite_059	Jeffrey Epstein's Secret "Black Books": Two Leaked Address Books \+ Epstein Isla	Citation
+cite_060	I Called Everyone in Jeffrey Epstein's Little Black Book \- Mother Jones, access	Citation
+cite_061	Video of Epstein v. Rothstein, et al. \- Trial \- 12/04/18 to 12/04/18 ..., acce	Citation
+cite_062	Bradley J. Edwards v. Jeffrey Epstein and Scott Rothstein \- Justia Law, accesse	Citation
+cite_063	Matter of Edwards \- New York State Unified Court System, accessed November 12, 	Citation
+cite_064	Wealthy Sex Offender Settles Suit, Averting Accusers' Testimony | Courthouse New	Citation
+cite_065	Relationship of Bill Clinton and Jeffrey Epstein \- Wikipedia, accessed November	Citation
+cite_066	Fresh Allegations Erupt Against Prince Andrew Over Thailand Trip Scandal | News9	Citation
+cite_067	Former Prince Andrew brought 40 prostitutes to hotel in Thailand ..., accessed N	Citation
+cite_068	Maison de L'Amitie \- Wikipedia, accessed November 12, 2025,	Citation
+cite_069	United States District Court Southern District of New York \- Courthouse News Se	Citation
+cite_070	What you need to know about the release of court records related to Jeffrey Epst	Citation
+cite_071	EPSTEIN V. BRUNEL, ET AL. :: 2019 :: Florida Third District Court of Appeal Deci	Citation
+cite_072	United States v. Epstein, 27 F. Supp. 2d 404 (S.D.N.Y. 1998\) \- Justia Law, acc	Citation
+cite_073	1 primary Jeffrey Edward Epstein b 1953 has one brother Mark, mother, Paula. Mem	Citation
+cite_074	Nadia Marcinko \- Wikipedia, accessed November 12, 2025,	Citation

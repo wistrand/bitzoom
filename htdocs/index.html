@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BitZoom — MinHash Aggregation</title>
+<link rel="stylesheet" href="bitzoom.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>BITZOOM</h1>
+    <div class="subtitle">MinHash · Rotation · Quantization · Aggregation</div>
+  </div>
+  <div class="zoom-controls">
+    <button class="reset-btn" id="loadNewBtn" style="display:none">Load</button>
+    <span class="zoom-label">Level</span>
+    <div class="zoom-stepper">
+      <button class="zoom-step-btn" id="zoomPrev">&#9664;</button>
+      <div class="zoom-current" id="zoomCurrent">L1</div>
+      <button class="zoom-step-btn" id="zoomNext">&#9654;</button>
+    </div>
+    <button class="reset-btn" id="resetBtn">↺</button>
+    <div class="nudge-control">
+      <span class="zoom-label">Topo α</span>
+      <input type="range" id="nudgeSlider" min="0" max="1" step="0.05" value="0">
+      <span class="nudge-val" id="nudgeVal">0</span>
+    </div>
+    <div class="nudge-control">
+      <span class="zoom-label">Size</span>
+      <div class="zoom-stepper">
+        <button class="zoom-step-btn" id="sizeByMembers" style="font-size:9px;width:auto;padding:0 6px" title="Size by member count">n</button>
+        <button class="zoom-step-btn" id="sizeByEdges" style="font-size:9px;width:auto;padding:0 6px" title="Size by edge count">e</button>
+      </div>
+    </div>
+    <div class="nudge-control">
+      <span class="zoom-label">Label</span>
+      <select id="labelSource" title="Label source property"></select>
+    </div>
+    <button class="reset-btn" id="heatmapBtn" title="Toggle heatmap">H</button>
+  </div>
+</header>
+
+<div id="loader-screen" class="loader-screen">
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-title">Load Graph</div>
+    <div class="drop-hint">Pick a dataset or drop your own .edges / .labels files</div>
+    <div class="dataset-list" id="datasetList"></div>
+    <div class="drop-hint" style="margin-top:16px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px">Or load from file</div>
+    <div class="file-input-row">
+      <label>.edges (required)
+        <input type="file" id="edgesFile" accept=".edges,.txt,.tsv">
+      </label>
+      <label>.labels (optional)
+        <input type="file" id="labelsFile" accept=".labels,.txt,.tsv">
+      </label>
+    </div>
+    <button class="load-btn" id="loadBtn" disabled>Load Graph</button>
+    <progress id="loadProgress" value="0" max="100" style="width:80%;height:4px;margin-top:12px;display:none"></progress>
+    <div class="load-status" id="loadStatus"></div>
+  </div>
+</div>
+
+<canvas id="canvas" style="display:none"></canvas>
+
+<div class="sidebar" id="sidebar">
+  <div>
+    <div class="panel-title">Overview</div>
+    <div id="overview-stats"></div>
+  </div>
+  <div>
+    <div class="panel-title">Cluster by</div>
+    <div class="preset-row" id="presetRow"></div>
+    <div id="weightSliders"></div>
+  </div>
+    <div class="algo-info" id="algo-info">
+      Click a node or supernode to inspect it. Zoom levels L0–L3 show increasingly fine MinHash bucket partitions.
+    </div>
+  </div>
+  <div>
+    <div class="panel-title">Hint</div>
+    <div class="hint">Drag to pan · Scroll to zoom canvas · Click node to inspect</div>
+  </div>
+</div>
+
+<div id="node-panel" class="node-panel">
+  <button class="node-panel-close" id="nodePanelClose">&times;</button>
+  <div id="node-detail"></div>
+</div>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<button class="sidebar-toggle" id="sidebarToggle">≡</button>
+<script type="module" src="bitzoom.js"></script>
+</body>
+</html>
