@@ -45,6 +45,13 @@ function rgba(r, g, b, a) {
   return s;
 }
 
+// ─── Deterministic edge sampling ─────────────────────────────────────────────
+// Hash edge index to [0,1) — stable across renders for the same edge set
+function edgeHash(i) {
+  let h = (i * 2654435761) >>> 0; // Knuth multiplicative hash
+  return (h & 0x7fffffff) / 0x80000000;
+}
+
 // ─── Size scaling ────────────────────────────────────────────────────────────
 
 function scaleSize(val, bz) {
@@ -208,7 +215,6 @@ function renderSupernodes(bz, pass) {
       const e = snEdges[i];
       const a = snMap[e.a], b = snMap[e.b];
       if (!a || !b) continue;
-      if ((hasSel && (selIds.has(e.a) || selIds.has(e.b))) || (hov !== null && (e.a === hov || e.b === hov))) continue;
       const pax = a.x * rz + bz.pan.x, pay = a.y * rz + bz.pan.y;
       const pbx = b.x * rz + bz.pan.x, pby = b.y * rz + bz.pan.y;
       const dx = pax - pbx, dy = pay - pby;
@@ -216,7 +222,7 @@ function renderSupernodes(bz, pass) {
       if (distSq > maxEdgeLenSq) continue;
       const dist = Math.sqrt(distSq);
       if (snSampleRate < 1) {
-        if (Math.random() > snSampleRate * (2 - dist / maxEdgeLen)) continue;
+        if (edgeHash(i) > snSampleRate * (2 - dist / maxEdgeLen)) continue;
       }
       if (++snDrawn > maxEdges) break;
       const distFade = dist <= fadeStart ? 1 : Math.max(0, 1 - (dist - fadeStart) / fadeRange);
@@ -383,7 +389,6 @@ function renderNodes(bz, pass) {
       const e = bz.edges[i];
       const a = bz.nodeIndexFull[e.src], b = bz.nodeIndexFull[e.dst];
       if (!a || !b) continue;
-      if ((hasSel && (selIds.has(e.src) || selIds.has(e.dst))) || (hov !== null && (e.src === hov || e.dst === hov))) continue;
       const pax = a.x * rz + bz.pan.x, pay = a.y * rz + bz.pan.y;
       const pbx = b.x * rz + bz.pan.x, pby = b.y * rz + bz.pan.y;
       const dx = pax - pbx, dy = pay - pby;
@@ -391,7 +396,7 @@ function renderNodes(bz, pass) {
       if (distSq > maxEdgeLenSq) continue;
       const dist = Math.sqrt(distSq);
       if (rawSampleRate < 1) {
-        if (Math.random() > rawSampleRate * (2 - dist / maxEdgeLen)) continue;
+        if (edgeHash(i) > rawSampleRate * (2 - dist / maxEdgeLen)) continue;
       }
       if (++rawDrawn > maxEdges) break;
       const distFade = dist <= fadeStart ? 1 : Math.max(0, 1 - (dist - fadeStart) / fadeRange);
