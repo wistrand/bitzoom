@@ -2,7 +2,13 @@
 
 A deterministic layout and hierarchical aggregation viewer for large property graphs. Nodes are positioned by property similarity using MinHash signatures and Gaussian projection, with stable zoom levels derived from stored uint16 grid coordinates via bit shifts.
 
-![BitZoom viewer showing MITRE ATT&CK dataset](https://img.shields.io/badge/datasets-9-blue) ![Tests](https://img.shields.io/badge/tests-45%20passing-green)
+![Datasets](https://img.shields.io/badge/datasets-9-blue) ![Tests](https://img.shields.io/badge/tests-45%20passing-green)
+
+<p align="center">
+  <img src="htdocs/images/bitzoom-1.png" width="48%" alt="BitZoom density heatmap with clustered supernodes">
+  <img src="htdocs/images/bitzoom-2.png" width="48%" alt="BitZoom zoomed in with node labels visible">
+</p>
+<p align="center"><em>Left: density heatmap showing property-based clusters. Right: zoomed in with individual node labels.</em></p>
 
 ## Key Ideas
 
