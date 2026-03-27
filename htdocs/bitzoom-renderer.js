@@ -101,7 +101,7 @@ export function screenToWorld(bz, sx, sy) {
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
 export function layoutAll(bz) {
-  const isRaw = bz.currentLevel === RAW_LEVEL - 1;
+  const isRaw = bz.currentLevel === RAW_LEVEL;
   const allNodes = isRaw ? bz.nodes : bz.getLevel(bz.currentLevel).supernodes;
   if (allNodes.length === 0) return;
 
@@ -171,7 +171,7 @@ export function render(bz) {
 
   // Layer order: edges → heatmap → hilited edges → circles → labels/counts
   setEdgeMode(bz.edgeMode);
-  const isRaw = bz.currentLevel === RAW_LEVEL - 1;
+  const isRaw = bz.currentLevel === RAW_LEVEL;
   const renderFn = isRaw ? renderNodes : renderSupernodes;
   if (bz.edgeMode !== 'none') renderFn(bz, 'edges');
   if (bz.heatmapMode === 'splat') renderHeatmapSplat(bz);
@@ -513,7 +513,7 @@ function renderHeatmapSplat(bz) {
   const ctx = bz.ctx;
   const W = bz.W, H = bz.H;
   const rz = bz.renderZoom;
-  const isRaw = bz.currentLevel === RAW_LEVEL - 1;
+  const isRaw = bz.currentLevel === RAW_LEVEL;
   const allNodes = isRaw ? bz.nodes : bz.getLevel(bz.currentLevel).supernodes;
 
   ctx.save();
@@ -575,7 +575,7 @@ function _densityCacheKey(bz) {
 function renderHeatmapDensity(bz) {
   const W = bz.W, H = bz.H;
   const rz = bz.renderZoom;
-  const isRaw = bz.currentLevel === RAW_LEVEL - 1;
+  const isRaw = bz.currentLevel === RAW_LEVEL;
   const allNodes = isRaw ? bz.nodes : bz.getLevel(bz.currentLevel).supernodes;
 
   const scale = 4;
@@ -706,7 +706,7 @@ function renderLegend(bz) {
   if (allEntries.length === 0) return;
 
   // Sort by frequency in current data
-  const isRaw = bz.currentLevel === RAW_LEVEL - 1;
+  const isRaw = bz.currentLevel === RAW_LEVEL;
   const allNodes = isRaw ? bz.nodes : bz.getLevel(bz.currentLevel).supernodes;
   const counts = {};
   for (const n of allNodes) {
@@ -798,7 +798,7 @@ export function hitTest(bz, sx, sy) {
   const wx = (sx - bz.pan.x) / rz;
   const wy = (sy - bz.pan.y) / rz;
 
-  if (bz.currentLevel === RAW_LEVEL - 1) {
+  if (bz.currentLevel === RAW_LEVEL) {
     const cellPxRaw = (Math.min(bz.W, bz.H) * rz) / 256;
     const rScreen = Math.max(8, Math.min(10, cellPxRaw * 0.42));
     const rWorld = (rScreen + 4) / rz;

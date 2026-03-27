@@ -26,10 +26,32 @@
     color: var(--text);
     font-family: 'Inter', sans-serif;
     line-height: 1.7;
-    max-width: 1100px;
-    margin: 0 auto;
+    max-width: 860px;
+    margin: 0 auto 0 max(24px, calc((100vw - 860px) / 2 + 80px));
     padding: 40px 24px 80px;
   }
+
+  .toc {
+    position: fixed;
+    left: max(8px, calc((100vw - 860px) / 2 + 80px - 170px));
+    top: 60px;
+    width: 150px;
+    font-size: 11px;
+    line-height: 1.4;
+    display: none;
+  }
+  @media (min-width: 1100px) { .toc { display: block; } }
+  @media (max-width: 1099px) { body { margin: 0 auto; } }
+  .toc a {
+    display: block;
+    padding: 3px 0 3px 10px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .toc a:hover { color: var(--text); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); }
 
   h1 {
     font-family: 'Syne', sans-serif;
@@ -174,12 +196,6 @@
     color: var(--text-dim);
   }
 
-  .back-link {
-    display: inline-block;
-    margin-bottom: 24px;
-    font-size: 13px;
-    color: var(--text-dim);
-  }
 
   table {
     width: 100%;
@@ -198,7 +214,23 @@
 </head>
 <body>
 
-<a href="/" class="back-link">&larr; Back to viewer</a>
+<nav class="toc" id="toc">
+  <a href="#problem">The Problem</a>
+  <a href="#pipeline">Pipeline</a>
+  <a href="#tokenize">1. Tokenize</a>
+  <a href="#minhash">2. MinHash</a>
+  <a href="#projection">3. Projection</a>
+  <a href="#blend">4. Blend</a>
+  <a href="#quantize">5. Quantize</a>
+  <a href="#zoom">6. Zoom</a>
+  <a href="#rendering">Rendering</a>
+  <a href="#heatmap">Heatmap</a>
+  <a href="#auto-level">Auto-Level</a>
+  <a href="#why">Why</a>
+  <a href="#complexity">Complexity</a>
+  <a href="#limitations">Limitations</a>
+  <a href="#code">Code</a>
+</nav>
 
 <h1>Bit<span>Zoom</span></h1>
 <p class="subtitle">Deterministic property-similarity layout with hierarchical bit-shift aggregation</p>
@@ -226,306 +258,36 @@
   <canvas id="demo-canvas" style="width:100%;height:400px;display:block;background:var(--bg)"></canvas>
 </div>
 
-<!-- Full pipeline overview SVG -->
-<div class="fig" style="margin-top:32px">
-<svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" style="min-height:500px">
-  <defs>
-    <marker id="ov-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7c6af7"/></marker>
-    <linearGradient id="fade-r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7c6af7" stop-opacity="0.5"/><stop offset="1" stop-color="#7c6af7" stop-opacity="0"/></linearGradient>
-  </defs>
+<h2 id="problem">The Problem</h2>
 
-  <!-- ── Step 1: Raw nodes with properties ── -->
-  <g transform="translate(20,20)">
-    <text x="55" y="0" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">1. NODES</text>
-    <!-- Node circles with property text -->
-    <circle cx="30" cy="40" r="16" fill="#f76a8c" opacity="0.7"/>
-    <text x="30" y="44" text-anchor="middle" fill="#fff" font-size="7" font-family="JetBrains Mono">web</text>
-    <circle cx="80" cy="35" r="14" fill="#f76a8c" opacity="0.7"/>
-    <text x="80" y="39" text-anchor="middle" fill="#fff" font-size="7" font-family="JetBrains Mono">web</text>
-    <circle cx="55" cy="75" r="12" fill="#6af7c8" opacity="0.7"/>
-    <text x="55" y="79" text-anchor="middle" fill="#111" font-size="7" font-family="JetBrains Mono">data</text>
-    <circle cx="25" cy="90" r="10" fill="#f7e06a" opacity="0.7"/>
-    <text x="25" y="94" text-anchor="middle" fill="#111" font-size="6" font-family="JetBrains Mono">ml</text>
-    <circle cx="85" cy="80" r="11" fill="#6af7c8" opacity="0.7"/>
-    <text x="85" y="84" text-anchor="middle" fill="#111" font-size="7" font-family="JetBrains Mono">data</text>
-    <!-- Edges -->
-    <line x1="30" y1="40" x2="80" y2="35" stroke="#555" stroke-width="0.8" opacity="0.4"/>
-    <line x1="30" y1="40" x2="55" y2="75" stroke="#555" stroke-width="0.8" opacity="0.4"/>
-    <line x1="55" y1="75" x2="85" y2="80" stroke="#555" stroke-width="0.8" opacity="0.4"/>
-    <line x1="80" y1="35" x2="85" y2="80" stroke="#555" stroke-width="0.8" opacity="0.4"/>
-  </g>
-
-  <!-- Arrow 1→2 -->
-  <path d="M 120 65 L 145 65" stroke="#7c6af7" stroke-width="1.5" fill="none" marker-end="url(#ov-arrow)"/>
-
-  <!-- ── Step 2: Tokenize ── -->
-  <g transform="translate(155,15)">
-    <text x="50" y="5" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">2. TOKENIZE</text>
-    <rect x="0" y="14" width="100" height="16" rx="3" fill="none" stroke="#f76a8c" stroke-width="1"/>
-    <text x="50" y="26" text-anchor="middle" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">group:web</text>
-    <rect x="0" y="34" width="100" height="16" rx="3" fill="none" stroke="#6af7c8" stroke-width="1"/>
-    <text x="50" y="46" text-anchor="middle" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">label:flask</text>
-    <rect x="0" y="54" width="100" height="16" rx="3" fill="none" stroke="#f7e06a" stroke-width="1"/>
-    <text x="50" y="66" text-anchor="middle" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">deg:4-7</text>
-    <rect x="0" y="74" width="100" height="16" rx="3" fill="none" stroke="#6ab4f7" stroke-width="1"/>
-    <text x="50" y="86" text-anchor="middle" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">ngroup:data</text>
-  </g>
-
-  <!-- Arrow 2→3 -->
-  <path d="M 265 65 L 290 65" stroke="#7c6af7" stroke-width="1.5" fill="none" marker-end="url(#ov-arrow)"/>
-
-  <!-- ── Step 3: MinHash ── -->
-  <g transform="translate(300,15)">
-    <text x="50" y="5" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">3. MINHASH</text>
-    <text x="50" y="20" text-anchor="middle" fill="#555568" font-family="Inter" font-size="8">k=128 signatures</text>
-    <!-- Signature bars -->
-    <g transform="translate(5,28)">
-      <rect x="0" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="7" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="14" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="21" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="28" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="35" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="42" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="49" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="56" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="63" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="70" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="77" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <text x="88" y="6" fill="#555568" font-family="JetBrains Mono" font-size="7">...</text>
-    </g>
-    <g transform="translate(5,40)">
-      <rect x="0" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="7" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="14" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="21" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="28" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="35" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="42" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="49" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="56" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="63" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="70" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="77" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <text x="88" y="6" fill="#555568" font-family="JetBrains Mono" font-size="7">...</text>
-    </g>
-    <g transform="translate(5,52)">
-      <rect x="0" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="7" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="14" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="21" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="28" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="35" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="42" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="49" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="56" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="63" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="70" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="77" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <text x="88" y="6" fill="#555568" font-family="JetBrains Mono" font-size="7">...</text>
-    </g>
-    <g transform="translate(5,64)">
-      <rect x="0" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="7" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="14" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="21" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="28" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="35" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <rect x="42" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="49" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="56" y="0" width="6" height="6" rx="1" fill="#7c6af7"/><rect x="63" y="0" width="6" height="6" rx="1" fill="#7c6af7"/>
-      <rect x="70" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/><rect x="77" y="0" width="6" height="6" rx="1" fill="#1e1e2e"/>
-      <text x="88" y="6" fill="#555568" font-family="JetBrains Mono" font-size="7">...</text>
-    </g>
-    <text x="50" y="86" text-anchor="middle" fill="#555568" font-family="Inter" font-size="8">one per property group</text>
-  </g>
-
-  <!-- Arrow 3→4 -->
-  <path d="M 410 65 L 435 65" stroke="#7c6af7" stroke-width="1.5" fill="none" marker-end="url(#ov-arrow)"/>
-
-  <!-- ── Step 4: Project to 2D ── -->
-  <g transform="translate(445,15)">
-    <text x="50" y="5" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">4. PROJECT 2D</text>
-    <text x="50" y="20" text-anchor="middle" fill="#555568" font-family="Inter" font-size="8">Gaussian random matrix</text>
-    <!-- 2D scatter per group -->
-    <rect x="5" y="25" width="90" height="70" rx="4" fill="#111118" stroke="#1e1e2e" stroke-width="0.8"/>
-    <circle cx="25" cy="42" r="3" fill="#f76a8c" opacity="0.9"/>
-    <circle cx="32" cy="48" r="3" fill="#f76a8c" opacity="0.9"/>
-    <circle cx="60" cy="65" r="3" fill="#6af7c8" opacity="0.9"/>
-    <circle cx="68" cy="72" r="3" fill="#6af7c8" opacity="0.9"/>
-    <circle cx="45" cy="82" r="3" fill="#f7e06a" opacity="0.9"/>
-    <!-- Axes -->
-    <line x1="10" y1="90" x2="90" y2="90" stroke="#333" stroke-width="0.5"/>
-    <line x1="10" y1="30" x2="10" y2="90" stroke="#333" stroke-width="0.5"/>
-    <text x="50" y="98" text-anchor="middle" fill="#555568" font-size="7">fixed anchors</text>
-  </g>
-
-  <!-- Arrow 4→5 (going down) -->
-  <path d="M 490 115 L 490 145" stroke="#7c6af7" stroke-width="1.5" fill="none" marker-end="url(#ov-arrow)"/>
-
-  <!-- ── Step 5: Blend (second row, right side) ── -->
-  <g transform="translate(420,155)">
-    <text x="75" y="0" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">5. BLEND</text>
-    <!-- Weight sliders -->
-    <g transform="translate(0,10)">
-      <text x="0" y="10" fill="#f76a8c" font-family="JetBrains Mono" font-size="8">group</text>
-      <rect x="40" y="4" width="60" height="4" rx="2" fill="#1e1e2e"/>
-      <rect x="40" y="4" width="45" height="4" rx="2" fill="#f76a8c" opacity="0.6"/>
-      <circle cx="85" cy="6" r="4" fill="#f76a8c"/>
-      <text x="110" y="10" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">3</text>
-    </g>
-    <g transform="translate(0,26)">
-      <text x="0" y="10" fill="#6af7c8" font-family="JetBrains Mono" font-size="8">label</text>
-      <rect x="40" y="4" width="60" height="4" rx="2" fill="#1e1e2e"/>
-      <rect x="40" y="4" width="15" height="4" rx="2" fill="#6af7c8" opacity="0.6"/>
-      <circle cx="55" cy="6" r="4" fill="#6af7c8"/>
-      <text x="110" y="10" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">1</text>
-    </g>
-    <g transform="translate(0,42)">
-      <text x="0" y="10" fill="#f7e06a" font-family="JetBrains Mono" font-size="8">struct</text>
-      <rect x="40" y="4" width="60" height="4" rx="2" fill="#1e1e2e"/>
-      <rect x="40" y="4" width="15" height="4" rx="2" fill="#f7e06a" opacity="0.6"/>
-      <circle cx="55" cy="6" r="4" fill="#f7e06a"/>
-      <text x="110" y="10" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">1</text>
-    </g>
-    <!-- Alpha -->
-    <g transform="translate(0,62)">
-      <text x="0" y="10" fill="#7c6af7" font-family="JetBrains Mono" font-size="8">topo &alpha;</text>
-      <rect x="40" y="4" width="60" height="4" rx="2" fill="#1e1e2e"/>
-      <rect x="40" y="4" width="0" height="4" rx="2" fill="#7c6af7"/>
-      <circle cx="40" cy="6" r="4" fill="#7c6af7"/>
-      <text x="110" y="10" fill="#c8c8d8" font-family="JetBrains Mono" font-size="8">0</text>
-    </g>
-    <text x="75" y="90" text-anchor="middle" fill="#555568" font-family="Inter" font-size="8">interactive &mdash; O(n)</text>
-  </g>
-
-  <!-- Arrow 5→6 (going left) -->
-  <path d="M 415 200 L 385 200" stroke="#7c6af7" stroke-width="1.5" fill="none" marker-end="url(#ov-arrow)"/>
-
-  <!-- ── Step 6: Quantize (second row, center) ── -->
-  <g transform="translate(220,155)">
-    <text x="75" y="0" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">6. QUANTIZE</text>
-    <text x="75" y="15" text-anchor="middle" fill="#555568" font-family="Inter" font-size="8">rank &rarr; uint16 (gx, gy)</text>
-    <!-- Grid with nodes -->
-    <rect x="10" y="22" width="130" height="75" rx="4" fill="#111118" stroke="#1e1e2e" stroke-width="0.8"/>
-    <!-- Grid lines -->
-    <g stroke="#1e1e2e" stroke-width="0.3">
-      <line x1="42" y1="22" x2="42" y2="97"/><line x1="75" y1="22" x2="75" y2="97"/>
-      <line x1="108" y1="22" x2="108" y2="97"/>
-      <line x1="10" y1="41" x2="140" y2="41"/><line x1="10" y1="60" x2="140" y2="60"/>
-      <line x1="10" y1="79" x2="140" y2="79"/>
-    </g>
-    <!-- Nodes snapped to grid -->
-    <circle cx="26" cy="32" r="4" fill="#f76a8c" opacity="0.9"/>
-    <circle cx="58" cy="32" r="4" fill="#f76a8c" opacity="0.9"/>
-    <circle cx="91" cy="50" r="4" fill="#6af7c8" opacity="0.9"/>
-    <circle cx="124" cy="50" r="4" fill="#6af7c8" opacity="0.9"/>
-    <circle cx="58" cy="70" r="4" fill="#f7e06a" opacity="0.9"/>
-  </g>
-
-  <!-- Arrow 6→7 (going left) -->
-  <path d="M 215 200 L 185 200" stroke="#7c6af7" stroke-width="1.5" fill="none" marker-end="url(#ov-arrow)"/>
-
-  <!-- ── Step 7: Bit-shift zoom (second row, left) ── -->
-  <g transform="translate(15,155)">
-    <text x="75" y="0" text-anchor="middle" fill="#8888a0" font-family="Syne" font-weight="700" font-size="10">7. BIT-SHIFT ZOOM</text>
-    <text x="75" y="15" text-anchor="middle" fill="#555568" font-family="Inter" font-size="8">gx &gt;&gt; (16 - L)</text>
-
-    <!-- L2: 4x4 -->
-    <rect x="5" y="22" width="64" height="64" rx="3" fill="#111118" stroke="#1e1e2e" stroke-width="0.8"/>
-    <line x1="21" y1="22" x2="21" y2="86" stroke="#1e1e2e" stroke-width="0.5"/>
-    <line x1="37" y1="22" x2="37" y2="86" stroke="#1e1e2e" stroke-width="0.5"/>
-    <line x1="53" y1="22" x2="53" y2="86" stroke="#1e1e2e" stroke-width="0.5"/>
-    <line x1="5" y1="38" x2="69" y2="38" stroke="#1e1e2e" stroke-width="0.5"/>
-    <line x1="5" y1="54" x2="69" y2="54" stroke="#1e1e2e" stroke-width="0.5"/>
-    <line x1="5" y1="70" x2="69" y2="70" stroke="#1e1e2e" stroke-width="0.5"/>
-    <!-- Supernodes -->
-    <circle cx="13" cy="30" r="7" fill="#f76a8c" opacity="0.7"/><text x="13" y="33" text-anchor="middle" fill="#fff" font-size="6">2</text>
-    <circle cx="45" cy="46" r="9" fill="#6af7c8" opacity="0.7"/><text x="45" y="49" text-anchor="middle" fill="#111" font-size="6">3</text>
-    <circle cx="29" cy="62" r="6" fill="#f7e06a" opacity="0.7"/><text x="29" y="65" text-anchor="middle" fill="#111" font-size="6">1</text>
-    <text x="37" y="96" text-anchor="middle" fill="#6af7c8" font-family="JetBrains Mono" font-size="8">L2: 4&times;4</text>
-
-    <!-- L4: 16x16 -->
-    <rect x="80" y="22" width="64" height="64" rx="3" fill="#111118" stroke="#1e1e2e" stroke-width="0.8"/>
-    <g stroke="#1e1e2e" stroke-width="0.2">
-      <line x1="84" y1="22" x2="84" y2="86"/><line x1="88" y1="22" x2="88" y2="86"/>
-      <line x1="92" y1="22" x2="92" y2="86"/><line x1="96" y1="22" x2="96" y2="86"/>
-      <line x1="100" y1="22" x2="100" y2="86"/><line x1="104" y1="22" x2="104" y2="86"/>
-      <line x1="108" y1="22" x2="108" y2="86"/><line x1="112" y1="22" x2="112" y2="86"/>
-      <line x1="116" y1="22" x2="116" y2="86"/><line x1="120" y1="22" x2="120" y2="86"/>
-      <line x1="124" y1="22" x2="124" y2="86"/><line x1="128" y1="22" x2="128" y2="86"/>
-      <line x1="132" y1="22" x2="132" y2="86"/><line x1="136" y1="22" x2="136" y2="86"/>
-      <line x1="140" y1="22" x2="140" y2="86"/>
-      <line x1="80" y1="26" x2="144" y2="26"/><line x1="80" y1="30" x2="144" y2="30"/>
-      <line x1="80" y1="34" x2="144" y2="34"/><line x1="80" y1="38" x2="144" y2="38"/>
-      <line x1="80" y1="42" x2="144" y2="42"/><line x1="80" y1="46" x2="144" y2="46"/>
-      <line x1="80" y1="50" x2="144" y2="50"/><line x1="80" y1="54" x2="144" y2="54"/>
-      <line x1="80" y1="58" x2="144" y2="58"/><line x1="80" y1="62" x2="144" y2="62"/>
-      <line x1="80" y1="66" x2="144" y2="66"/><line x1="80" y1="70" x2="144" y2="70"/>
-      <line x1="80" y1="74" x2="144" y2="74"/><line x1="80" y1="78" x2="144" y2="78"/>
-      <line x1="80" y1="82" x2="144" y2="82"/>
-    </g>
-    <!-- Smaller supernodes -->
-    <circle cx="86" cy="28" r="3" fill="#f76a8c" opacity="0.8"/>
-    <circle cx="90" cy="32" r="2.5" fill="#f76a8c" opacity="0.8"/>
-    <circle cx="104" cy="44" r="4" fill="#6af7c8" opacity="0.8"/>
-    <circle cx="108" cy="48" r="3" fill="#6af7c8" opacity="0.8"/>
-    <circle cx="100" cy="52" r="2" fill="#6af7c8" opacity="0.8"/>
-    <circle cx="92" cy="60" r="3" fill="#f7e06a" opacity="0.8"/>
-    <circle cx="120" cy="36" r="2" fill="#c86af7" opacity="0.8"/>
-    <circle cx="130" cy="70" r="3.5" fill="#6ab4f7" opacity="0.8"/>
-    <circle cx="134" cy="74" r="2" fill="#6ab4f7" opacity="0.8"/>
-    <text x="112" y="96" text-anchor="middle" fill="#6af7c8" font-family="JetBrains Mono" font-size="8">L4: 16&times;16</text>
-  </g>
-
-  <!-- Bottom banner: key properties -->
-  <g transform="translate(0,280)">
-    <rect x="20" y="0" width="720" height="120" rx="8" fill="rgba(124,106,247,0.06)" stroke="none"/>
-
-    <g transform="translate(40,20)">
-      <circle cx="12" cy="10" r="12" fill="#7c6af7"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-family="Syne" font-weight="800" font-size="11">1</text>
-      <text x="32" y="10" fill="#eeeef8" font-family="Inter" font-weight="600" font-size="12">Near-linear</text>
-      <text x="32" y="26" fill="#8888a0" font-family="Inter" font-size="10">O(n &times; k &times; G) preprocessing.</text>
-      <text x="32" y="40" fill="#8888a0" font-family="Inter" font-size="10">No O(n&sup2;) force simulation.</text>
-    </g>
-
-    <g transform="translate(230,20)">
-      <circle cx="12" cy="10" r="12" fill="#7c6af7"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-family="Syne" font-weight="800" font-size="11">2</text>
-      <text x="32" y="10" fill="#eeeef8" font-family="Inter" font-weight="600" font-size="12">Interactive weights</text>
-      <text x="32" y="26" fill="#8888a0" font-family="Inter" font-size="10">Change weights &rarr; O(n) blend.</text>
-      <text x="32" y="40" fill="#8888a0" font-family="Inter" font-size="10">No rehashing or reprojection.</text>
-    </g>
-
-    <g transform="translate(460,20)">
-      <circle cx="12" cy="10" r="12" fill="#7c6af7"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-family="Syne" font-weight="800" font-size="11">3</text>
-      <text x="32" y="10" fill="#eeeef8" font-family="Inter" font-weight="600" font-size="12">Instant zoom</text>
-      <text x="32" y="26" fill="#8888a0" font-family="Inter" font-size="10">14 levels from 4 bytes/node.</text>
-      <text x="32" y="40" fill="#8888a0" font-family="Inter" font-size="10">Bit shifts, not recomputation.</text>
-    </g>
-
-    <g transform="translate(140,72)">
-      <circle cx="12" cy="10" r="12" fill="#7c6af7"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-family="Syne" font-weight="800" font-size="11">4</text>
-      <text x="32" y="10" fill="#eeeef8" font-family="Inter" font-weight="600" font-size="12">Deterministic</text>
-      <text x="32" y="26" fill="#8888a0" font-family="Inter" font-size="10">Same data = same layout. Always.</text>
-    </g>
-
-    <g transform="translate(400,72)">
-      <circle cx="12" cy="10" r="12" fill="#7c6af7"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-family="Syne" font-weight="800" font-size="11">5</text>
-      <text x="32" y="10" fill="#eeeef8" font-family="Inter" font-weight="600" font-size="12">Property-first</text>
-      <text x="32" y="26" fill="#8888a0" font-family="Inter" font-size="10">Similarity by what nodes are,</text>
-      <text x="32" y="40" fill="#8888a0" font-family="Inter" font-size="10">not who they connect to.</text>
-    </g>
-  </g>
-</svg>
-<div class="fig-caption">The BitZoom pipeline: properties &rarr; tokens &rarr; MinHash signatures &rarr; 2D projection &rarr; weighted blend &rarr; grid quantization &rarr; hierarchical zoom via bit shifts.</div>
-</div>
-
-<h2>The Problem</h2>
-
-<p>Classical graph layout (force-directed, spectral) optimizes for <em>topological</em> fidelity &mdash; connected nodes should be near each other. For property graphs, this is often wrong. Semantically similar nodes frequently share no edge. A ransomware sample and another ransomware sample may never connect, but they should be <em>near</em> each other.</p>
+<p>Classical graph layout (<a href="https://en.wikipedia.org/wiki/Force-directed_graph_drawing">force-directed</a>, <a href="https://en.wikipedia.org/wiki/Spectral_layout">spectral</a>) optimizes for <em>topological</em> fidelity: connected nodes should be near each other. For property graphs, this is often wrong. Semantically similar nodes frequently share no edge. Two ransomware samples may never connect, but they should be <em>near</em> each other.</p>
 
 <p>BitZoom inverts the priority: <strong>property similarity first, topology second</strong>. Proximity means "these nodes have similar properties," not "these nodes are connected."</p>
 
-<h2>The Pipeline</h2>
+<h2 id="pipeline">The Pipeline</h2>
 
 <div class="pipeline">
   <span class="pipeline-step">Properties</span>
   <span class="pipeline-arrow">&rarr;</span>
   <span class="pipeline-step">Tokenize</span>
   <span class="pipeline-arrow">&rarr;</span>
-  <span class="pipeline-step">MinHash</span>
+  <span class="pipeline-step">MinHash (k=128)</span>
   <span class="pipeline-arrow">&rarr;</span>
-  <span class="pipeline-step">Project 2D</span>
+  <span class="pipeline-step">z-norm + Project 2D</span>
   <span class="pipeline-arrow">&rarr;</span>
-  <span class="pipeline-step">Blend</span>
+  <span class="pipeline-step">Weighted blend + &alpha;</span>
   <span class="pipeline-arrow">&rarr;</span>
-  <span class="pipeline-step">Quantize</span>
+  <span class="pipeline-step">&Phi;(z) quantize</span>
   <span class="pipeline-arrow">&rarr;</span>
-  <span class="pipeline-step">Bit-shift zoom</span>
+  <span class="pipeline-step">gx &gt;&gt; (16-L)</span>
 </div>
 
-<!-- Step 1: Tokenization -->
-<h2>Step 1: Tokenization</h2>
+<p>Steps 1&ndash;3 run once at load. Steps 4&ndash;5 rerun on weight or &alpha; change. Step 6 is O(1) per node on zoom.</p>
 
-<p>Each node's properties are converted into <em>token sets</em>, partitioned by independent property groups. This separation is key &mdash; it enables interactive weight adjustment later.</p>
+<!-- Step 1: Tokenization -->
+<h2 id="tokenize">Step 1: Tokenization</h2>
+
+<p>Each node's properties are converted into <em>token sets</em>, partitioned by independent property groups. This separation is key: it enables interactive weight adjustment later.</p>
 
 <div class="fig">
 <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg">
@@ -559,21 +321,28 @@
   <text x="290" y="160" fill="#6ab4f7" font-family="JetBrains Mono" font-size="9">STRUCTURE</text>
   <text x="290" y="178" fill="#c8c8d8" font-family="JetBrains Mono" font-size="11">deg:32+ leaf:false</text>
 
-  <!-- Note about numeric -->
-  <rect x="490" y="15" width="190" height="60" rx="5" fill="rgba(124,106,247,0.08)" stroke="none"/>
-  <text x="500" y="35" fill="#8888a0" font-family="Inter" font-size="11">Numeric: 3 resolution</text>
-  <text x="500" y="50" fill="#8888a0" font-family="Inter" font-size="11">tokens (coarse/med/fine)</text>
-  <text x="500" y="67" fill="#8888a0" font-family="Inter" font-size="11">Empty: 0 tokens (neutral)</text>
+  <!-- Numeric example: degree=47, range [0,100] -->
+  <rect x="490" y="15" width="195" height="110" rx="5" fill="rgba(124,106,247,0.08)" stroke="none"/>
+  <text x="500" y="33" fill="#eeeef8" font-family="JetBrains Mono" font-size="9">NUMERIC (degree: 47)</text>
+  <text x="500" y="50" fill="#c8c8d8" font-family="JetBrains Mono" font-size="9">c:40-60</text>
+  <text x="580" y="50" fill="#555568" font-family="Inter" font-size="9">coarse (5 bins)</text>
+  <text x="500" y="65" fill="#c8c8d8" font-family="JetBrains Mono" font-size="9">m:46-48</text>
+  <text x="580" y="65" fill="#555568" font-family="Inter" font-size="9">medium (50 bins)</text>
+  <text x="500" y="80" fill="#c8c8d8" font-family="JetBrains Mono" font-size="9">f:46.8-47.0</text>
+  <text x="600" y="80" fill="#555568" font-family="Inter" font-size="9">fine (500)</text>
+  <line x1="500" y1="90" x2="675" y2="90" stroke="#1e1e2e" stroke-width="0.5"/>
+  <text x="500" y="105" fill="#8888a0" font-family="Inter" font-size="9">Nearby values share coarse tokens.</text>
+  <text x="500" y="118" fill="#8888a0" font-family="Inter" font-size="9">Empty fields: 0 tokens (neutral).</text>
 </svg>
 <div class="fig-caption">Properties are tokenized into independent groups. Each group gets its own MinHash signature.</div>
 </div>
 
-<p>Numeric properties receive <strong>multi-resolution tokenization</strong>: three tokens at coarse (5 bins), medium (50 bins), and fine (500 bins) resolution. Nearby values share coarse tokens, producing smooth Jaccard similarity. Empty or undefined values emit zero tokens &mdash; resulting in a neutral projection rather than false clustering with other missing-data nodes.</p>
+<p>Numeric properties receive <strong>multi-resolution tokenization</strong>: three tokens at coarse (5 bins), medium (50 bins), and fine (500 bins) resolution. Nearby values share coarse tokens, producing smooth <a href="https://en.wikipedia.org/wiki/Jaccard_index">Jaccard</a> similarity. Empty or undefined values emit zero tokens, resulting in a neutral projection rather than false clustering with other missing-data nodes.</p>
 
 <!-- Step 2: MinHash -->
-<h2>Step 2: MinHash Signatures</h2>
+<h2 id="minhash">Step 2: MinHash Signatures</h2>
 
-<p>For each property group, the token set is hashed into a <em>MinHash signature</em> of length k=128 using universal hashing. The probability that two nodes share a hash minimum equals their Jaccard similarity:</p>
+<p>For each property group, the token set is hashed into a <a href="https://en.wikipedia.org/wiki/MinHash"><em>MinHash</em></a> signature of length k=128 using <a href="https://en.wikipedia.org/wiki/Universal_hashing">universal hashing</a>. The probability that two nodes share a hash minimum equals their <a href="https://en.wikipedia.org/wiki/Jaccard_index">Jaccard similarity</a>:</p>
 
 <div class="math-block">
 <math display="block">
@@ -639,9 +408,9 @@
 </div>
 
 <!-- Step 3: Projection -->
-<h2>Step 3: Gaussian Random Projection</h2>
+<h2 id="projection">Step 3: Gaussian Random Projection</h2>
 
-<p>Each 128-dimensional signature is projected to 2D via a fixed Gaussian random matrix <strong>R</strong> &isin; &reals;<sup>2&times;128</sup>. Each property group uses an independently seeded matrix:</p>
+<p>Each 128-dimensional signature is <strong>z-score normalized</strong> (subtract mean, divide by standard deviation) then projected to 2D via a fixed <a href="https://en.wikipedia.org/wiki/Random_projection">Gaussian random matrix</a> <strong>R</strong> &isin; &reals;<sup>2&times;128</sup>. Each property group uses an independently seeded matrix:</p>
 
 <div class="math-block">
 <math display="block">
@@ -653,16 +422,18 @@
     <mo>=</mo>
     <mi mathvariant="bold">R</mi>
     <mo>&sdot;</mo>
-    <mtext>normalize</mtext><mo>(</mo><mi>sig</mi><mo>)</mo>
+    <mtext>zscore</mtext><mo>(</mo><mi>sig</mi><mo>)</mo>
   </mrow>
 </math>
 </div>
+
+<p>Z-score normalization is essential: MinHash values are integers in [0, 2<sup>31</sup>) with a large common offset. Without normalization, the projection is dominated by this offset and all nodes project to nearly the same point. Normalization extracts the discriminative signal and scales it to unit magnitude.</p>
 
 <p>These per-group 2D projections are <strong>computed once and stored permanently</strong>. No weight change or parameter adjustment ever alters them. They are the fixed anchors for everything that follows.</p>
 
 <h3>Why does projecting 128D &rarr; 2D work?</h3>
 
-<p>It shouldn't &mdash; in the strict mathematical sense. Johnson-Lindenstrauss guarantees distance preservation only for target dimension O(log n / &epsilon;&sup2;), far more than 2. But BitZoom doesn't need distance preservation. It needs <strong>ordering preservation</strong>: if A is more similar to B than to C in 128D, then A should be closer to B than to C in 2D, <em>most of the time</em>.</p>
+<p>It shouldn't, in the strict mathematical sense. The <a href="https://en.wikipedia.org/wiki/Johnson%E2%80%93Lindenstrauss_lemma">Johnson-Lindenstrauss lemma</a> guarantees distance preservation only for target dimension O(log n / &epsilon;&sup2;), far more than 2. But BitZoom doesn't need distance preservation. It needs <strong>ordering preservation</strong>: if A is more similar to B than to C in 128D, then A should be closer to B than to C in 2D, <em>most of the time</em>.</p>
 
 <div class="fig">
 <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg">
@@ -788,17 +559,17 @@
     </g>
   </g>
 </svg>
-<div class="fig-caption">Similar MinHash signatures (high Jaccard) produce correlated 128D vectors, which project to nearby 2D points. Dissimilar signatures produce uncorrelated vectors that land far apart. The projection preserves the ordering: "more similar = closer" holds statistically, even though exact distances are not preserved.</div>
+<div class="fig-caption">In practice, similar MinHash signatures tend to produce correlated z-normalized vectors, which a fixed random projection places nearer in 2D. Dissimilar signatures tend to land far apart. This is a useful heuristic, not a formal guarantee.</div>
 </div>
 
 <div class="note">
-  This is an <em>empirical observation</em>, not a theorem. It works because MinHash signatures with high Jaccard overlap share most hash values, making their z-normalized vectors point in similar directions. The Gaussian random matrix then preserves the angular relationship. For BitZoom's purposes &mdash; rank-based quantization into grid cells &mdash; preserving the <em>ordering</em> of similarities is sufficient. We don't need exact distances.
+  This is an <em>empirical heuristic</em>, not a theorem. MinHash signatures with high Jaccard overlap share most hash values, so their z-normalized vectors tend to be correlated. The fixed random projection tends to place correlated vectors nearer in 2D. For BitZoom's purposes (quantization into grid cells), a stable ordering signal is sufficient. Exact distance preservation is not needed and not provided.
 </div>
 
 <!-- Step 4: Blend -->
-<h2>Step 4: Unified Blend</h2>
+<h2 id="blend">Step 4: Unified Blend</h2>
 
-<p>The final position is a weighted combination of per-group anchors plus an optional topology signal:</p>
+<p>The final position is a weighted combination of per-group anchors plus an optional <a href="https://en.wikipedia.org/wiki/Laplacian_smoothing">topology smoothing</a> signal:</p>
 
 <div class="math-block">
 <math display="block">
@@ -870,24 +641,26 @@
 <div class="fig-caption">The &alpha; parameter controls the balance between property similarity and topology. High &alpha; causes oversmoothing.</div>
 </div>
 
-<p>Because the blend is a <strong>convex combination of fixed anchors</strong>, changing a weight smoothly moves nodes along predictable paths. No rehashing, no reprojection &mdash; just arithmetic.</p>
+<p>Because the blend is a <strong>convex combination of fixed anchors</strong>, changing a weight smoothly moves nodes along predictable paths. No rehashing, no reprojection. Just arithmetic.</p>
 
 <!-- Synthetic demo: property clustering + topology -->
 <div style="display:flex;gap:12px;margin:24px 0;flex-wrap:wrap">
   <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Property only (&alpha;=0) &mdash; clusters by role</div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Property only (&alpha;=0). Clusters by role</div>
     <canvas id="synth-prop" style="width:100%;height:240px;display:block;background:var(--bg)"></canvas>
   </div>
   <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">With topology (&alpha;=0.6) &mdash; connected nodes pull together</div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">With topology (&alpha;=0.75). Connected nodes pull together</div>
     <canvas id="synth-topo" style="width:100%;height:240px;display:block;background:var(--bg)"></canvas>
   </div>
 </div>
 
 <!-- Step 5: Quantization -->
-<h2>Step 5: Rank Quantization</h2>
+<h2 id="quantize">Step 5: Grid Quantization</h2>
 
-<p>Continuous positions are quantized to <strong>uint16 grid coordinates</strong> (65536 &times; 65536) via rank ordering. Each node's rank determines its grid position:</p>
+<p>Continuous positions are quantized to <strong>uint16 grid coordinates</strong> (65536 &times; 65536). Two modes are available:</p>
+
+<p><strong>Gaussian (default)</strong>: maps through <a href="https://en.wikipedia.org/wiki/Normal_distribution#Cumulative_distribution_function">&Phi;(z)</a> using fixed boundaries (&mu;, &sigma;) computed once from the initial blend. This is a reasonable fit when projected coordinates are roughly bell-shaped (as Gaussian random projection tends to produce via the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">Central Limit Theorem</a>), but it is an approximation, not a guaranteed model. Post-blend distributions can be multimodal or skewed, especially at high &alpha; or with dominant weights. The boundaries are fixed across weight changes; only the node positions shift.</p>
 
 <div class="math-block">
 <math display="block">
@@ -895,10 +668,13 @@
     <mi>gx</mi>
     <mo>=</mo>
     <mo>&lfloor;</mo>
+    <mi>&Phi;</mi>
+    <mo>(</mo>
     <mfrac>
-      <mrow><mi>rank</mi><mo>(</mo><mi>i</mi><mo>)</mo></mrow>
-      <mi>n</mi>
+      <mrow><msub><mi>px</mi><mi>i</mi></msub><mo>&minus;</mo><mi>&mu;</mi></mrow>
+      <mi>&sigma;</mi>
     </mfrac>
+    <mo>)</mo>
     <mo>&times;</mo>
     <mn>65536</mn>
     <mo>&rfloor;</mo>
@@ -906,10 +682,12 @@
 </math>
 </div>
 
-<p>This guarantees <strong>equal occupancy</strong> per grid bucket regardless of the position distribution. The output is 4 bytes per node: two uint16 values (gx, gy).</p>
+<p><strong>Rank</strong>: sorts all nodes by blended position and assigns grid coordinates by rank. Guarantees equal occupancy per bucket but destroys density information.</p>
+
+<p>Either way, the output is 4 bytes per node: two uint16 values (gx, gy).</p>
 
 <!-- Step 6: Zoom -->
-<h2>Step 6: Bit-Shift Zoom Hierarchy</h2>
+<h2 id="zoom">Step 6: Bit-Shift Zoom Hierarchy</h2>
 
 <p>This is the key trick. All 14 zoom levels derive from the stored uint16 coordinates via <strong>bit shifts</strong>:</p>
 
@@ -1072,7 +850,7 @@
 <!-- Synthetic demo: zoom hierarchy -->
 <div style="margin:24px 0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
   <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Zoom hierarchy &mdash; arrow keys or scroll to change level</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Zoom hierarchy. Arrow keys or scroll to change level</span>
   </div>
   <canvas id="synth-zoom" style="width:100%;height:280px;display:block;background:var(--bg)"></canvas>
 </div>
@@ -1081,7 +859,7 @@
 <!-- RENDERING SECTION -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<h2>Rendering Pipeline</h2>
+<h2 id="rendering">Rendering Pipeline</h2>
 
 <p>BitZoom renders in <strong>five layers</strong>, back to front. This ordering ensures that edges never obscure nodes, heatmaps provide context without hiding structure, and highlighted connections are always visible.</p>
 
@@ -1124,7 +902,7 @@
     <rect x="0" y="0" width="660" height="40" rx="6" fill="#111118" stroke="#1e1e2e" stroke-width="1" filter="url(#shadow)"/>
     <text x="16" y="14" fill="#7c6af7" font-family="Syne" font-weight="700" font-size="10">3</text>
     <text x="32" y="14" fill="#eeeef8" font-family="Inter" font-weight="600" font-size="11">Highlighted Edges</text>
-    <text x="32" y="30" fill="#8888a0" font-family="Inter" font-size="10">Selected/hovered node connections. No distance filter &mdash; always visible above heatmap.</text>
+    <text x="32" y="30" fill="#8888a0" font-family="Inter" font-size="10">Selected/hovered node connections. No distance filter. Always visible above heatmap.</text>
     <g transform="translate(500,5)">
       <path d="M 0 15 C 20 2, 50 2, 70 15" stroke="#b4b4dc" stroke-width="1.5" fill="none" opacity="0.5"/>
       <path d="M 30 20 C 50 5, 90 5, 110 20" stroke="#b4b4dc" stroke-width="1.5" fill="none" opacity="0.5"/>
@@ -1168,7 +946,7 @@
 <!-- HEATMAP SECTION -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<h2>Heatmap Visualization</h2>
+<h2 id="heatmap">Heatmap Visualization</h2>
 
 <p>Two heatmap modes reveal cluster density and color distribution at a glance, without requiring individual node inspection.</p>
 
@@ -1348,7 +1126,7 @@
 <!-- ZOOM SECTION -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<h2>Seamless Zoom &amp; Auto-Level</h2>
+<h2 id="auto-level">Seamless Zoom &amp; Auto-Level</h2>
 
 <p>BitZoom maintains a <strong>logical zoom</strong> that can exceed the 1:1 grid scale. When logical zoom crosses a threshold, the aggregation level changes automatically while the visual scale stays continuous.</p>
 
@@ -1422,7 +1200,7 @@
   <rect x="40" y="200" width="680" height="65" rx="8" fill="rgba(124,106,247,0.06)" stroke="none"/>
   <text x="380" y="222" text-anchor="middle" fill="#eeeef8" font-family="Syne" font-weight="700" font-size="11">Visual scale is continuous</text>
   <text x="380" y="242" text-anchor="middle" fill="#8888a0" font-family="Inter" font-size="11">renderZoom = max(1, zoom &times; 2<tspan baseline-shift="super" font-size="8">level &minus; base</tspan>)</text>
-  <text x="380" y="258" text-anchor="middle" fill="#8888a0" font-family="Inter" font-size="10">Level UP halves zoom, but the exponent increases &mdash; renderZoom stays the same. No visual jump.</text>
+  <text x="380" y="258" text-anchor="middle" fill="#8888a0" font-family="Inter" font-size="10">Level UP halves zoom, but the exponent increases, so renderZoom stays the same. No visual jump.</text>
 </svg>
 <div class="fig-caption">The 4&times; hysteresis gap (0.5&times; to 2&times;) prevents oscillation. renderZoom compensates for level offset, keeping the visual scale perfectly continuous across transitions.</div>
 </div>
@@ -1495,7 +1273,7 @@
 <div class="fig-caption">Density-adaptive rendering: zoomed out shows only opacity-scaled circles. Zooming in progressively reveals counts, then full labels.</div>
 </div>
 
-<h2>Why This Matters</h2>
+<h2 id="why">Why This Matters</h2>
 
 <div class="step">
   <span class="step-num">1</span>
@@ -1504,7 +1282,7 @@
 
 <div class="step">
   <span class="step-num">2</span>
-  <div class="step-content"><strong>Interactive weight tuning.</strong> Changing a property weight moves nodes smoothly &mdash; no rehashing, no reprojection. Just a weighted average of fixed 2D anchors: O(n).</div>
+  <div class="step-content"><strong>Interactive weight tuning.</strong> Changing a property weight moves nodes smoothly. No rehashing, no reprojection. Anchor recomputation is O(n &times; G); topology smoothing adds O(passes &times; (n + |E|)) when &alpha; &gt; 0.</div>
 </div>
 
 <div class="step">
@@ -1517,47 +1295,59 @@
   <div class="step-content"><strong>Deterministic.</strong> Same data + same parameters = same layout. Every time. No random initialization, no convergence sensitivity.</div>
 </div>
 
-<h2>Complexity</h2>
+<h2 id="complexity">Complexity</h2>
 
 <table>
   <tr><th>Phase</th><th>Cost</th></tr>
   <tr><td>Tokenization</td><td>O(n &times; T)</td></tr>
   <tr><td>MinHash signatures</td><td>O(n &times; k &times; G &times; T)</td></tr>
   <tr><td>Gaussian projection</td><td>O(n &times; k &times; G)</td></tr>
-  <tr><td>Unified blend</td><td>O(passes &times; (n + |E|) &times; G)</td></tr>
-  <tr><td>Rank quantization</td><td>O(n log n)</td></tr>
+  <tr><td>Anchor recomputation</td><td>O(n &times; G)</td></tr>
+  <tr><td>Topology smoothing</td><td>O(passes &times; (n + |E|))</td></tr>
+  <tr><td>Quantization (rank)</td><td>O(n log n)</td></tr>
+  <tr><td>Quantization (Gaussian)</td><td>O(n)</td></tr>
   <tr><td>Level construction</td><td>O(n + |E|) per level, lazy</td></tr>
   <tr><td>Zoom-cell derivation</td><td><strong>O(1)</strong> per node</td></tr>
-  <tr><td>Weight change</td><td>O(passes &times; (n + |E|) &times; G) &mdash; no re-projection</td></tr>
+  <tr><td>Weight change</td><td>O(n &times; G + passes &times; (n + |E|)), no re-projection</td></tr>
 </table>
 
 <p>Where n = nodes, |E| = edges, k = 128 (MinHash length), G = property groups, T = avg tokens per node, passes = blend iterations (default 5).</p>
 
-<h2>Known Limitations</h2>
+<h2 id="limitations">Known Limitations</h2>
 
 <p><strong>Jaccard on tokens is crude</strong> for continuous or ordinal data. Multi-resolution tokenization helps but doesn't eliminate bin sensitivity.</p>
 
 <p><strong>2D projection doesn't preserve distances.</strong> Layout reflects coarse ordering, not metric geometry.</p>
 
-<p><strong>Quantization tradeoffs.</strong> Rank quantization destroys density (uniform occupancy by design). Gaussian quantization preserves density but uses fixed boundaries from the initial blend &mdash; large weight changes can shift the distribution beyond the stored &mu;/&sigma;, pushing nodes to grid extremes.</p>
+<p><strong>Quantization tradeoffs.</strong> Rank quantization destroys density (uniform occupancy by design). Gaussian quantization preserves density but uses fixed boundaries from the initial blend. Large weight changes can shift the distribution beyond the stored &mu;/&sigma;, pushing nodes to grid extremes.</p>
 
-<p><strong>Undefined values with high weight</strong> cause degenerate clustering. Empty fields project to a neutral (0,0) point. When that property group dominates, all undefined nodes share the same pre-quantization position. Neither quantization scheme can decorrelate axes that are correlated in the input &mdash; the result is visible edge pile-up.</p>
+<p><strong>Undefined values with high weight</strong> cause degenerate clustering. Empty fields project to a neutral (0,0) point. When that property group dominates, all undefined nodes share the same pre-quantization position. Neither quantization scheme can decorrelate axes that are correlated in the input, and the result is visible edge pile-up.</p>
 
-<p><strong>Oversmoothing</strong> at high &alpha; with many passes &mdash; well-connected components collapse toward their centroid. At &alpha;=1, both axes are driven by the same graph operator, producing a diagonal layout.</p>
+<p><strong>Oversmoothing</strong> at high &alpha; with many passes. Well-connected components collapse toward their centroid. At high &alpha;, both axes are increasingly driven by the same smoothing operator, which can produce poorly separated, low-variance structure.</p>
 
 <div class="note">
   The individual components (MinHash, random projection, hierarchical grids, graph smoothing) are all established techniques. The contribution is their combination into a pipeline where each stage's output feeds naturally into the next, and where the stored intermediate representations support both efficient navigation and interactive parameter exploration.
 </div>
 
-<p style="margin-top:48px;color:var(--text-dim);font-size:13px;text-align:center;">
-  <a href="/">Try BitZoom</a> &middot; <a href="https://github.com">Source on GitHub</a>
-</p>
+<h2 id="code">Code</h2>
+
+<table>
+  <tr><th>File</th><th>Role</th></tr>
+  <tr><td><a href="/">Interactive viewer</a></td><td>Load datasets, adjust weights, explore zoom levels</td></tr>
+  <tr><td><a href="bitzoom-algo.js"><code>bitzoom-algo.js</code></a></td><td>Pure algorithm functions: MinHash, projection, blend, quantization, level building</td></tr>
+  <tr><td><a href="bitzoom-pipeline.js"><code>bitzoom-pipeline.js</code></a></td><td>SNAP parsers, graph building, tokenization, full projection pipeline</td></tr>
+  <tr><td><a href="bitzoom-canvas.js"><code>bitzoom-canvas.js</code></a></td><td>Standalone embeddable component: canvas, interaction, rendering</td></tr>
+  <tr><td><a href="bitzoom.js"><code>bitzoom.js</code></a></td><td>Application shell: UI, workers, data loading, detail panel, URL state</td></tr>
+  <tr><td><a href="bitzoom-renderer.js"><code>bitzoom-renderer.js</code></a></td><td>5-layer canvas rendering, heatmaps, edge sampling, hit testing</td></tr>
+  <tr><td><a href="bitzoom-worker.js"><code>bitzoom-worker.js</code></a></td><td>Web Worker coordinator, fans out to projection sub-workers</td></tr>
+  <tr><td><a href="https://github.com/wistrand/bitzoom">GitHub</a></td><td>Source, datasets, tests, SNAP converters</td></tr>
+</table>
 
 <script type="module">
 import { createBitZoomView } from './bitzoom-canvas.js';
 
 const DEMO_PRESETS = {
-  'epstein':        { initialLevel: 4, weights: { group: 8, edgetype: 4 }, labelProps: ['label'] },
+  'epstein':        { initialLevel: 2, weights: { group: 8, edgetype: 4 }, labelProps: ['label'] },
   'data-graph-file':{ initialLevel: 3, weights: {} },
   'bitzoom-source': { initialLevel: 4, weights: { kind: 8, group: 3 }, labelProps: ['file', 'kind'] },
   'mitre-attack':   { initialLevel: 4, weights: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'], quantMode: 'rank', edgeMode: 'none' },
@@ -1648,9 +1438,9 @@ createBitZoomView(document.getElementById('synth-prop'), synthEdges, synthLabels
   weights: { group: 8, Lang: 3 },
 });
 
-// Topology view (α=0.6)
+// Topology view (α=0.75)
 createBitZoomView(document.getElementById('synth-topo'), synthEdges, synthLabels, {
-  initialLevel: 3, edgeMode: 'lines', showLegend: true, showResetBtn: true, smoothAlpha: 0.6,
+  initialLevel: 3, edgeMode: 'curves', showLegend: true, showResetBtn: true, smoothAlpha: 0.75,
   weights: { group: 8, Lang: 3 },
 });
 
@@ -1659,6 +1449,19 @@ createBitZoomView(document.getElementById('synth-zoom'), synthEdges, synthLabels
   initialLevel: 1, edgeMode: 'lines', showLegend: true, showResetBtn: true, smoothAlpha: 0,
   weights: { group: 8, Lang: 3 },
 });
+
+// ─── TOC scroll sync ─────────────────────────────────────────────────────
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = Array.from(tocLinks).map(a => document.getElementById(a.getAttribute('href').slice(1)));
+function updateToc() {
+  let active = sections[0];
+  for (const s of sections) {
+    if (s && s.getBoundingClientRect().top <= 80) active = s;
+  }
+  tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + active?.id));
+}
+window.addEventListener('scroll', updateToc, { passive: true });
+updateToc();
 </script>
 
 </body>

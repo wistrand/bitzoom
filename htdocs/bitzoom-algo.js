@@ -16,7 +16,7 @@ export const LARGE_PRIME = 2147483647;
 export const GRID_BITS = 16;
 export const GRID_SIZE = 1 << GRID_BITS; // 65536
 export const ZOOM_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-export const RAW_LEVEL = 15;
+export const RAW_LEVEL = 14; // index into LEVEL_LABELS for the raw (individual node) level
 export const LEVEL_LABELS = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11','L12','L13','L14','RAW'];
 
 // ─── PRNG ────────────────────────────────────────────────────────────────────
@@ -336,16 +336,17 @@ export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjLis
 // colorValFn(node) → string, labelValFn(node) → string
 // These are called once per member at build time, cached on the supernode.
 export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, labelValFn, colorLookup) {
-  const bucketMap = {};
+  const bucketMap = new Map();
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
     const bid = cellIdAtLevel(n.gx, n.gy, level);
-    if (!bucketMap[bid]) bucketMap[bid] = [];
-    bucketMap[bid].push(n);
+    let bucket = bucketMap.get(bid);
+    if (!bucket) { bucket = []; bucketMap.set(bid, bucket); }
+    bucket.push(n);
   }
 
-  const supernodes = Object.entries(bucketMap).map(([bidStr, members]) => {
-    const bid = parseInt(bidStr);
+  const supernodes = [];
+  for (const [bid, members] of bucketMap) {
     const cx = bid >> level;
     const cy = bid & ((1 << level) - 1);
 
@@ -381,9 +382,9 @@ export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, label
     const cachedColor = colorLookup ? (colorLookup(cachedColorVal) || '#888888') : '#888888';
     const cachedLabel = labelValFn ? maxCountKey(labelCounts) : repName;
 
-    return { bid, members, ax, ay, domGroup, avgDegree, totalDegree, repName,
-             cachedColorVal, cachedColor, cachedLabel, x:0, y:0, cx, cy };
-  });
+    supernodes.push({ bid, members, ax, ay, domGroup, avgDegree, totalDegree, repName,
+             cachedColorVal, cachedColor, cachedLabel, x:0, y:0, cx, cy });
+  }
 
   // #10: Build supernode edges using string keys to avoid numeric overflow.
   // At level 14, bid can reach 2^28 — numeric packing overflows at level > 10.
@@ -407,8 +408,8 @@ export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, label
   let idx = 0;
   for (const [key, weight] of snEdgeMap) {
     const comma = key.indexOf(',');
-    const lo = parseInt(key.slice(0, comma));
-    const hi = parseInt(key.slice(comma + 1));
+    const lo = parseInt(key.slice(0, comma), 10);
+    const hi = parseInt(key.slice(comma + 1), 10);
     snEdges[idx++] = {a: lo, b: hi, weight};
   }
 

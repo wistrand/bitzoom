@@ -69,7 +69,7 @@ No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`
 
 Pure functions, no DOM. Single source of truth for MinHash/projection.
 
-- **Constants**: `MINHASH_K=128`, `GRID_BITS=16`, `GRID_SIZE=65536`, `ZOOM_LEVELS[1..14]`, `RAW_LEVEL=15`, `LEVEL_LABELS`
+- **Constants**: `MINHASH_K=128`, `GRID_BITS=16`, `GRID_SIZE=65536`, `ZOOM_LEVELS[1..14]`, `RAW_LEVEL=14`, `LEVEL_LABELS`
 - **MinHash** (GC-optimized): `HASH_PARAMS_A/B` (Int32Array), `computeMinHashInto` → reusable `_sig` Float64Array (NaN sentinel for empty tokens), `computeMinHash` (allocating wrapper). Universal hash via multi-word modular multiply (`hashSlot`) — no 32-bit truncation.
 - **Projection** (GC-optimized): `projectInto(sig, ROT, buf, offset)` → writes to buffer, `projectWith` (convenience wrapper returning `[px, py]`). NaN sentinel check: `sig[0] !== sig[0]`.
 - **Blend**: `unifiedBlend(nodes, groupNames, weights, alpha, adjList, nodeIndex, passes, quantMode)`
@@ -85,6 +85,7 @@ Shared parsing, graph building, tokenization. Imports from algo. No DOM.
 - **Parsers**: `parseEdgesFile` (streaming line-by-line, flat arrays), `parseLabelsFile` (header detection, extra columns, preserves empty tabs)
 - **Graph building**: `buildGraph` — nodes, edges, adjacency, neighbor groups, numeric column auto-detection (`numericBins`)
 - **Tokenization**: `degreeBucket`, `tokenizeLabel` (inline word scanner), `tokenizeNumeric` (3-level for numeric, categorical fallback, 0 tokens for empty/undefined)
+- **Signature**: `computeNodeSig(node, groupNames, numericBins)` — on-demand signature computation (signatures not stored on nodes)
 - **Full pipeline**: `computeProjections` (GC-optimized), `runPipeline(edgesText, labelsText)` (parse → build → project)
 
 ### bitzoom-renderer.js (665 lines)
@@ -109,13 +110,13 @@ Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` 
 
 **Edge sampling**: `maxEdgesToDraw = min(5000, max(200, nodeCount × 3))`. Short-edge bias in probabilistic sampling.
 
-**Other**: cubic bezier edges, Gaussian splat heatmap (additive), KDE density heatmap (1/4 resolution, persistent buffers), hit testing.
+**Other**: cubic bezier edges, Gaussian splat heatmap (additive), KDE density heatmap (1/4 resolution, persistent buffers), hit testing, level transition animation for supernodes (<80 nodes).
 
 ### bitzoom-canvas.js (~600 lines)
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
-**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Constructor accepts `skipEvents` (for composition) and `onRender` callback.
+**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Constructor accepts `skipEvents` (for composition), `onRender` callback, `showLegend`, and `showResetBtn` options.
 
 **`createBitZoomView(canvas, edgesText, labelsText, opts)`**: convenience factory — parses SNAP data, hydrates nodes, blends, returns ready-to-use canvas view.
 
@@ -204,7 +205,7 @@ Numeric values emit 3 tokens (coarse/medium/fine bins). Nearby values share coar
 - Jaccard on discretised tokens is crude for continuous/ordinal properties.
 - 2D projection doesn't preserve distances — provides ordering signal, not metric embedding.
 - Rank quantization (when selected) destroys density information; Gaussian quantization preserves it but assumes approximately normal marginals.
-- Gaussian quantization uses fixed boundaries (μ,σ from initial snapshot) — weight changes can shift the distribution far from stored boundaries, pushing nodes to grid extremes.
+- Gaussian quantization uses fixed boundaries (μ,σ frozen from dataset-tuned weights, reset in `_applyDatasetSettings`) — subsequent weight changes can shift the distribution far from stored boundaries, pushing nodes to grid extremes.
 - Undefined values with high weight cause degenerate clustering. Empty fields → neutral [0,0] projection. When that group dominates, all undefined nodes collapse to one pre-quantization point. Rank quantization spreads axes independently but preserves 2D correlation → edge pile-up. Neither quantization scheme can fix this.
 - Weight stability is piecewise constant after quantization.
 - Oversmoothing at high α with many passes.
@@ -224,7 +225,7 @@ Individual components (MinHash, random projection, hierarchical grids, graph smo
 
 ## Test Coverage (45 tests)
 
-**Algo** (12): hashToken, computeMinHash/Into, jaccardEstimate, buildGaussianRotation, projectWith/Into, cellIdAtLevel, maxCountKey, generateGroupColors.
+**Algo** (12): hashToken, computeMinHash/Into, jaccardEstimate, buildGaussianRotation(seed, cols), projectWith/Into, cellIdAtLevel, maxCountKey, generateGroupColors.
 
 **Pipeline** (16): parsers (2-col, 3-col, comments, headers, trailing empties), buildGraph, degreeBucket, tokenizeLabel, computeProjections, runPipeline, normalizeAndQuantize, buildLevel.
 

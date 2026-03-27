@@ -139,8 +139,8 @@ class BitZoom {
   switchLevel(idx) {
     const v = this.view;
     const oldIdx = v.currentLevel;
-    const oldIsRaw = oldIdx === RAW_LEVEL - 1;
-    const newIsRaw = idx === RAW_LEVEL - 1;
+    const oldIsRaw = oldIdx === RAW_LEVEL;
+    const newIsRaw = idx === RAW_LEVEL;
 
     // Capture old supernode screen positions for animation
     const oldSns = !oldIsRaw ? v.getLevel(oldIdx).supernodes : null;
@@ -322,7 +322,7 @@ class BitZoom {
     if (!this._zoomTargetMembers || this._zoomTargetMembers.length === 0) return;
     const targetLabel = this._zoomTargetLabel || '';
 
-    if (v.currentLevel === RAW_LEVEL - 1) {
+    if (v.currentLevel === RAW_LEVEL) {
       let best = v.nodeIndexFull[this._zoomTargetMembers[0].id];
       if (targetLabel) {
         for (const m of this._zoomTargetMembers) {
@@ -380,7 +380,7 @@ class BitZoom {
     const n = v.nodeIndexFull[id];
     if (!n) return;
     v.selectedId = id;
-    this.switchLevel(RAW_LEVEL - 1);
+    this.switchLevel(RAW_LEVEL);
     const p = v.worldToScreen(n.x, n.y);
     v.pan.x += v.W / 2 - p.x;
     v.pan.y += v.H / 2 - p.y;
@@ -412,7 +412,7 @@ class BitZoom {
   _updateOverview() {
     const v = this.view;
     const stats = document.getElementById('overview-stats');
-    const isRaw = v.currentLevel === RAW_LEVEL - 1;
+    const isRaw = v.currentLevel === RAW_LEVEL;
     if (isRaw) {
       stats.innerHTML = `
         <div class="stat-row"><span class="stat-label">Nodes</span><span class="stat-value">${v.nodes.length}</span></div>
@@ -435,7 +435,7 @@ class BitZoom {
 
   _updateAlgoInfo() {
     const v = this.view;
-    const isRaw = v.currentLevel === RAW_LEVEL - 1;
+    const isRaw = v.currentLevel === RAW_LEVEL;
     const lvNum = ZOOM_LEVELS[v.currentLevel];
     const k = isRaw ? GRID_SIZE : (1 << lvNum);
     const desc = isRaw
@@ -619,6 +619,7 @@ class BitZoom {
     }
     this._syncWeightUI();
     this._syncLabelCheckboxes();
+    v._quantStats = {}; // re-snapshot boundaries from dataset-tuned weights
     v._refreshPropCache();
     this.rebuildProjections();
   }

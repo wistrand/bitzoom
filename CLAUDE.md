@@ -87,5 +87,5 @@ scripts/
 - `getLevel()` calls `layoutAll()` when building a new level.
 - `switchLevel()` adjusts zoom to preserve renderZoom across level changes.
 - Empty/undefined property values emit 0 tokens → NaN sentinel → neutral [0,0] projection. No false clustering at low weight, but degenerate clustering when that group dominates (all undefined nodes share the same projection point).
-- Gaussian quantization boundaries (μ,σ) are fixed from the initial blend snapshot — stable across weight/alpha changes but can misfit if the distribution shifts significantly.
+- Gaussian quantization boundaries (μ,σ) freeze from the dataset-tuned weight snapshot (reset in `_applyDatasetSettings`) — stable across subsequent weight/alpha changes but can misfit if the distribution shifts significantly.
 - Heatmap density maxW is cached per level/zoom config, lerped on change — stable across pan.

@@ -245,7 +245,7 @@ export class BitZoomCanvas {
 
   zoomForLevel(levelIdx) {
     const TARGET_PX = 44;
-    const isRaw = levelIdx === RAW_LEVEL - 1;
+    const isRaw = levelIdx === RAW_LEVEL;
     const k = isRaw ? 256 : (1 << ZOOM_LEVELS[levelIdx]);
     const pad = Math.min(60, this.W * 0.08, this.H * 0.08);
     const availMin = Math.min(this.W - pad*2, this.H - pad*2);
