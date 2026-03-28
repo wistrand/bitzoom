@@ -538,8 +538,8 @@ Deno.test("buildLevel: creates supernodes and edges", () => {
 // ─── E2E: Epstein dataset ────────────────────────────────────────────────────
 
 Deno.test("E2E: Epstein dataset loads and processes correctly", async () => {
-  const edgesText = await Deno.readTextFile("data/epstein.edges");
-  const labelsText = await Deno.readTextFile("data/epstein.labels");
+  const edgesText = await Deno.readTextFile("docs/data/epstein.edges");
+  const labelsText = await Deno.readTextFile("docs/data/epstein.labels");
 
   const result = runPipeline(edgesText, labelsText);
 
@@ -632,8 +632,8 @@ Deno.test("E2E: Epstein dataset loads and processes correctly", async () => {
 });
 
 Deno.test("E2E: Epstein with topology alpha > 0", async () => {
-  const edgesText = await Deno.readTextFile("data/epstein.edges");
-  const labelsText = await Deno.readTextFile("data/epstein.labels");
+  const edgesText = await Deno.readTextFile("docs/data/epstein.edges");
+  const labelsText = await Deno.readTextFile("docs/data/epstein.labels");
   const result = runPipeline(edgesText, labelsText);
 
   const G = result.groupNames.length;

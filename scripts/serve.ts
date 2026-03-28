@@ -20,11 +20,10 @@ const NO_CACHE = {
 };
 
 // Map URL paths to filesystem directories.
-// /data/* serves from ./data/, everything else from ./docs/
+// Everything serves from ./docs/
 function resolve(pathname: string): string {
   if (pathname === "/") return "docs/index.html";
   const clean = pathname.replace(/^\/+/, "");
-  if (clean.startsWith("data/")) return clean;
   return `docs/${clean}`;
 }
 
