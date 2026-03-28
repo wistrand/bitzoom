@@ -629,50 +629,19 @@ export class BitZoomCanvas {
   }
 }
 
-// ─── Helper: create a BitZoomCanvas from raw SNAP text ───────────────────────
+// ─── Factories: create a BitZoomCanvas from data ────────────────────────────
 
-import { runPipeline } from './bitzoom-pipeline.js';
+import { runPipeline, computeProjections } from './bitzoom-pipeline.js';
 
-/**
- * Convenience factory: parse SNAP data and create a ready-to-use canvas view.
- * @param {HTMLCanvasElement} canvas
- * @param {string} edgesText
- * @param {string|null} labelsText
- * @param {object} [opts] - additional BitZoomCanvas options
- * @returns {BitZoomCanvas}
- */
-export function createBitZoomView(canvas, edgesText, labelsText, opts = {}) {
-  const result = runPipeline(edgesText, labelsText);
-  const G = result.groupNames.length;
-
-  // Hydrate nodes with projections (signatures computed on demand, not stored)
-  const nodes = result.nodeArray.map((n, i) => {
-    const projections = {};
-    for (let g = 0; g < G; g++) {
-      const off = (i * G + g) * 2;
-      projections[result.groupNames[g]] = [result.projBuf[off], result.projBuf[off + 1]];
-    }
-    return { ...n, projections, px: 0, py: 0, gx: 0, gy: 0, x: 0, y: 0 };
-  });
-
-  const nodeIndexFull = Object.fromEntries(nodes.map(n => [n.id, n]));
-  const adjList = Object.fromEntries(nodes.map(n => [n.id, []]));
-  for (const e of result.edges) {
-    if (adjList[e.src] && adjList[e.dst]) {
-      adjList[e.src].push(e.dst);
-      adjList[e.dst].push(e.src);
-    }
-  }
-
-  // Default weights
+// Shared tail: weights, colors, blend, construct view.
+function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, hasEdgeTypes, opts) {
   const propWeights = {};
-  for (const g of result.groupNames) propWeights[g] = g === 'group' ? 3 : 1;
+  for (const g of groupNames) propWeights[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
   Object.assign(propWeights, opts.weights || {});
 
-  // Build colors
   const propColors = {};
   const propValues = {};
-  for (const g of result.groupNames) propValues[g] = new Set();
+  for (const g of groupNames) propValues[g] = new Set();
   for (const n of nodes) {
     propValues['group'].add(n.group || 'unknown');
     propValues['label'].add(n.label || n.id);
@@ -684,25 +653,126 @@ export function createBitZoomView(canvas, edgesText, labelsText, opts = {}) {
     }
     if (n.extraProps) {
       for (const [k, v] of Object.entries(n.extraProps)) {
-        if (propValues[k]) propValues[k].add(v || 'unknown');
+        if (propValues[k]) propValues[k].add(v == null ? 'unknown' : String(v));
       }
     }
   }
-  for (const g of result.groupNames) {
+  for (const g of groupNames) {
     propColors[g] = generateGroupColors([...propValues[g]].sort());
   }
 
-  // Blend — pass a fresh stats object so the canvas gets fixed boundaries
   const quantStats = {};
-  unifiedBlend(nodes, result.groupNames, propWeights, opts.smoothAlpha || 0, adjList, nodeIndexFull, 5, opts.quantMode, quantStats);
+  unifiedBlend(nodes, groupNames, propWeights, opts.smoothAlpha || 0, adjList, nodeIndexFull, 5, opts.quantMode, quantStats);
 
   const view = new BitZoomCanvas(canvas, {
-    nodes, edges: result.edges, nodeIndexFull, adjList,
-    groupNames: result.groupNames, propWeights, propColors,
+    nodes, edges, nodeIndexFull, adjList,
+    groupNames, propWeights, propColors,
     groupColors: propColors['group'],
-    hasEdgeTypes: result.hasEdgeTypes,
+    hasEdgeTypes,
     ...opts,
   });
   view._quantStats = quantStats;
   return view;
+}
+
+// Hydrate nodes from projBuf + build adjList
+function _hydrateAndLink(nodeArray, projBuf, groupNames, edges) {
+  const G = groupNames.length;
+  const nodes = nodeArray.map((n, i) => {
+    const projections = {};
+    for (let g = 0; g < G; g++) {
+      const off = (i * G + g) * 2;
+      projections[groupNames[g]] = [projBuf[off], projBuf[off + 1]];
+    }
+    return { ...n, projections, px: 0, py: 0, gx: 0, gy: 0, x: 0, y: 0 };
+  });
+  const nodeIndexFull = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const adjList = Object.fromEntries(nodes.map(n => [n.id, []]));
+  for (const e of edges) {
+    if (adjList[e.src] && adjList[e.dst]) {
+      adjList[e.src].push(e.dst);
+      adjList[e.dst].push(e.src);
+    }
+  }
+  return { nodes, nodeIndexFull, adjList };
+}
+
+/**
+ * Create a BitZoomCanvas from SNAP .edges/.labels text.
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} edgesText
+ * @param {string|null} labelsText
+ * @param {object} [opts] - additional BitZoomCanvas options
+ * @returns {BitZoomCanvas}
+ */
+export function createBitZoomView(canvas, edgesText, labelsText, opts = {}) {
+  const result = runPipeline(edgesText, labelsText);
+  const { nodes, nodeIndexFull, adjList } = _hydrateAndLink(result.nodeArray, result.projBuf, result.groupNames, result.edges);
+  return _finalize(canvas, nodes, result.edges, nodeIndexFull, adjList, result.groupNames, result.hasEdgeTypes, opts);
+}
+
+/**
+ * Create a BitZoomCanvas from JS graph objects (no SNAP parsing).
+ * Nodes: {id, group?, label?, ...extraProps}. Edges: {src, dst}.
+ * @param {HTMLCanvasElement} canvas
+ * @param {Array} rawNodes
+ * @param {Array} rawEdges
+ * @param {object} [opts] - additional BitZoomCanvas options
+ * @returns {BitZoomCanvas}
+ */
+export function createBitZoomFromGraph(canvas, rawNodes, rawEdges, opts = {}) {
+  const nodeIndex = {};
+  const tempAdj = {};
+  const nodeArray = rawNodes.map(rn => {
+    const id = rn.id;
+    const group = rn.group || 'unknown';
+    const label = rn.label || id;
+    const extraProps = {};
+    for (const k in rn) {
+      if (k !== 'id' && k !== 'group' && k !== 'label') extraProps[k] = rn[k];
+    }
+    const node = { id, group, label, degree: 0, edgeTypes: null, extraProps };
+    nodeIndex[id] = node;
+    tempAdj[id] = [];
+    return node;
+  });
+
+  const edges = [];
+  for (const e of rawEdges) {
+    if (nodeIndex[e.src] && nodeIndex[e.dst]) {
+      edges.push(e);
+      nodeIndex[e.src].degree++;
+      nodeIndex[e.dst].degree++;
+      tempAdj[e.src].push(e.dst);
+      tempAdj[e.dst].push(e.src);
+    }
+  }
+
+  const extraPropNames = [];
+  if (nodeArray.length > 0) {
+    for (const k of Object.keys(nodeArray[0].extraProps)) extraPropNames.push(k);
+  }
+  const groupNames = ['group', 'label', 'structure', 'neighbors'];
+  for (const ep of extraPropNames) groupNames.push(ep);
+
+  const adjGroups = nodeArray.map(n => tempAdj[n.id].map(nid => nodeIndex[nid].group));
+
+  const numericBins = {};
+  for (const ep of extraPropNames) {
+    let numCount = 0, total = 0, min = Infinity, max = -Infinity;
+    for (const n of nodeArray) {
+      const v = n.extraProps[ep];
+      if (v == null || v === '') continue;
+      total++;
+      const num = Number(v);
+      if (isFinite(num)) { numCount++; if (num < min) min = num; if (num > max) max = num; }
+    }
+    if (total > 0 && numCount / total >= 0.8 && max > min) {
+      numericBins[ep] = { min, max, coarse: 5, medium: 50, fine: 500 };
+    }
+  }
+
+  const { projBuf } = computeProjections(nodeArray, adjGroups, groupNames, false, extraPropNames, numericBins);
+  const { nodes, nodeIndexFull, adjList } = _hydrateAndLink(nodeArray, projBuf, groupNames, edges);
+  return _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, false, opts);
 }

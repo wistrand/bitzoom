@@ -222,6 +222,14 @@
   .sidebar::-webkit-scrollbar-track { background: transparent; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
+  .algo-info {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    padding: 8px 0;
+    line-height: 1.4;
+  }
+
   .panel-title {
     font-size: 9px;
     text-transform: uppercase;

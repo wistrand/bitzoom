@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BitZoom — How It Works</title>
+<meta name="description" content="How BitZoom works: MinHash signatures, Gaussian projection, weighted blend, bit-shift zoom hierarchy.">
+<meta property="og:title" content="BitZoom — How It Works">
+<meta property="og:description" content="How BitZoom works: MinHash signatures, Gaussian projection, weighted blend, bit-shift zoom hierarchy.">
+<meta property="og:image" content="images/bitzoom-1.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BitZoom — How It Works">
+<meta name="twitter:description" content="MinHash signatures, Gaussian projection, weighted blend, bit-shift zoom hierarchy.">
+<meta name="twitter:image" content="images/bitzoom-1.png">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
 
@@ -232,8 +242,8 @@
   <a href="#code">Code</a>
 </nav>
 
-<h1>Bit<span>Zoom</span></h1>
-<p class="subtitle">Deterministic property-similarity layout with hierarchical bit-shift aggregation</p>
+<h1><a href="/" style="text-decoration:none;color:inherit"><img src="logo.svg" alt="" style="width:36px;height:36px;vertical-align:-4px;margin-right:8px">Bit<span>Zoom</span></a></h1>
+<p class="subtitle">Deterministic property-similarity layout with hierarchical bit-shift aggregation &middot; <a href="viewer.html">Viewer</a> &middot; <a href="howto.html">Developer Guide</a></p>
 
 <!-- Live interactive demo -->
 <div style="margin:32px 0 48px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
@@ -1333,11 +1343,11 @@
 
 <table>
   <tr><th>File</th><th>Role</th></tr>
-  <tr><td><a href="/">Interactive viewer</a></td><td>Load datasets, adjust weights, explore zoom levels</td></tr>
+  <tr><td><a href="viewer.html">Interactive viewer</a></td><td>Load datasets, adjust weights, explore zoom levels</td></tr>
   <tr><td><a href="bitzoom-algo.js"><code>bitzoom-algo.js</code></a></td><td>Pure algorithm functions: MinHash, projection, blend, quantization, level building</td></tr>
   <tr><td><a href="bitzoom-pipeline.js"><code>bitzoom-pipeline.js</code></a></td><td>SNAP parsers, graph building, tokenization, full projection pipeline</td></tr>
   <tr><td><a href="bitzoom-canvas.js"><code>bitzoom-canvas.js</code></a></td><td>Standalone embeddable component: canvas, interaction, rendering</td></tr>
-  <tr><td><a href="bitzoom.js"><code>bitzoom.js</code></a></td><td>Application shell: UI, workers, data loading, detail panel, URL state</td></tr>
+  <tr><td><a href="bitzoom-viewer.js"><code>bitzoom-viewer.js</code></a></td><td>Viewer application: UI, workers, data loading, detail panel, URL state</td></tr>
   <tr><td><a href="bitzoom-renderer.js"><code>bitzoom-renderer.js</code></a></td><td>5-layer canvas rendering, heatmaps, edge sampling, hit testing</td></tr>
   <tr><td><a href="bitzoom-worker.js"><code>bitzoom-worker.js</code></a></td><td>Web Worker coordinator, fans out to projection sub-workers</td></tr>
   <tr><td><a href="https://github.com/wistrand/bitzoom">GitHub</a></td><td>Source, datasets, tests, SNAP converters</td></tr>

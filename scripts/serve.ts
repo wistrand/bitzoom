@@ -7,6 +7,8 @@ const MIME: Record<string, string> = {
   json: "application/json",
   edges: "text/plain; charset=utf-8",
   labels: "text/plain; charset=utf-8",
+  svg: "image/svg+xml",
+  png: "image/png",
   md: "text/plain; charset=utf-8",
 };
 

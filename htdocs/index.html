@@ -3,93 +3,263 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BitZoom — MinHash Aggregation</title>
-<link rel="stylesheet" href="bitzoom.css">
+<title>BitZoom</title>
+<meta name="description" content="Deterministic property-similarity layout with hierarchical bit-shift aggregation for large graphs.">
+<meta property="og:title" content="BitZoom">
+<meta property="og:description" content="Deterministic property-similarity layout with hierarchical bit-shift aggregation for large graphs.">
+<meta property="og:image" content="images/bitzoom-1.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BitZoom">
+<meta name="twitter:description" content="Deterministic property-similarity layout with hierarchical bit-shift aggregation for large graphs.">
+<meta name="twitter:image" content="images/bitzoom-1.png">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #7c6af7;
+    --accent2: #f76a8c;
+    --accent3: #6af7c8;
+    --text: #c8c8d8;
+    --text-dim: #8888a0;
+    --text-bright: #eeeef8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 60px 24px 40px;
+  }
+
+  .hero {
+    text-align: center;
+    max-width: 640px;
+    margin-bottom: 40px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--text-bright);
+    margin-bottom: 12px;
+  }
+  h1 span { color: var(--accent); }
+
+  .tagline {
+    font-size: 17px;
+    color: var(--text-dim);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .props {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 36px;
+  }
+  .prop {
+    text-align: center;
+    width: 160px;
+  }
+  .prop-icon {
+    font-size: 24px;
+    margin-bottom: 6px;
+  }
+  .prop-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+  }
+  .prop-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .links {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+  .links a {
+    display: inline-block;
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .links a.primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .links a.primary:hover { background: #6a5ae0; }
+  .links a.secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .links a.secondary:hover { border-color: var(--accent); color: var(--text-bright); }
+
+  .demo-wrap {
+    width: 100%;
+    max-width: 900px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+    margin-bottom: 32px;
+  }
+  .demo-bar {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .demo-bar span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .demo-bar select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .footer {
+    margin-top: auto;
+    padding-top: 32px;
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+  .footer a { color: var(--text-dim); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
+</style>
 </head>
 <body>
 
-<header>
-  <div>
-    <h1><a href="about.html" style="color:inherit;text-decoration:none" title="How it works">BITZOOM</a></h1>
-    <div class="subtitle">MinHash · Rotation · Quantization · Aggregation</div>
-  </div>
-  <div class="zoom-controls">
-    <button class="reset-btn" id="loadNewBtn" style="display:none">Load</button>
-    <span class="zoom-label">Level</span>
-    <div class="zoom-stepper">
-      <button class="zoom-step-btn" id="zoomPrev">&#9664;</button>
-      <div class="zoom-current" id="zoomCurrent">L1</div>
-      <button class="zoom-step-btn" id="zoomNext">&#9654;</button>
-    </div>
-    <button class="reset-btn" id="resetBtn">↺</button>
-    <div class="nudge-control">
-      <span class="zoom-label">Topo α</span>
-      <input type="range" id="nudgeSlider" min="0" max="1" step="0.05" value="0">
-      <span class="nudge-val" id="nudgeVal">0</span>
-    </div>
-    <div class="nudge-control">
-      <span class="zoom-label">Size</span>
-      <div class="zoom-stepper">
-        <button class="zoom-step-btn" id="sizeByMembers" style="font-size:9px;width:auto;padding:0 6px" title="Size by member count">n</button>
-        <button class="zoom-step-btn" id="sizeByEdges" style="font-size:9px;width:auto;padding:0 6px" title="Size by edge count">e</button>
-        <button class="zoom-step-btn" id="sizeLogBtn" style="font-size:9px;width:auto;padding:0 6px" title="Toggle log scale">log</button>
-      </div>
-    </div>
-    <button class="reset-btn" id="quantModeBtn" title="Quantization: gaussian/rank">Q:G</button>
-    <button class="reset-btn" id="edgeModeBtn" title="Edge mode: curves/lines/none">E</button>
-    <button class="reset-btn" id="heatmapBtn" title="Toggle heatmap">H</button>
-  </div>
-</header>
+<div class="hero">
+  <h1><img src="logo.svg" alt="" style="width:48px;height:48px;vertical-align:-6px;margin-right:12px">Bit<span>Zoom</span></h1>
+  <p class="tagline">Deterministic property-similarity layout with hierarchical bit-shift aggregation for large graphs.</p>
 
-<div id="loader-screen" class="loader-screen">
-  <div class="drop-zone" id="dropZone">
-    <div class="drop-title">Load Graph</div>
-    <div class="drop-hint">Pick a dataset or drop your own .edges / .labels files</div>
-    <div class="dataset-list" id="datasetList"></div>
-    <div class="drop-hint" style="margin-top:16px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px">Or load from file</div>
-    <div class="file-input-row">
-      <label>.edges (required)
-        <input type="file" id="edgesFile" accept=".edges,.txt,.tsv">
-      </label>
-      <label>.labels (optional)
-        <input type="file" id="labelsFile" accept=".labels,.txt,.tsv">
-      </label>
+  <div class="props">
+    <div class="prop">
+      <div class="prop-title">Property-first</div>
+      <div class="prop-desc">Nodes positioned by what they are, not who they connect to.</div>
     </div>
-    <button class="load-btn" id="loadBtn" disabled>Load Graph</button>
-    <progress id="loadProgress" value="0" max="100" style="width:80%;height:4px;margin-top:12px;display:none"></progress>
-    <div class="load-status" id="loadStatus"></div>
+    <div class="prop">
+      <div class="prop-title">Instant zoom</div>
+      <div class="prop-desc">14 aggregation levels from 4 stored bytes per node. Bit shifts, not recomputation.</div>
+    </div>
+    <div class="prop">
+      <div class="prop-title">Interactive weights</div>
+      <div class="prop-desc">Change property weights and see the layout respond in real-time.</div>
+    </div>
+  </div>
+
+  <div class="links">
+    <a href="viewer.html" class="primary">Open Viewer</a>
+    <a href="about.html" class="secondary">How It Works</a>
+    <a href="howto.html" class="secondary">Developer Guide</a>
+    <a href="https://github.com/wistrand/bitzoom" class="secondary">GitHub</a>
   </div>
 </div>
 
-<canvas id="canvas" style="display:none"></canvas>
-
-<div class="sidebar" id="sidebar">
-  <div>
-    <div class="panel-title">Overview</div>
-    <div id="overview-stats"></div>
-  </div>
-  <div>
-    <div class="panel-title">Cluster by</div>
-    <div class="preset-row" id="presetRow"></div>
-    <div id="weightSliders"></div>
-  </div>
-    <div class="algo-info" id="algo-info">
-      Click a node or supernode to inspect it. Zoom levels L0–L3 show increasingly fine MinHash bucket partitions.
+<div class="demo-wrap">
+  <div class="demo-bar">
+    <span>Live demo. Scroll to zoom. Drag to pan. Click to select.</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="demo-dataset">
+        <option value="epstein">Epstein</option>
+        <option value="data-graph-file">Karate Club</option>
+        <option value="bitzoom-source">BitZoom Source</option>
+        <option value="mitre-attack">MITRE ATT&CK</option>
+      </select>
     </div>
   </div>
-  <div>
-    <div class="panel-title">Hint</div>
-    <div class="hint">Drag to pan · Scroll to zoom canvas · Click node to inspect</div>
-  </div>
+  <canvas id="demo-canvas" style="width:100%;height:420px;display:block;background:var(--bg)"></canvas>
 </div>
 
-<div id="node-panel" class="node-panel">
-  <button class="node-panel-close" id="nodePanelClose">&times;</button>
-  <div id="node-detail"></div>
+<div class="footer">
+  <a href="about.html">How It Works</a> &middot;
+  <a href="howto.html">Developer Guide</a> &middot;
+  <a href="https://github.com/wistrand/bitzoom">GitHub</a>
 </div>
 
-<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-<button class="sidebar-toggle" id="sidebarToggle">≡</button>
-<script type="module" src="bitzoom.js"></script>
+<script type="module">
+import { createBitZoomView } from './bitzoom-canvas.js';
+
+const PRESETS = {
+  'epstein':        { initialLevel: 3, weights: { group: 8, edgetype: 4 }, labelProps: ['label'] },
+  'data-graph-file':{ initialLevel: 3 },
+  'bitzoom-source': { initialLevel: 4, weights: { kind: 8, group: 3 }, labelProps: ['file', 'kind'] },
+  'mitre-attack':   { initialLevel: 4, weights: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'], quantMode: 'rank', edgeMode: 'none' },
+};
+
+let view = null;
+
+async function loadDemo(name) {
+  const [edgesRes, labelsRes] = await Promise.all([
+    fetch(`data/${name}.edges`),
+    fetch(`data/${name}.labels`).catch(() => null),
+  ]);
+  const edgesText = await edgesRes.text();
+  let labelsText = null;
+  if (labelsRes && labelsRes.ok) labelsText = await labelsRes.text();
+
+  if (view) view.destroy();
+  const preset = PRESETS[name] || {};
+  view = createBitZoomView(document.getElementById('demo-canvas'), edgesText, labelsText, {
+    initialLevel: preset.initialLevel || 3,
+    edgeMode: preset.edgeMode || 'lines',
+    heatmapMode: 'density',
+    showLegend: true,
+    showResetBtn: true,
+    weights: preset.weights || {},
+    labelProps: preset.labelProps || [],
+    quantMode: preset.quantMode,
+  });
+}
+
+// Handle hash redirect: if URL has viewer params, redirect to viewer
+if (location.hash && location.hash.includes('d=')) {
+  location.href = 'viewer.html' + location.hash;
+} else {
+  loadDemo('epstein');
+}
+
+document.getElementById('demo-dataset').addEventListener('change', e => loadDemo(e.target.value));
+</script>
+
 </body>
 </html>

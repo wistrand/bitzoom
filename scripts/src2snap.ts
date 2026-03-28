@@ -163,6 +163,186 @@ for (const f of files) {
   }
 }
 
+// Parse deno.json for tasks
+for (const f of files) {
+  if (f.relPath !== "deno.json") continue;
+  const fileId = `file:${f.relPath}`;
+  try {
+    const json = JSON.parse(f.content);
+    if (json.tasks) {
+      for (const [taskName, cmd] of Object.entries(json.tasks)) {
+        const id = `task:${taskName}`;
+        addSymbol({ id, name: taskName, kind: "task", file: f.relPath, line: 0, size: 1, bytes: 0, ageHours: 0 });
+        addEdge(fileId, id, "defines");
+        // Link task → script file it runs
+        const fileMatch = String(cmd).match(/(?:scripts|tests)\/\S+\.(?:ts|js)/);
+        if (fileMatch) {
+          const targetId = `file:${fileMatch[0]}`;
+          if (symbols.has(targetId)) addEdge(id, targetId, "runs");
+        }
+      }
+    }
+    if (json.imports) {
+      for (const [specifier, _target] of Object.entries(json.imports)) {
+        const id = `import:${specifier}`;
+        addSymbol({ id, name: specifier, kind: "import-map", file: f.relPath, line: 0, size: 1, bytes: 0, ageHours: 0 });
+        addEdge(fileId, id, "defines");
+      }
+    }
+  } catch { /* not valid JSON */ }
+}
+
+// Parse HTML files for elements and structure
+for (const f of files) {
+  if (f.ext !== ".html") continue;
+  const fileId = `file:${f.relPath}`;
+  const lines = f.content.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Elements with id attributes
+    const idMatches = line.matchAll(/id=["']([^"']+)["']/g);
+    for (const m of idMatches) {
+      const elemId = m[1];
+      // Determine tag name
+      const tagMatch = line.match(/<(\w+)[^>]*id=["']/ + elemId);
+      const tag = line.match(/<(\w+)/)?.[1] || "element";
+      const id = `elem:${f.relPath}:#${elemId}`;
+      addSymbol({ id, name: `#${elemId}`, kind: "element", file: f.relPath, line: i + 1, size: 1, bytes: 0, ageHours: 0 });
+      addEdge(fileId, id, "defines");
+    }
+
+    // Inline <script> and <style> blocks as regions
+    if (line.match(/<script(?:\s[^>]*)?>/) && !line.match(/src=/)) {
+      let end = i + 1;
+      while (end < lines.length && !lines[end].includes("</script>")) end++;
+      const id = `region:${f.relPath}:script:${i + 1}`;
+      addSymbol({ id, name: `inline-script:${i + 1}`, kind: "script", file: f.relPath, line: i + 1, size: end - i + 1, bytes: 0, ageHours: 0 });
+      addEdge(fileId, id, "defines");
+    }
+    if (line.match(/<style(?:\s[^>]*)?>/) && !line.match(/src=/)) {
+      let end = i + 1;
+      while (end < lines.length && !lines[end].includes("</style>")) end++;
+      const id = `region:${f.relPath}:style:${i + 1}`;
+      addSymbol({ id, name: `inline-style:${i + 1}`, kind: "style", file: f.relPath, line: i + 1, size: end - i + 1, bytes: 0, ageHours: 0 });
+      addEdge(fileId, id, "defines");
+    }
+  }
+}
+
+// Parse CSS files for selectors, keyframes, and custom properties
+for (const f of files) {
+  if (f.ext !== ".css") continue;
+  const fileId = `file:${f.relPath}`;
+  const lines = f.content.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // @keyframes name {
+    const keyframeMatch = line.match(/@keyframes\s+([\w-]+)/);
+    if (keyframeMatch) {
+      let end = i + 1;
+      let depth = (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
+      while (end < lines.length && depth > 0) {
+        depth += (lines[end].match(/{/g) || []).length;
+        depth -= (lines[end].match(/}/g) || []).length;
+        end++;
+      }
+      const id = `keyframe:${f.relPath}:${keyframeMatch[1]}`;
+      addSymbol({ id, name: keyframeMatch[1], kind: "keyframe", file: f.relPath, line: i + 1, size: end - i, bytes: 0, ageHours: 0 });
+      addEdge(fileId, id, "defines");
+      i = end - 1;
+      continue;
+    }
+
+    // Top-level selectors (lines with { that aren't inside a rule, @-rules, or comments)
+    const trimmed = line.trimStart();
+    const isTopLevel = !trimmed.startsWith("@") && !trimmed.startsWith("/*") && !trimmed.startsWith("*") && !trimmed.startsWith("//");
+    const selectorMatch = isTopLevel ? trimmed.match(/^([^{/]+)\s*\{/) : null;
+    if (selectorMatch) {
+      const selector = selectorMatch[1].trim();
+      const indent = line.length - trimmed.length;
+      if (selector && indent <= 2) {
+        let end = i + 1;
+        let depth = (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
+        while (end < lines.length && depth > 0) {
+          depth += (lines[end].match(/{/g) || []).length;
+          depth -= (lines[end].match(/}/g) || []).length;
+          end++;
+        }
+        const ruleId = `rule:${f.relPath}:${i + 1}`;
+        addSymbol({ id: ruleId, name: selector, kind: "rule", file: f.relPath, line: i + 1, size: end - i, bytes: 0, ageHours: 0 });
+        addEdge(fileId, ruleId, "defines");
+        // Extract CSS custom properties defined within this rule
+        for (let j = i + 1; j < end; j++) {
+          const varMatch = lines[j].match(/(--[\w-]+)\s*:/);
+          if (varMatch) {
+            const varId = `cssvar:${f.relPath}:${varMatch[1]}`;
+            if (!symbols.has(varId)) {
+              addSymbol({ id: varId, name: varMatch[1], kind: "variable", file: f.relPath, line: j + 1, size: 1, bytes: 0, ageHours: 0 });
+              addEdge(ruleId, varId, "defines");
+            }
+          }
+        }
+        i = end - 1;
+        continue;
+      }
+    }
+    // Standalone CSS custom properties (not inside a rule block)
+    const varMatch = line.match(/(--[\w-]+)\s*:/);
+    if (varMatch) {
+      const varId = `cssvar:${f.relPath}:${varMatch[1]}`;
+      if (!symbols.has(varId)) {
+        addSymbol({ id: varId, name: varMatch[1], kind: "variable", file: f.relPath, line: i + 1, size: 1, bytes: 0, ageHours: 0 });
+        addEdge(fileId, varId, "defines");
+      }
+    }
+  }
+}
+
+// Cross-reference: CSS selectors ↔ HTML elements
+for (const [id, sym] of symbols) {
+  if (sym.kind !== "rule") continue;
+  // Extract #id references from CSS selector
+  const idRefs = sym.name.matchAll(/#([\w-]+)/g);
+  for (const m of idRefs) {
+    // Find matching HTML element
+    for (const [eid, esym] of symbols) {
+      if (esym.kind === "element" && esym.name === `#${m[1]}`) {
+        addEdge(id, eid, "styles");
+      }
+    }
+  }
+}
+
+// Cross-reference: JS getElementById/querySelector → HTML elements
+for (const f of files) {
+  if (f.ext !== ".js" && f.ext !== ".ts") continue;
+  const getByIdPattern = /getElementById\(["']([^"']+)["']\)/g;
+  const querySelectorPattern = /querySelector\(["']#([^"']+)["']\)/g;
+  let m;
+  while ((m = getByIdPattern.exec(f.content)) !== null) {
+    for (const [eid, esym] of symbols) {
+      if (esym.kind === "element" && esym.name === `#${m[1]}`) {
+        // Find the JS symbol that contains this reference
+        const jsSymbols = [...symbols.values()].filter(s => s.file === f.relPath && s.kind !== "file" && s.line <= f.content.slice(0, m.index).split("\n").length);
+        const closest = jsSymbols.sort((a, b) => b.line - a.line)[0];
+        if (closest) addEdge(closest.id, eid, "references");
+        else addEdge(`file:${f.relPath}`, eid, "references");
+      }
+    }
+  }
+  while ((m = querySelectorPattern.exec(f.content)) !== null) {
+    for (const [eid, esym] of symbols) {
+      if (esym.kind === "element" && esym.name === `#${m[1]}`) {
+        addEdge(`file:${f.relPath}`, eid, "references");
+      }
+    }
+  }
+}
+
 // Build a name→id map for cross-reference resolution
 const nameToIds: Map<string, string[]> = new Map();
 for (const [id, sym] of symbols) {
