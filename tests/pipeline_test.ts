@@ -4,8 +4,8 @@ import { assertEquals, assertExists, assert } from "https://deno.land/std/assert
 import {
   MINHASH_K, GRID_SIZE, ZOOM_LEVELS, RAW_LEVEL,
   computeMinHash, computeMinHashInto, _sig, projectWith, projectInto,
-  buildGaussianRotation, hashToken, jaccardEstimate, cellIdAtLevel,
-  normalizeAndQuantize, unifiedBlend, buildLevel, generateGroupColors,
+  buildGaussianProjection, hashToken, jaccardEstimate, cellIdAtLevel,
+  normalizeAndQuantize, unifiedBlend, buildLevel, buildLevelNodes, buildLevelEdges, generateGroupColors,
   maxCountKey, getNodePropValue, getSupernodeDominantValue,
 } from "../htdocs/bitzoom-algo.js";
 
@@ -63,16 +63,16 @@ Deno.test("jaccardEstimate: similar sets have high J", () => {
   assert(jAB > jAC, `Similar sets (${jAB}) should have higher J than dissimilar (${jAC})`);
 });
 
-Deno.test("buildGaussianRotation is deterministic", () => {
-  const r1 = buildGaussianRotation(42, MINHASH_K);
-  const r2 = buildGaussianRotation(42, MINHASH_K);
+Deno.test("buildGaussianProjection is deterministic", () => {
+  const r1 = buildGaussianProjection(42, MINHASH_K);
+  const r2 = buildGaussianProjection(42, MINHASH_K);
   assertEquals(r1[0][0], r2[0][0]);
   assertEquals(r1[1][MINHASH_K - 1], r2[1][MINHASH_K - 1]);
 });
 
 Deno.test("projectWith returns [x, y]", () => {
   const sig = computeMinHash(["test"]);
-  const rot = buildGaussianRotation(1, MINHASH_K);
+  const rot = buildGaussianProjection(1, MINHASH_K);
   const [x, y] = projectWith(sig, rot);
   assert(typeof x === "number" && !isNaN(x));
   assert(typeof y === "number" && !isNaN(y));
@@ -80,7 +80,7 @@ Deno.test("projectWith returns [x, y]", () => {
 
 Deno.test("projectInto writes to buffer", () => {
   const sig = computeMinHash(["test"]);
-  const rot = buildGaussianRotation(1, MINHASH_K);
+  const rot = buildGaussianProjection(1, MINHASH_K);
   const buf = new Float64Array(4);
   projectInto(sig, rot, buf, 2);
   assert(buf[2] !== 0 || buf[3] !== 0, "Should write non-zero projection");
@@ -676,4 +676,119 @@ Deno.test("E2E: Epstein with topology alpha > 0", async () => {
     }
   }
   assert(anyDiff, "Topology alpha should change node positions");
+});
+
+// ─── Statistical MinHash accuracy ─────────────────────────────────────────────
+
+Deno.test("MinHash Jaccard estimates converge to true Jaccard", () => {
+  // Generate random token sets with known overlaps and verify that
+  // MinHash estimates converge within expected standard deviation.
+  const universe = [];
+  for (let i = 0; i < 200; i++) universe.push("tok:" + i);
+
+  function randomSet(size: number): string[] {
+    const s = new Set<string>();
+    while (s.size < size) s.add(universe[Math.floor(Math.random() * universe.length)]);
+    return [...s];
+  }
+
+  function trueJaccard(a: string[], b: string[]): number {
+    const setA = new Set(a), setB = new Set(b);
+    let inter = 0;
+    for (const x of setA) if (setB.has(x)) inter++;
+    return inter / (setA.size + setB.size - inter);
+  }
+
+  const TRIALS = 500;
+  let totalError = 0;
+  let maxError = 0;
+
+  for (let t = 0; t < TRIALS; t++) {
+    const sizeA = 10 + Math.floor(Math.random() * 40);
+    const sizeB = 10 + Math.floor(Math.random() * 40);
+    const a = randomSet(sizeA);
+    const b = randomSet(sizeB);
+    const sigA = computeMinHash(a);
+    const sigB = computeMinHash(b);
+    const estimated = jaccardEstimate(sigA, sigB);
+    const actual = trueJaccard(a, b);
+    const err = Math.abs(estimated - actual);
+    totalError += err;
+    if (err > maxError) maxError = err;
+  }
+
+  const meanError = totalError / TRIALS;
+  // Expected std dev of MinHash estimate: sqrt(J(1-J)/k) <= 1/(2*sqrt(k)) = 1/(2*sqrt(128)) ≈ 0.044
+  // Mean absolute error should be well below this for 500 trials
+  assert(meanError < 0.08, `Mean Jaccard error ${meanError.toFixed(4)} should be < 0.08`);
+  assert(maxError < 0.35, `Max Jaccard error ${maxError.toFixed(4)} should be < 0.35`);
+});
+
+// ─── Two-phase buildLevel ─────────────────────────────────────────────────────
+
+Deno.test("buildLevelNodes: returns supernodes with empty snEdges", () => {
+  const parsed = parseEdgesFile(SAMPLE_EDGES);
+  const labelResult = parseLabelsFile(SAMPLE_LABELS);
+  const graph = buildGraph(parsed, labelResult.labels, labelResult.extraPropNames);
+  const { projBuf } = computeProjections(graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, labelResult.extraPropNames, graph.numericBins);
+  const G = graph.groupNames.length;
+  const nodes = graph.nodeArray.map((n, i) => {
+    const projections = {};
+    for (let g = 0; g < G; g++) {
+      const off = (i * G + g) * 2;
+      projections[graph.groupNames[g]] = [projBuf[off], projBuf[off + 1]];
+    }
+    return { ...n, projections, px: 0, py: 0, gx: 0, gy: 0, x: 0, y: 0 };
+  });
+  const nodeIndex = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const adjList = Object.fromEntries(nodes.map(n => [n.id, []]));
+  for (const e of graph.edges) {
+    if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
+  }
+  const weights: Record<string, number> = {};
+  for (const g of graph.groupNames) weights[g] = 1;
+  unifiedBlend(nodes, graph.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+
+  const lvl = buildLevelNodes(4, nodes, n => n.group, n => n.label || n.id, () => '#888');
+  assert(lvl.supernodes.length > 0, "Should have supernodes");
+  assertEquals(lvl.snEdges.length, 0, "Phase 1 should have empty snEdges");
+  assertEquals(lvl._edgesReady, false, "Phase 1 should not be edge-ready");
+  assert(lvl.supernodes[0].cachedColor !== undefined, "Supernodes should have cached color");
+});
+
+Deno.test("buildLevelEdges: populates snEdges correctly", () => {
+  const parsed = parseEdgesFile(SAMPLE_EDGES);
+  const labelResult = parseLabelsFile(SAMPLE_LABELS);
+  const graph = buildGraph(parsed, labelResult.labels, labelResult.extraPropNames);
+  const { projBuf } = computeProjections(graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, labelResult.extraPropNames, graph.numericBins);
+  const G = graph.groupNames.length;
+  const nodes = graph.nodeArray.map((n, i) => {
+    const projections = {};
+    for (let g = 0; g < G; g++) {
+      const off = (i * G + g) * 2;
+      projections[graph.groupNames[g]] = [projBuf[off], projBuf[off + 1]];
+    }
+    return { ...n, projections, px: 0, py: 0, gx: 0, gy: 0, x: 0, y: 0 };
+  });
+  const nodeIndex = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const adjList = Object.fromEntries(nodes.map(n => [n.id, []]));
+  for (const e of graph.edges) {
+    if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
+  }
+  const weights: Record<string, number> = {};
+  for (const g of graph.groupNames) weights[g] = 1;
+  unifiedBlend(nodes, graph.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+
+  // Phase 1
+  const lvl = buildLevelNodes(4, nodes, n => n.group, n => n.label || n.id, () => '#888');
+  assertEquals(lvl.snEdges.length, 0);
+
+  // Phase 2
+  buildLevelEdges(lvl, graph.edges, nodeIndex, 4);
+  assert(lvl._edgesReady, "Should be edge-ready after phase 2");
+
+  // Compare with combined buildLevel
+  const ref = buildLevel(4, nodes, graph.edges, nodeIndex, n => n.group, n => n.label || n.id, () => '#888');
+  assertEquals(lvl.snEdges.length, ref.snEdges.length, "Edge count should match combined buildLevel");
+  assertEquals(lvl.supernodes.length, ref.supernodes.length, "Supernode count should match");
 });

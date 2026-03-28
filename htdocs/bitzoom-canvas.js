@@ -13,7 +13,8 @@
 
 import {
   MINHASH_K, GRID_SIZE, GRID_BITS, ZOOM_LEVELS, RAW_LEVEL, LEVEL_LABELS,
-  buildGaussianRotation, generateGroupColors, unifiedBlend, buildLevel,
+  buildGaussianProjection, generateGroupColors, unifiedBlend, buildLevel,
+  buildLevelNodes, buildLevelEdges, cellIdAtLevel,
   getNodePropValue, getSupernodeDominantValue, maxCountKey,
 } from './bitzoom-algo.js';
 
@@ -60,7 +61,7 @@ export class BitZoomCanvas {
 
     // Build rotation matrices
     for (let i = 0; i < this.groupNames.length; i++) {
-      this.groupRotations[this.groupNames[i]] = buildGaussianRotation(2001 + i, MINHASH_K);
+      this.groupRotations[this.groupNames[i]] = buildGaussianProjection(2001 + i, MINHASH_K);
     }
 
     // Compute max degree
@@ -114,6 +115,7 @@ export class BitZoomCanvas {
     this.t2 = null;
     this.touchMoved = false;
     this._renderPending = false;
+    this._edgeBuildRaf = null;
     this._abortController = new AbortController();
     this._resizeObserver = null;
     this._onRender = opts.onRender || null;
@@ -159,6 +161,7 @@ export class BitZoomCanvas {
     this._cachedLabelProps = this.labelProps.size > 0 ? [...this.labelProps] : [best];
     this._cachedColorMap = this.propColors[best] || {};
     this.levels = new Array(ZOOM_LEVELS.length).fill(null);
+    if (this._edgeBuildRaf) { cancelAnimationFrame(this._edgeBuildRaf); this._edgeBuildRaf = null; }
   }
 
   // ─── Node property accessors (used by renderer) ───────────────────────────
@@ -202,15 +205,77 @@ export class BitZoomCanvas {
     if (!this.levels[idx]) {
       const colorProp = this._dominantProp;
       const propColors = this.propColors[colorProp];
-      this.levels[idx] = buildLevel(
-        ZOOM_LEVELS[idx], this.nodes, this.edges, this.nodeIndexFull,
+      // Phase 1: supernodes only (fast). Edges built asynchronously in chunks.
+      this.levels[idx] = buildLevelNodes(
+        ZOOM_LEVELS[idx], this.nodes,
         n => getNodePropValue(n, colorProp, this.adjList),
         n => this._nodeLabel(n),
         val => (propColors && propColors[val]) || '#888888'
       );
       this.layoutAll();
+      this._scheduleEdgeBuild(idx);
+    } else if (!this.levels[idx]._edgesReady && !this._edgeBuildRaf) {
+      // Edges were cancelled by a competing build — reschedule
+      this._scheduleEdgeBuild(idx);
     }
     return this.levels[idx];
+  }
+
+  _scheduleEdgeBuild(idx) {
+    if (this._edgeBuildRaf) { cancelAnimationFrame(this._edgeBuildRaf); this._edgeBuildRaf = null; }
+    const levelObj = this.levels[idx];
+    if (!levelObj || levelObj._edgesReady) return;
+
+    const edges = this.edges;
+    const nodeIndexFull = this.nodeIndexFull;
+    const level = ZOOM_LEVELS[idx];
+    const CHUNK = 50000;
+    const canPack = level <= 13;
+    const PACK_MUL = 0x4000000;
+    const snEdgeMap = new Map();
+    let offset = 0;
+
+    const processChunk = () => {
+      const end = Math.min(offset + CHUNK, edges.length);
+      for (let i = offset; i < end; i++) {
+        const e = edges[i];
+        const srcNode = nodeIndexFull[e.src];
+        const dstNode = nodeIndexFull[e.dst];
+        if (!srcNode || !dstNode) continue;
+        const sbid = cellIdAtLevel(srcNode.gx, srcNode.gy, level);
+        const dbid = cellIdAtLevel(dstNode.gx, dstNode.gy, level);
+        if (sbid !== dbid) {
+          const lo = sbid < dbid ? sbid : dbid;
+          const hi = sbid < dbid ? dbid : sbid;
+          const key = canPack ? lo * PACK_MUL + hi : lo + ',' + hi;
+          snEdgeMap.set(key, (snEdgeMap.get(key) || 0) + 1);
+        }
+      }
+      offset = end;
+
+      if (this.levels[idx] !== levelObj) { this._edgeBuildRaf = null; return; } // level invalidated
+
+      if (offset < edges.length) {
+        this._edgeBuildRaf = requestAnimationFrame(processChunk);
+      } else {
+        // Materialize snEdges array
+        const snEdges = new Array(snEdgeMap.size);
+        let j = 0;
+        if (canPack) {
+          for (const [key, weight] of snEdgeMap) snEdges[j++] = { a: key / PACK_MUL | 0, b: key % PACK_MUL, weight };
+        } else {
+          for (const [key, weight] of snEdgeMap) {
+            const comma = key.indexOf(',');
+            snEdges[j++] = { a: parseInt(key.slice(0, comma), 10), b: parseInt(key.slice(comma + 1), 10), weight };
+          }
+        }
+        levelObj.snEdges = snEdges;
+        levelObj._edgesReady = true;
+        this._edgeBuildRaf = null;
+        this.render();
+      }
+    };
+    this._edgeBuildRaf = requestAnimationFrame(processChunk);
   }
 
   layoutAll() { layoutAll(this); }
@@ -498,10 +563,8 @@ export class BitZoomCanvas {
   /** Clean up all event listeners and observers */
   destroy() {
     this._abortController.abort();
-    if (this._resizeObserver) {
-      this._resizeObserver.disconnect();
-      this._resizeObserver = null;
-    }
+    if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
+    if (this._edgeBuildRaf) { cancelAnimationFrame(this._edgeBuildRaf); this._edgeBuildRaf = null; }
   }
 
   // ─── Internal animation helpers ────────────────────────────────────────────

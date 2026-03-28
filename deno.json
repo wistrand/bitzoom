@@ -4,6 +4,7 @@
     "stix2snap": "deno run --allow-read --allow-write scripts/stix2snap.ts",
     "csv2snap": "deno run --allow-read --allow-write scripts/csv2snap.ts",
     "src2snap": "deno run --allow-read --allow-write scripts/src2snap.ts",
-    "test": "deno test --no-check --allow-read tests/"
+    "test": "deno test --no-check --allow-read tests/",
+    "bench": "deno run scripts/bench-hashslot.js"
   }
 }

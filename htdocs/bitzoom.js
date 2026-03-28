@@ -2,11 +2,14 @@
 
 import {
   MINHASH_K, GRID_SIZE, GRID_BITS, ZOOM_LEVELS, RAW_LEVEL, LEVEL_LABELS,
-  buildGaussianRotation, generateGroupColors, unifiedBlend, cellIdAtLevel,
+  buildGaussianProjection, generateGroupColors, unifiedBlend, cellIdAtLevel,
 } from './bitzoom-algo.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
 import { computeNodeSig } from './bitzoom-pipeline.js';
+
+// HTML-escape user-derived strings to prevent XSS from crafted SNAP files.
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // Dataset definitions. Optional `settings` configures initial weights and label checkboxes.
 const DATASETS = [
@@ -455,16 +458,16 @@ class BitZoom {
       const col = v._nodeColor(n);
       const nbrCount = (v.adjList[n.id] || []).length;
       let propsHtml = `
-        <div class="prop-row"><div class="prop-key">Group</div><div class="prop-val">${n.group}</div></div>
-        <div class="prop-row"><div class="prop-key">Label</div><div class="prop-val">${n.label}</div></div>
+        <div class="prop-row"><div class="prop-key">Group</div><div class="prop-val">${esc(n.group)}</div></div>
+        <div class="prop-row"><div class="prop-key">Label</div><div class="prop-val">${esc(n.label)}</div></div>
         <div class="prop-row"><div class="prop-key">Degree</div><div class="prop-val">${n.degree} (${nbrCount} neighbors)</div></div>`;
       if (n.edgeTypes && n.edgeTypes.size > 0) {
-        propsHtml += `<div class="prop-row"><div class="prop-key">Edge types</div><div class="prop-val">${[...n.edgeTypes].join(', ')}</div></div>`;
+        propsHtml += `<div class="prop-row"><div class="prop-key">Edge types</div><div class="prop-val">${[...n.edgeTypes].map(esc).join(', ')}</div></div>`;
       }
       if (n.extraProps) {
         for (const [key, val] of Object.entries(n.extraProps)) {
           if (val && val !== 'unknown') {
-            propsHtml += `<div class="prop-row"><div class="prop-key">${key}</div><div class="prop-val">${val}</div></div>`;
+            propsHtml += `<div class="prop-row"><div class="prop-key">${esc(key)}</div><div class="prop-val">${esc(val)}</div></div>`;
           }
         }
       }
@@ -485,14 +488,14 @@ class BitZoom {
           const [gName, members] = groups[gi];
           members.sort((a, b) => b.degree - a.degree);
           const gc = v.groupColors[gName] || '#888888';
-          nbrHtml += `<div style="margin-top:4px"><span class="prop-key" style="color:${gc}">${gName} (${members.length})</span></div>`;
+          nbrHtml += `<div style="margin-top:4px"><span class="prop-key" style="color:${gc}">${esc(gName)} (${members.length})</span></div>`;
           for (let mi = 0; mi < Math.min(members.length, MAX_PER_GROUP); mi++) {
             const nb = members[mi];
             const nc = v._nodeColor(nb);
             const label = nb.label || nb.id;
             const shortLabel = label.length > 40 ? label.slice(0, 37) + '…' : label;
-            nbrHtml += `<div class="neighbor-item" onclick="bz.selectNode('${nb.id}')" style="cursor:pointer">
-              <span>${shortLabel}</span>
+            nbrHtml += `<div class="neighbor-item" onclick="bz.selectNode('${esc(nb.id)}')" style="cursor:pointer">
+              <span>${esc(shortLabel)}</span>
               <span style="color:${nc};font-size:9px">deg:${nb.degree}</span>
             </div>`;
           }
@@ -506,8 +509,8 @@ class BitZoom {
         propsHtml += `<div class="prop-row"><div class="prop-key">Linked nodes (${nbrIds.length})</div><div class="neighbor-list">${nbrHtml}</div></div>`;
       }
       detail.innerHTML = `
-        <div class="node-title">${n.id}</div>
-        <div class="node-badge" style="background:${col}33;color:${col};border:1px solid ${col}55">${n.group}</div>
+        <div class="node-title">${esc(n.id)}</div>
+        <div class="node-badge" style="background:${col}33;color:${col};border:1px solid ${col}55">${esc(n.group)}</div>
         <div style="height:10px"></div>
         ${propsHtml}
         <div class="prop-row">
@@ -531,7 +534,7 @@ class BitZoom {
       const groupBreakdown = {};
       for (const m of sn.members) groupBreakdown[m.group] = (groupBreakdown[m.group]||0)+1;
       const groupRows = Object.entries(groupBreakdown).sort((a,b)=>b[1]-a[1])
-        .map(([g,cnt]) => `<div class="neighbor-item"><span>${g}</span><span style="color:${v.groupColors[g]||'#888888'}">${cnt}</span></div>`).join('');
+        .map(([g,cnt]) => `<div class="neighbor-item"><span>${esc(g)}</span><span style="color:${v.groupColors[g]||'#888888'}">${cnt}</span></div>`).join('');
 
       let extraHtml = '';
       if (sn.members.length > 0 && sn.members[0].extraProps) {
@@ -543,8 +546,8 @@ class BitZoom {
             counts[val] = (counts[val] || 0) + 1;
           }
           const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
-          const top = sorted.slice(0, 3).map(([val, c]) => `${val} (${c})`).join(', ');
-          extraHtml += `<div class="prop-row"><div class="prop-key">${key}</div><div class="prop-val">${top}</div></div>`;
+          const top = sorted.slice(0, 3).map(([val, c]) => `${esc(val)} (${c})`).join(', ');
+          extraHtml += `<div class="prop-row"><div class="prop-key">${esc(key)}</div><div class="prop-val">${top}</div></div>`;
         }
       }
 
@@ -566,7 +569,7 @@ class BitZoom {
         const lc = linked.cachedColor;
         const lbl = linked.cachedLabel || linked.repName;
         const shortLbl = lbl.length > 35 ? lbl.slice(0, 32) + '…' : lbl;
-        linkedHtml += `<div class="neighbor-item"><span>${shortLbl}</span><span style="color:${lc};font-size:9px">${linkedSns[i].weight} edges</span></div>`;
+        linkedHtml += `<div class="neighbor-item"><span>${esc(shortLbl)}</span><span style="color:${lc};font-size:9px">${linkedSns[i].weight} edges</span></div>`;
       }
       if (linkedSns.length > MAX_LINKED) {
         linkedHtml += `<div class="hint">+${linkedSns.length - MAX_LINKED} more</div>`;
@@ -576,8 +579,8 @@ class BitZoom {
       const memberList = topMembers.slice(0, 8).map(m => {
         const ml = m.label || m.id;
         const shortMl = ml.length > 35 ? ml.slice(0, 32) + '…' : ml;
-        return `<div class="neighbor-item" onclick="bz.selectNode('${m.id}')" style="cursor:pointer">
-          <span>${shortMl}</span>
+        return `<div class="neighbor-item" onclick="bz.selectNode('${esc(m.id)}')" style="cursor:pointer">
+          <span>${esc(shortMl)}</span>
           <span style="color:${v.groupColors[m.group]||'#888888'};font-size:9px">deg:${m.degree}</span>
         </div>`;
       }).join('') + (sn.members.length > 8 ? `<div class="hint">+${sn.members.length-8} more…</div>` : '');
@@ -651,8 +654,8 @@ class BitZoom {
       const row = document.createElement('div');
       row.className = 'weight-row';
       row.innerHTML = `
-        <input type="checkbox" id="lbl-${key}" title="Include in label">
-        <span class="weight-label">${key}</span>
+        <input type="checkbox" id="lbl-${esc(key)}" title="Include in label">
+        <span class="weight-label">${esc(key)}</span>
         <input class="weight-slider" type="range" id="w-${key}" min="1" max="10" step="1" value="${v.propWeights[key]}">
         <span class="weight-val" id="wv-${key}">${v.propWeights[key]}</span>`;
       sliderContainer.appendChild(row);
@@ -791,7 +794,7 @@ class BitZoom {
 
     v.groupRotations = {};
     for (let i = 0; i < v.groupNames.length; i++) {
-      v.groupRotations[v.groupNames[i]] = buildGaussianRotation(2001 + i, MINHASH_K);
+      v.groupRotations[v.groupNames[i]] = buildGaussianProjection(2001 + i, MINHASH_K);
     }
 
     const G = groupNames.length;

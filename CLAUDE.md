@@ -23,15 +23,15 @@ deno task src2snap    # source code → SNAP call graph
 
 ```
 htdocs/                    Web app (ES modules, no build step)
-  index.html               HTML shell (96 lines)
-  bitzoom.css              Styles (619 lines)
-  bitzoom-algo.js          Pure algorithm functions and constants (~430 lines)
-  bitzoom-pipeline.js      Parsers, graph building, tokenization, projection (345 lines)
-  bitzoom-renderer.js      Canvas rendering, heatmaps, hit testing (665 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (600 lines)
-  bitzoom.js               BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1185 lines)
-  bitzoom-worker.js        Web Worker coordinator (145 lines)
-  bitzoom-proj-worker.js   Web Worker projection (105 lines)
+  index.html               HTML shell (95 lines)
+  bitzoom.css              Styles (638 lines)
+  bitzoom-algo.js          Pure algorithm functions and constants (~446 lines)
+  bitzoom-pipeline.js      Parsers, graph building, tokenization, projection (348 lines)
+  bitzoom-renderer.js      Canvas rendering, heatmaps, hit testing (825 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (645 lines)
+  bitzoom.js               BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1287 lines)
+  bitzoom-worker.js        Web Worker coordinator (142 lines)
+  bitzoom-proj-worker.js   Web Worker projection (95 lines)
 
 data/                      9 SNAP-format datasets (.edges + .labels)
 tests/pipeline_test.ts     45 tests: unit, numeric, undefined values, E2E
@@ -55,19 +55,19 @@ scripts/
 | Name | Nodes | Edges | Properties |
 |---|---|---|---|
 | Karate Club | 34 | 78 | group |
-| Epstein | ~500 | ~500 | type, edge types |
-| Melker src | 305 | 1,433 | module groups |
-| Synth Packages | 2,000 | 4,050 | downloads, license, version, depcount |
+| Epstein | 364 | 534 | type, edge types |
+| Melker src | 304 | 1,433 | module groups |
+| Synth Packages | 1,868 | 4,050 | downloads, license, version, depcount |
 | Amazon | 367K | 988K | product category |
 | CERT Polska STIX | 93 | 417 | STIX types, platforms |
-| OpenCTI PAP | 107 | 2,879 | source, marking, tags, confidence |
-| BitZoom Source | 144 | 401 | kind, file, lines, bytes, age |
+| OpenCTI PAP | 106 | 2,879 | source, marking, tags, confidence |
+| BitZoom Source | 145 | 443 | kind, file, lines, bytes, age |
 | MITRE ATT&CK | 4,736 | 25,856 | kill chain, platforms, aliases |
 
 ## Key Design Decisions
 
 - **ES modules** — `import`/`export` everywhere. Module workers. Single `<script type="module">`.
-- **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array HASH_PARAMS) in `bitzoom-algo.js`, imported by pipeline and workers.
+- **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in `bitzoom-algo.js`, imported by pipeline and workers.
 - **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. BitZoom adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `skipEvents`/`onRender` options for embedding.
 - **Web Workers** — coordinator fans out to up to 3 projection sub-workers. Transferable Float64Array buffers.
 - **Supernode color/label cached at build time** — not recomputed per frame. `_refreshPropCache()` invalidates level cache.

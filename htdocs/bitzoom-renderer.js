@@ -1,7 +1,7 @@
 // bitzoom-renderer.js — Canvas rendering, heatmaps, edge drawing, hit testing.
 // Optimized to minimize GC pressure: reusable point objects, cached strings.
 
-import { RAW_LEVEL, ZOOM_LEVELS } from './bitzoom-algo.js';
+import { RAW_LEVEL, ZOOM_LEVELS, GRID_SIZE, GRID_BITS, cellIdAtLevel } from './bitzoom-algo.js';
 
 // Adaptive edge cap: scales with visible node count to avoid clutter on dense graphs
 function maxEdgesToDraw(nodeCount) {
@@ -34,6 +34,10 @@ function fontStr(size, bold) {
   _fontCache[key] = s;
   return s;
 }
+
+// Pre-built hex alpha lookup: _hexAlpha[i] = two-char hex string for i in [0,255]
+const _hexAlpha = new Array(256);
+for (let i = 0; i < 256; i++) _hexAlpha[i] = i.toString(16).padStart(2, '0');
 
 // Pre-built RGBA string cache (for common alpha values)
 const _rgbaCache = {};
@@ -131,6 +135,13 @@ export function layoutAll(bz) {
   const offsetX = pad + (availW - rangeX * scale) / 2;
   const offsetY = pad + (availH - rangeY * scale) / 2;
 
+  // Store layout transform for inverse mapping in hitTest
+  bz._layoutScale = scale;
+  bz._layoutOffX = offsetX;
+  bz._layoutOffY = offsetY;
+  bz._layoutMinX = minX;
+  bz._layoutMinY = minY;
+
   if (isRaw) {
     for (let i = 0; i < bz.nodes.length; i++) {
       const n = bz.nodes[i];
@@ -162,12 +173,14 @@ export function render(bz) {
   ctx.strokeStyle = 'rgba(60,60,100,0.6)';
   ctx.lineWidth = 0.5;
   const gridSize = 40 * bz.renderZoom;
-  const ox = bz.pan.x % gridSize;
-  const oy = bz.pan.y % gridSize;
-  ctx.beginPath();
-  for (let x = ox; x < W; x += gridSize) { ctx.moveTo(x,0); ctx.lineTo(x,H); }
-  for (let y = oy; y < H; y += gridSize) { ctx.moveTo(0,y); ctx.lineTo(W,y); }
-  ctx.stroke();
+  if (gridSize >= 4) { // skip sub-pixel grid lines
+    const ox = bz.pan.x % gridSize;
+    const oy = bz.pan.y % gridSize;
+    ctx.beginPath();
+    for (let x = ox; x < W; x += gridSize) { ctx.moveTo(x,0); ctx.lineTo(x,H); }
+    for (let y = oy; y < H; y += gridSize) { ctx.moveTo(0,y); ctx.lineTo(W,y); }
+    ctx.stroke();
+  }
 
   // Layer order: edges → heatmap → hilited edges → circles → labels/counts
   setEdgeMode(bz.edgeMode);
@@ -190,11 +203,15 @@ export function render(bz) {
 
 function renderSupernodes(bz, pass) {
   const ctx = bz.ctx;
-  const { supernodes, snEdges } = bz.getLevel(bz.currentLevel);
+  const level = bz.getLevel(bz.currentLevel);
+  const { supernodes, snEdges } = level;
 
-  // Build snMap using direct index — avoid Object.fromEntries per frame
-  const snMap = {};
-  for (let i = 0; i < supernodes.length; i++) snMap[supernodes[i].bid] = supernodes[i];
+  // Cached bid→supernode lookup — built once per level, reused across passes and frames
+  if (!level._snByBid) {
+    level._snByBid = new Map();
+    for (const sn of supernodes) level._snByBid.set(sn.bid, sn);
+  }
+  const snMap = level._snByBid;
 
   const diag = Math.sqrt(bz.W * bz.W + bz.H * bz.H);
   const maxEdgeLen = diag * 1.2;
@@ -208,32 +225,47 @@ function renderSupernodes(bz, pass) {
   const hov = bz.hoveredId;
 
   if (pass === 'edges') {
-    // Normal edges — drawn behind heatmap
+    // Normal edges — batched by alpha bucket to minimize beginPath/stroke calls
     const maxEdges = maxEdgesToDraw(supernodes.length);
     const snSampleRate = snEdges.length > maxEdges ? maxEdges / snEdges.length : 1;
     let snDrawn = 0;
 
+    const ALPHA_BUCKETS = 10;
+    const edgeBuckets = new Array(ALPHA_BUCKETS);
+    for (let b = 0; b < ALPHA_BUCKETS; b++) edgeBuckets[b] = [];
+
+    const fadeStartSq = fadeStart * fadeStart;
     for (let i = 0; i < snEdges.length; i++) {
       const e = snEdges[i];
-      const a = snMap[e.a], b = snMap[e.b];
+      const a = snMap.get(e.a), b = snMap.get(e.b);
       if (!a || !b) continue;
       const pax = a.x * rz + bz.pan.x, pay = a.y * rz + bz.pan.y;
       const pbx = b.x * rz + bz.pan.x, pby = b.y * rz + bz.pan.y;
       const dx = pax - pbx, dy = pay - pby;
       const distSq = dx * dx + dy * dy;
       if (distSq > maxEdgeLenSq) continue;
-      const dist = Math.sqrt(distSq);
       if (snSampleRate < 1) {
-        if (edgeHash(i) > snSampleRate * (2 - dist / maxEdgeLen)) continue;
+        // Sampling bias: prefer short edges. Use distSq ratio to avoid sqrt.
+        if (edgeHash(i) > snSampleRate * (2 - distSq / maxEdgeLenSq)) continue;
       }
       if (++snDrawn > maxEdges) break;
-      const distFade = dist <= fadeStart ? 1 : Math.max(0, 1 - (dist - fadeStart) / fadeRange);
+      const distFade = distSq <= fadeStartSq ? 1 : Math.max(0, 1 - (Math.sqrt(distSq) - fadeStart) / fadeRange);
       const alpha = Math.min(0.4, 0.05 + e.weight * 0.05) * distFade;
       if (alpha < 0.01) continue;
-      ctx.strokeStyle = rgba(124, 106, 247, (alpha * 100 | 0) / 100);
-      ctx.lineWidth = Math.min(3, 0.5 + e.weight * 0.3);
+      const bucket = Math.min(ALPHA_BUCKETS - 1, (alpha / 0.4 * ALPHA_BUCKETS) | 0);
+      edgeBuckets[bucket].push(pax, pay, pbx, pby);
+    }
+
+    for (let b = 0; b < ALPHA_BUCKETS; b++) {
+      const coords = edgeBuckets[b];
+      if (coords.length === 0) continue;
+      const a = ((b + 0.5) / ALPHA_BUCKETS * 40 | 0) / 100;
+      ctx.strokeStyle = rgba(124, 106, 247, a);
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      drawEdge(ctx, pax, pay, pbx, pby);
+      for (let j = 0; j < coords.length; j += 4) {
+        drawEdge(ctx, coords[j], coords[j+1], coords[j+2], coords[j+3]);
+      }
       ctx.stroke();
     }
     return;
@@ -251,7 +283,7 @@ function renderSupernodes(bz, pass) {
         const aHit = selIds.has(e.a) || e.a === hov;
         const bHit = selIds.has(e.b) || e.b === hov;
         if (!aHit && !bHit) continue;
-        const a = snMap[e.a], b = snMap[e.b];
+        const a = snMap.get(e.a), b = snMap.get(e.b);
         if (!a || !b) continue;
         const pax = a.x * rz + bz.pan.x, pay = a.y * rz + bz.pan.y;
         const pbx = b.x * rz + bz.pan.x, pby = b.y * rz + bz.pan.y;
@@ -265,19 +297,27 @@ function renderSupernodes(bz, pass) {
     return;
   }
 
-  // Count visible supernodes + find max size for opacity scaling
-  let visibleCount = 0;
-  let maxSizeVal = 1;
-  const margin = cellPx * 0.5;
-  for (let i = 0; i < supernodes.length; i++) {
-    const sn = supernodes[i];
-    const sx = sn.x * rz + bz.pan.x, sy = sn.y * rz + bz.pan.y;
-    if (sx >= -margin && sx <= bz.W + margin && sy >= -margin && sy <= bz.H + margin) {
-      visibleCount++;
-      const sv = scaleSize(bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length, bz);
-      if (sv > maxSizeVal) maxSizeVal = sv;
+  // Compute visible count + max size once per frame, cache on level object.
+  // Keyed by pan+zoom so it recomputes on viewport change but not across passes.
+  const visKey = bz.pan.x + '|' + bz.pan.y + '|' + rz + '|' + bz.sizeBy + '|' + bz.sizeLog;
+  if (level._visKey !== visKey) {
+    let vc = 0, ms = 1;
+    const margin = cellPx * 0.5;
+    for (let i = 0; i < supernodes.length; i++) {
+      const sn = supernodes[i];
+      const sx = sn.x * rz + bz.pan.x, sy = sn.y * rz + bz.pan.y;
+      if (sx >= -margin && sx <= bz.W + margin && sy >= -margin && sy <= bz.H + margin) {
+        vc++;
+        const sv = scaleSize(bz.sizeBy === 'edges' ? sn.totalDegree : sn.members.length, bz);
+        if (sv > ms) ms = sv;
+      }
     }
+    level._visKey = visKey;
+    level._visibleCount = vc;
+    level._maxSizeVal = ms;
   }
+  const visibleCount = level._visibleCount;
+  const maxSizeVal = level._maxSizeVal;
 
   for (let i = 0; i < supernodes.length; i++) {
     const sn = supernodes[i];
@@ -304,8 +344,7 @@ function renderSupernodes(bz, pass) {
         ctx.fill();
       }
 
-      const normalAlpha = Math.round(importance * 0x99).toString(16).padStart(2, '0');
-      ctx.fillStyle = col + (isSelected ? 'ff' : isHovered ? 'cc' : normalAlpha);
+      ctx.fillStyle = col + (isSelected ? 'ff' : isHovered ? 'cc' : _hexAlpha[Math.round(importance * 0x99)]);
       ctx.beginPath();
       ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fill();
@@ -387,6 +426,7 @@ function renderNodes(bz, pass) {
     const edgeBuckets = new Array(ALPHA_BUCKETS);
     for (let b = 0; b < ALPHA_BUCKETS; b++) edgeBuckets[b] = [];
 
+    const fadeStartSq = fadeStart * fadeStart;
     for (let i = 0; i < bz.edges.length; i++) {
       const e = bz.edges[i];
       const a = bz.nodeIndexFull[e.src], b = bz.nodeIndexFull[e.dst];
@@ -396,12 +436,11 @@ function renderNodes(bz, pass) {
       const dx = pax - pbx, dy = pay - pby;
       const distSq = dx * dx + dy * dy;
       if (distSq > maxEdgeLenSq) continue;
-      const dist = Math.sqrt(distSq);
       if (rawSampleRate < 1) {
-        if (edgeHash(i) > rawSampleRate * (2 - dist / maxEdgeLen)) continue;
+        if (edgeHash(i) > rawSampleRate * (2 - distSq / maxEdgeLenSq)) continue;
       }
       if (++rawDrawn > maxEdges) break;
-      const distFade = dist <= fadeStart ? 1 : Math.max(0, 1 - (dist - fadeStart) / fadeRange);
+      const distFade = distSq <= fadeStartSq ? 1 : Math.max(0, 1 - (Math.sqrt(distSq) - fadeStart) / fadeRange);
       const alpha = 0.25 * distFade;
       if (alpha < 0.01) continue;
       const bucket = Math.min(ALPHA_BUCKETS - 1, (alpha / 0.25 * ALPHA_BUCKETS) | 0);
@@ -803,22 +842,95 @@ export function hitTest(bz, sx, sy) {
     const rScreen = Math.max(8, Math.min(10, cellPxRaw * 0.42));
     const rWorld = (rScreen + 4) / rz;
     const rWorldSq = rWorld * rWorld;
-    for (let i = 0; i < bz.nodes.length; i++) {
-      const n = bz.nodes[i];
-      const dx = n.x - wx, dy = n.y - wy;
-      if (dx*dx + dy*dy < rWorldSq) return {type:'node', item:n};
+
+    // Spatial culling via supernode hierarchy: convert world coords to grid
+    // coords, find the cell at a coarse level, scan only nearby members.
+    // CULL_IDX is an index into the levels array; the actual zoom level
+    // value is ZOOM_LEVELS[CULL_IDX] (used for cellIdAtLevel / bid encoding).
+    const CULL_IDX = 5;
+    const cullLevel = ZOOM_LEVELS[CULL_IDX]; // actual level value (e.g., 6 → 64×64)
+    const scale = bz._layoutScale;
+    if (scale && bz.nodes.length > 500) {
+      const px = (wx - bz._layoutOffX) / scale + bz._layoutMinX;
+      const py = (wy - bz._layoutOffY) / scale + bz._layoutMinY;
+      const gx = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor((px + 1) / 2 * GRID_SIZE)));
+      const gy = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor((py + 1) / 2 * GRID_SIZE)));
+      const shift = GRID_BITS - cullLevel;
+      const ccx = gx >> shift, ccy = gy >> shift;
+      const k = 1 << cullLevel;
+
+      // Build cell→supernode index on first use, cache on level object
+      const level = bz.getLevel(CULL_IDX);
+      if (!level._snByBid) {
+        level._snByBid = new Map();
+        for (const sn of level.supernodes) level._snByBid.set(sn.bid, sn);
+      }
+
+      // Scan 3×3 neighborhood of cells
+      for (let dy = -1; dy <= 1; dy++) {
+        const cy = ccy + dy;
+        if (cy < 0 || cy >= k) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const cx = ccx + dx;
+          if (cx < 0 || cx >= k) continue;
+          const bid = (cx << cullLevel) | cy;
+          const sn = level._snByBid.get(bid);
+          if (!sn) continue;
+          for (const n of sn.members) {
+            const ddx = n.x - wx, ddy = n.y - wy;
+            if (ddx*ddx + ddy*ddy < rWorldSq) return {type:'node', item:n};
+          }
+        }
+      }
+    } else {
+      // Small dataset or no layout yet: linear scan
+      for (let i = 0; i < bz.nodes.length; i++) {
+        const n = bz.nodes[i];
+        const dx = n.x - wx, dy = n.y - wy;
+        if (dx*dx + dy*dy < rWorldSq) return {type:'node', item:n};
+      }
     }
   } else {
-    const k = 1 << ZOOM_LEVELS[bz.currentLevel];
+    const lvlVal = ZOOM_LEVELS[bz.currentLevel];
+    const k = 1 << lvlVal;
     const cellPx = (Math.min(bz.W, bz.H) * rz) / k;
     const rScreen = Math.max(6, Math.min(22, cellPx * 0.42));
     const rWorld = (rScreen + 6) / rz;
     const rWorldSq = rWorld * rWorld;
-    const sns = bz.getLevel(bz.currentLevel).supernodes;
-    for (let i = 0; i < sns.length; i++) {
-      const sn = sns[i];
-      const dx = sn.x - wx, dy = sn.y - wy;
-      if (dx*dx + dy*dy < rWorldSq) return {type:'supernode', item:sn};
+    const level = bz.getLevel(bz.currentLevel);
+
+    // Spatial lookup via grid cell — O(9) instead of O(supernodes)
+    const scale = bz._layoutScale;
+    if (scale && level.supernodes.length > 100) {
+      if (!level._snByBid) {
+        level._snByBid = new Map();
+        for (const sn of level.supernodes) level._snByBid.set(sn.bid, sn);
+      }
+      const ax = (wx - bz._layoutOffX) / scale + bz._layoutMinX;
+      const ay = (wy - bz._layoutOffY) / scale + bz._layoutMinY;
+      const gx = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor((ax + 1) / 2 * GRID_SIZE)));
+      const gy = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor((ay + 1) / 2 * GRID_SIZE)));
+      const shift = GRID_BITS - lvlVal;
+      const ccx = gx >> shift, ccy = gy >> shift;
+      for (let dy = -1; dy <= 1; dy++) {
+        const cy = ccy + dy;
+        if (cy < 0 || cy >= k) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const cx = ccx + dx;
+          if (cx < 0 || cx >= k) continue;
+          const sn = level._snByBid.get((cx << lvlVal) | cy);
+          if (!sn) continue;
+          const ddx = sn.x - wx, ddy = sn.y - wy;
+          if (ddx*ddx + ddy*ddy < rWorldSq) return {type:'supernode', item:sn};
+        }
+      }
+    } else {
+      // Small level or no layout yet: linear scan
+      for (let i = 0; i < level.supernodes.length; i++) {
+        const sn = level.supernodes[i];
+        const dx = sn.x - wx, dy = sn.y - wy;
+        if (dx*dx + dy*dy < rWorldSq) return {type:'supernode', item:sn};
+      }
     }
   }
   return null;

@@ -1,7 +1,7 @@
 // bitzoom-pipeline.js — Shared parsing, graph building, and tokenization/projection.
 // No DOM, no Worker API. Usable from Web Workers, Deno, or browser.
 
-import { MINHASH_K, buildGaussianRotation, computeMinHash, computeMinHashInto, _sig, projectInto } from './bitzoom-algo.js';
+import { MINHASH_K, buildGaussianProjection, computeMinHash, computeMinHashInto, _sig, projectInto } from './bitzoom-algo.js';
 
 // ─── SNAP file parsers ───────────────────────────────────────────────────────
 
@@ -246,7 +246,7 @@ export function computeProjections(nodeArray, adjGroups, groupNames, hasEdgeType
   numericBins = numericBins || {};
   const groupRotations = {};
   for (let i = 0; i < groupNames.length; i++) {
-    groupRotations[groupNames[i]] = buildGaussianRotation(2001 + i, MINHASH_K);
+    groupRotations[groupNames[i]] = buildGaussianProjection(2001 + i, MINHASH_K);
   }
 
   const N = nodeArray.length;

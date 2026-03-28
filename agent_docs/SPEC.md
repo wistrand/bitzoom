@@ -16,6 +16,8 @@ Scale is a second motivation. Force-directed is O(n²) without approximation; sp
 
 Property similarity is estimated via Jaccard on token sets, sketched with MinHash at k=128. Jaccard is a simple and robust baseline for sparse categorical properties — it handles missing values gracefully and requires no distance metric. It is a reasonable default, not a uniquely correct choice. Continuous properties require discretisation and results are bin-sensitive. Common tokens dominate unless downweighted. Ordinal structure and near-matches are not captured.
 
+A design convention: J(∅, ∅) is defined as 1 (mathematically it is 0/0, undefined). This causes nodes with no tokens in a property group to cluster together via their shared NaN signature, grouping "unknown" nodes where users can see them. The alternative J(∅, ∅) = 0 would scatter them randomly.
+
 Treating MinHash integer values as a vector and applying Gaussian projection has no direct geometric justification from MinHash theory. In practice, similar signatures produce correlated projected coordinates — an empirical observation rather than a proven property. Any method producing a fixed-dimensional vector per node can replace MinHash at the same point in the pipeline.
 
 The practical performance of the system depends heavily on tokenisation and grouping quality — schema-aware field naming, sensible discretisation of numeric fields, downweighting of common tokens, and grouping of properties by semantic independence. These choices determine whether the notion of similarity the pipeline faithfully preserves is actually the one users want.

@@ -22,10 +22,11 @@ tests/pipeline_test.ts     45 Deno tests: algo unit, pipeline, numeric, undefine
 
 data/                      9 SNAP-format graph datasets (.edges + .labels)
 agent_docs/                Architecture and spec documentation
-serve.ts                   Deno HTTP server (htdocs/ + data/ at root, no-cache headers)
-stix2snap.ts               STIX 2.1 JSON → SNAP (extracts platforms, kill chains, aliases)
-csv2snap.ts                OpenCTI CSV → SNAP (Jaccard co-reference container graph)
-src2snap.ts                Source code → SNAP call graph (files, functions, methods, calls)
+scripts/
+  serve.ts                 Deno HTTP server (htdocs/ + data/ at root, no-cache headers)
+  stix2snap.ts             STIX 2.1 JSON → SNAP (extracts platforms, kill chains, aliases)
+  csv2snap.ts              OpenCTI CSV → SNAP (Jaccard co-reference container graph)
+  src2snap.ts              Source code → SNAP call graph (files, functions, methods, calls)
 deno.json                  Tasks: serve, test, stix2snap, csv2snap, src2snap
 ```
 
@@ -65,30 +66,30 @@ No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`
 
 ## Module Responsibilities
 
-### bitzoom-algo.js (340 lines)
+### bitzoom-algo.js (446 lines)
 
 Pure functions, no DOM. Single source of truth for MinHash/projection.
 
 - **Constants**: `MINHASH_K=128`, `GRID_BITS=16`, `GRID_SIZE=65536`, `ZOOM_LEVELS[1..14]`, `RAW_LEVEL=14`, `LEVEL_LABELS`
 - **MinHash** (GC-optimized): `HASH_PARAMS_A/B` (Int32Array), `computeMinHashInto` → reusable `_sig` Float64Array (NaN sentinel for empty tokens), `computeMinHash` (allocating wrapper). Universal hash via multi-word modular multiply (`hashSlot`) — no 32-bit truncation.
 - **Projection** (GC-optimized): `projectInto(sig, ROT, buf, offset)` → writes to buffer, `projectWith` (convenience wrapper returning `[px, py]`). NaN sentinel check: `sig[0] !== sig[0]`.
-- **Blend**: `unifiedBlend(nodes, groupNames, weights, alpha, adjList, nodeIndex, passes, quantMode)`
-- **Quantization**: `normalizeAndQuantize(nodes)` (rank-based, O(n log n)), `gaussianQuantize(nodes)` (Φ(z) via precomputed lookup table, O(n)). Default: Gaussian. Reasonable fit when blended coordinates are roughly bell-shaped; an approximation, not a guarantee.
+- **Blend**: `unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats)`
+- **Quantization**: `normalizeAndQuantize(nodes)` (rank-based, O(n log n)), `gaussianQuantize(nodes, stats)` (Φ(z) via precomputed lookup table, O(n)). Default: Gaussian. Reasonable fit when blended coordinates are roughly bell-shaped; an approximation, not a guarantee.
 - **Grid**: `cellIdAtLevel(gx, gy, level)`
-- **Level building**: `buildLevel(level, nodes, edges, nodeIndex, colorFn, labelFn, colorLookup)` — caches `cachedColor`/`cachedLabel` on supernodes, numeric edge keys (no string allocation)
+- **Level building**: `buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, labelValFn, colorLookup)` — caches `cachedColor`/`cachedLabel` on supernodes, string edge keys (`lo,hi`) parsed back via `parseInt(..., 10)`
 - **Helpers**: `maxCountKey` (O(k) max), `generateGroupColors` (golden-angle HSL → hex), `getNodePropValue`, `getSupernodeDominantValue`
 
-### bitzoom-pipeline.js (345 lines)
+### bitzoom-pipeline.js (348 lines)
 
 Shared parsing, graph building, tokenization. Imports from algo. No DOM.
 
 - **Parsers**: `parseEdgesFile` (streaming line-by-line, flat arrays), `parseLabelsFile` (header detection, extra columns, preserves empty tabs)
 - **Graph building**: `buildGraph` — nodes, edges, adjacency, neighbor groups, numeric column auto-detection (`numericBins`)
 - **Tokenization**: `degreeBucket`, `tokenizeLabel` (inline word scanner), `tokenizeNumeric` (3-level for numeric, categorical fallback, 0 tokens for empty/undefined)
-- **Signature**: `computeNodeSig(node, groupNames, numericBins)` — on-demand signature computation (signatures not stored on nodes)
+- **Signature**: `computeNodeSig(node)` — on-demand signature computation (signatures not stored on nodes)
 - **Full pipeline**: `computeProjections` (GC-optimized), `runPipeline(edgesText, labelsText)` (parse → build → project)
 
-### bitzoom-renderer.js (665 lines)
+### bitzoom-renderer.js (825 lines)
 
 Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` in layout).
 
@@ -110,9 +111,9 @@ Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` 
 
 **Edge sampling**: `maxEdgesToDraw = min(5000, max(200, nodeCount × 3))`. Short-edge bias in probabilistic sampling.
 
-**Other**: cubic bezier edges, Gaussian splat heatmap (additive), KDE density heatmap (1/4 resolution, persistent buffers), hit testing, level transition animation for supernodes (<80 nodes).
+**Other**: cubic bezier edges, Gaussian splat heatmap (additive), KDE density heatmap (1/4 resolution, persistent buffers), hit testing.
 
-### bitzoom-canvas.js (~600 lines)
+### bitzoom-canvas.js (645 lines)
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
@@ -122,13 +123,13 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **Public API**: `setWeights()`, `setAlpha()`, `setOptions()`, `destroy()`. Callbacks: `onSelect`, `onHover`.
 
-### bitzoom.js (~1185 lines)
+### bitzoom.js (1287 lines)
 
 `BitZoom` class — composes `BitZoomCanvas` as `this.view`. Adds application UI and orchestration.
 
 **Composition**: all graph/view state accessed via `this.view.*`. BitZoom owns app-only state (dataLoaded, presets, workers, hash timers, mouse state).
 
-**Navigation**: `switchLevel` (delegates to view + UI updates), `_checkAutoLevel` (delegates to view, adds stepper/info updates), `zoomToNode` (animated 350ms with reselection after level change), `_animateZoom` (shift+dblclick zoom-out).
+**Navigation**: `switchLevel` (delegates to view + UI updates, animates supernodes when both old and new levels have <80 nodes), `_checkAutoLevel` (delegates to view, adds stepper/info updates), `zoomToNode` (animated 350ms with reselection after level change), `_animateZoom` (shift+dblclick zoom-out).
 
 **Multi-select**: Ctrl+click toggles `view.selectedIds`. Edges highlight for all selected nodes.
 
@@ -138,7 +139,7 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **UI**: dynamic weight sliders, preset buttons, label checkboxes, size-by toggle (members/edges), quantization mode toggle (gaussian/rank), heatmap mode cycle (off/splat/density), edge mode cycle (curves/lines/none), detail panel (slide-in overlay with grouped linked nodes), single-click delayed 250ms for dblclick disambiguation.
 
-### Workers (145 + 105 lines)
+### Workers (142 + 95 lines)
 
 **bitzoom-worker.js**: coordinator. Imports parsers from pipeline. Fans out to up to 3 sub-workers. Merges Float64Array chunks. Passes `numericBins` for numeric tokenization.
 
@@ -219,14 +220,14 @@ Individual components (MinHash, random projection, hierarchical grids, graph smo
 1. Per-group projected anchors — fixed, reusable across weight configurations
 2. Interactive linear reweighting — smooth, proportional, no recomputation
 3. Unified blend — property weights and topology in one normalization
-4. Exact bit-prefix zoom hierarchy — all levels from two stored bytes
+4. Exact bit-prefix zoom hierarchy — all levels from two stored uint16 coordinates
 5. Multi-resolution numeric tokenization — smooth similarity for continuous properties
 6. Gaussian quantization as default — reasonable CDF fit for roughly bell-shaped blended coordinates
 7. Adaptive density rendering — visibility thresholds based on visible node count
 
 ## Test Coverage (45 tests)
 
-**Algo** (12): hashToken, computeMinHash/Into, jaccardEstimate, buildGaussianRotation(seed, cols), projectWith/Into, cellIdAtLevel, maxCountKey, generateGroupColors.
+**Algo** (12): hashToken, computeMinHash/Into, jaccardEstimate, buildGaussianProjection(seed, cols), projectWith/Into, cellIdAtLevel, maxCountKey, generateGroupColors.
 
 **Pipeline** (16): parsers (2-col, 3-col, comments, headers, trailing empties), buildGraph, degreeBucket, tokenizeLabel, computeProjections, runPipeline, normalizeAndQuantize, buildLevel.
 

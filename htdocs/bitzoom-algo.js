@@ -56,9 +56,16 @@ export const _sig = new Float64Array(MINHASH_K);
 // #5b: True universal hash: (a * tv + b) mod p, computed without overflow.
 // a < 2^31, tv < 2^32. Split tv into 16-bit halves so each partial product
 // stays under 2^47, well within the 2^53 safe integer range.
+// Mersenne fast-mod: p = 2^31 - 1 admits x mod p = (x & p) + (x >>> 31),
+// followed by a conditional subtract if result >= p.
+function mersMod(x) {
+  x = (x & LARGE_PRIME) + ((x / 0x80000000) | 0); // x >>> 31 via float division for values > 2^32
+  return x >= LARGE_PRIME ? x - LARGE_PRIME : x;
+}
 function hashSlot(a, tv, b) {
   const tvHi = (tv >>> 16), tvLo = tv & 0xFFFF;
-  return ((a * tvHi % LARGE_PRIME) * 0x10000 + a * tvLo + b) % LARGE_PRIME;
+  const hi = mersMod(a * tvHi);
+  return mersMod(hi * 0x10000 + a * tvLo + b);
 }
 
 // #6: Compute MinHash into the reusable _sig buffer.
@@ -101,7 +108,7 @@ export function jaccardEstimate(sigA, sigB) {
 // ─── Gaussian projection ─────────────────────────────────────────────────────
 
 // Always produces a 2×cols matrix (128D → 2D projection).
-export function buildGaussianRotation(seed, cols) {
+export function buildGaussianProjection(seed, cols) {
   const u = mulberry32(seed);
   const R = [new Float64Array(cols), new Float64Array(cols)];
   for (let i = 0; i < 2; i++) {
@@ -331,11 +338,11 @@ export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjLis
   doQuant();
 }
 
-// ─── Level building ──────────────────────────────────────────────────────────
+// ─── Level building (two-phase for large datasets) ──────────────────────────
 
-// colorValFn(node) → string, labelValFn(node) → string
-// These are called once per member at build time, cached on the supernode.
-export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, labelValFn, colorLookup) {
+// Phase 1: bucket nodes into supernodes. O(n). No edge processing.
+// Returns a level object with snEdges:[] that can render circles/heatmap/labels immediately.
+export function buildLevelNodes(level, nodes, colorValFn, labelValFn, colorLookup) {
   const bucketMap = new Map();
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
@@ -386,8 +393,15 @@ export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, label
              cachedColorVal, cachedColor, cachedLabel, x:0, y:0, cx, cy });
   }
 
-  // #10: Build supernode edges using string keys to avoid numeric overflow.
-  // At level 14, bid can reach 2^28 — numeric packing overflows at level > 10.
+  return { supernodes, snEdges: [], level, _edgesReady: false };
+}
+
+// Phase 2: aggregate edges into super-edges. O(|E|). Mutates levelObj.snEdges in place.
+// For levels 1-13, packs two cell IDs into one number (26 bits each, 52 < 53 safe bits).
+// Level 14 uses string keys (28 bits each = 56 > 53).
+export function buildLevelEdges(levelObj, edges, nodeIndexFull, level) {
+  const canPack = level <= 13;
+  const PACK_MUL = 0x4000000; // 2^26
   const snEdgeMap = new Map();
   for (let i = 0; i < edges.length; i++) {
     const e = edges[i];
@@ -399,21 +413,32 @@ export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, label
     if (sbid !== dbid) {
       const lo = sbid < dbid ? sbid : dbid;
       const hi = sbid < dbid ? dbid : sbid;
-      const key = lo + ',' + hi;
+      const key = canPack ? lo * PACK_MUL + hi : lo + ',' + hi;
       snEdgeMap.set(key, (snEdgeMap.get(key) || 0) + 1);
     }
   }
 
   const snEdges = new Array(snEdgeMap.size);
   let idx = 0;
-  for (const [key, weight] of snEdgeMap) {
-    const comma = key.indexOf(',');
-    const lo = parseInt(key.slice(0, comma), 10);
-    const hi = parseInt(key.slice(comma + 1), 10);
-    snEdges[idx++] = {a: lo, b: hi, weight};
+  if (canPack) {
+    for (const [key, weight] of snEdgeMap) {
+      snEdges[idx++] = { a: key / PACK_MUL | 0, b: key % PACK_MUL, weight };
+    }
+  } else {
+    for (const [key, weight] of snEdgeMap) {
+      const comma = key.indexOf(',');
+      snEdges[idx++] = { a: parseInt(key.slice(0, comma), 10), b: parseInt(key.slice(comma + 1), 10), weight };
+    }
   }
+  levelObj.snEdges = snEdges;
+  levelObj._edgesReady = true;
+}
 
-  return { supernodes, snEdges, level };
+// Combined wrapper for backward compatibility (tests, standalone BitZoomCanvas).
+export function buildLevel(level, nodes, edges, nodeIndexFull, colorValFn, labelValFn, colorLookup) {
+  const lvl = buildLevelNodes(level, nodes, colorValFn, labelValFn, colorLookup);
+  buildLevelEdges(lvl, edges, nodeIndexFull, level);
+  return lvl;
 }
 
 // ─── Node property helpers ───────────────────────────────────────────────────

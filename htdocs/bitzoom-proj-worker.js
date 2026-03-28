@@ -3,7 +3,7 @@
 
 import { degreeBucket, tokenizeLabel, tokenizeNumeric } from './bitzoom-pipeline.js';
 import {
-  MINHASH_K, buildGaussianRotation,
+  MINHASH_K, buildGaussianProjection,
   computeMinHashInto, _sig, projectInto,
 } from './bitzoom-algo.js';
 
@@ -16,7 +16,7 @@ self.onmessage = function(e) {
 
     const groupRotations = {};
     for (let i = 0; i < groupNames.length; i++) {
-      groupRotations[groupNames[i]] = buildGaussianRotation(groupRotationSeeds[i], MINHASH_K);
+      groupRotations[groupNames[i]] = buildGaussianProjection(groupRotationSeeds[i], MINHASH_K);
     }
 
     const N = nodes.length;

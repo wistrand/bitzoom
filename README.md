@@ -14,7 +14,7 @@ A deterministic layout and hierarchical aggregation viewer for large property gr
 
 - **Property-first layout** — nodes are positioned by what they are (properties), not who they're connected to (topology). Topology influence is a tunable parameter, not the primary organizing principle.
 - **Near-linear preprocessing** — MinHash signatures + random projection, O(n) per node. No force-directed O(n²) computation.
-- **Instant zoom** — all 14 aggregation levels derive from two stored bytes per node via bit shifts. No recomputation on navigation.
+- **Instant zoom** — all 14 aggregation levels derive from two stored uint16 coordinates per node via bit shifts. No recomputation on navigation.
 - **Interactive weight tuning** — change property weights and see the layout respond in real-time. No rehashing, no reprojection — just a weighted blend of fixed 2D anchors.
 
 ## Quick Start
@@ -83,13 +83,13 @@ D	Dave	manager	88
 | Dataset | Nodes | Edges | Source |
 |---|---|---|---|
 | Karate Club | 34 | 78 | Zachary 1977 |
-| Epstein Network | ~500 | ~500 | Public records |
-| Melker src | 305 | 1,433 | Source code imports |
-| Synth Packages | 2,000 | 4,050 | Generated |
+| Epstein Network | 364 | 534 | Public records |
+| Melker src | 304 | 1,433 | Source code imports |
+| Synth Packages | 1,868 | 4,050 | Generated |
 | Amazon Co-purchase | 367K | 988K | SNAP Stanford |
 | CERT Polska STIX | 93 | 417 | STIX 2.1 threat intel |
-| OpenCTI PAP | 107 | 2,879 | OpenCTI CSV export |
-| BitZoom Source | 144 | 401 | This project's code |
+| OpenCTI PAP | 106 | 2,879 | OpenCTI CSV export |
+| BitZoom Source | 145 | 443 | This project's code |
 | MITRE ATT&CK | 4,736 | 25,856 | MITRE ATT&CK v15 |
 
 ## Converters
@@ -116,7 +116,7 @@ deno task src2snap data/output-prefix
 5. **Quantize** blended positions to a uint16 grid (65536×65536) — Gaussian (default, density-preserving) or rank (uniform occupancy)
 6. **Zoom** by bit-shifting grid coordinates: level L gives a 2^L × 2^L cell grid
 
-Weight changes only repeat step 4-5 (O(n)). Zoom is O(1) per node. Signatures are not stored — recomputed on demand for detail panel visualization. See [SPEC.md](agent_docs/SPEC.md) for the full algorithm design.
+Weight changes only repeat steps 4-5: O(n × G) for anchor recomputation plus O(passes × (n + |E|)) for topology smoothing when α > 0. Zoom is O(1) per node. Signatures are not stored — recomputed on demand for detail panel visualization. See [SPEC.md](agent_docs/SPEC.md) for the full algorithm design.
 
 ## Architecture
 
@@ -124,7 +124,8 @@ Weight changes only repeat step 4-5 (O(n)). Zoom is O(1) per node. Signatures ar
 bitzoom-algo.js        Pure algorithms (MinHash, projection, blend, levels)
 bitzoom-pipeline.js    Parsers, graph building, tokenization pipeline
 bitzoom-renderer.js    Canvas rendering (5-layer: edges → heatmap → hilite → circles → labels)
-bitzoom.js             Application class (state, navigation, UI, workers)
+bitzoom-canvas.js      Standalone embeddable component — canvas, interaction, rendering
+bitzoom.js             Application class (composes BitZoomCanvas, UI, workers)
 bitzoom-worker.js      Web Worker coordinator (parse, fan-out)
 bitzoom-proj-worker.js Web Worker (MinHash projection, ×3 parallel)
 ```
