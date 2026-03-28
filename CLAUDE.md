@@ -22,7 +22,7 @@ deno task src2snap    # source code → SNAP call graph
 ## File Structure
 
 ```
-htdocs/                    Web app (ES modules, no build step)
+docs/                    Web app (ES modules, no build step)
   index.html               Landing page (265 lines)
   viewer.html              Viewer HTML shell (105 lines)
   about.html               How It Works page (1478 lines)
@@ -66,7 +66,7 @@ scripts/
 ## Key Design Decisions
 
 - **ES modules** — `import`/`export` everywhere. Module workers. `<script type="module">` in each HTML page.
-- **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in [bitzoom-algo.js](htdocs/bitzoom-algo.js), imported by pipeline and workers.
+- **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in [bitzoom-algo.js](docs/bitzoom-algo.js), imported by pipeline and workers.
 - **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `skipEvents`/`onRender` options for embedding.
 - **Web Workers** — coordinator fans out to up to 3 projection sub-workers. Transferable Float64Array buffers.
 - **Supernode color/label cached at build time** — not recomputed per frame. `_refreshPropCache()` invalidates level cache.

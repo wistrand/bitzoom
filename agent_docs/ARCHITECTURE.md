@@ -7,7 +7,7 @@ BitZoom is a deterministic layout and hierarchical aggregation viewer for large 
 ## Project Structure
 
 ```
-htdocs/                    Web application (ES modules, served by Deno)
+docs/                    Web application (ES modules, served by Deno)
   index.html               Landing page
   viewer.html              Viewer HTML shell — header, loader, canvas, sidebar, detail panel
   about.html               How It Works — interactive explainer with embedded demos
@@ -26,7 +26,7 @@ tests/pipeline_test.ts     48 Deno tests: algo unit, pipeline, numeric, undefine
 data/                      5 SNAP-format graph datasets (.edges + .labels, Amazon .gz compressed)
 agent_docs/                Architecture and spec documentation
 scripts/
-  serve.ts                 Deno HTTP server (htdocs/ + data/ at root, no-cache headers)
+  serve.ts                 Deno HTTP server (docs/ + data/ at root, no-cache headers)
   stix2snap.ts             STIX 2.1 JSON → SNAP (extracts platforms, kill chains, aliases)
   csv2snap.ts              OpenCTI CSV → SNAP (Jaccard co-reference container graph)
   src2snap.ts              Source code → SNAP call graph (files, functions, methods, calls)
@@ -53,7 +53,7 @@ bitzoom-renderer.js
   (imports from algo)
 ```
 
-No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) live once in [bitzoom-algo.js](../htdocs/bitzoom-algo.js). `BitZoom` composes `BitZoomCanvas` (`this.view`) — all graph state, rendering, and interaction primitives live on the canvas component.
+No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) live once in [bitzoom-algo.js](../docs/bitzoom-algo.js). `BitZoom` composes `BitZoomCanvas` (`this.view`) — all graph state, rendering, and interaction primitives live on the canvas component.
 
 ## Data Format (SNAP)
 
@@ -69,7 +69,7 @@ No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`
 
 ## Module Responsibilities
 
-### [bitzoom-algo.js](../htdocs/bitzoom-algo.js) (471 lines)
+### [bitzoom-algo.js](../docs/bitzoom-algo.js) (471 lines)
 
 Pure functions, no DOM. Single source of truth for MinHash/projection.
 
@@ -82,7 +82,7 @@ Pure functions, no DOM. Single source of truth for MinHash/projection.
 - **Level building**: `buildLevelNodes` (phase 1: bucket nodes into supernodes, O(n)) + `buildLevelEdges` (phase 2: aggregate edges, O(|E|), numeric key packing for levels 1-13, string keys for level 14) + `buildLevel` (combined wrapper). Caches `cachedColor`/`cachedLabel` on supernodes.
 - **Helpers**: `maxCountKey` (O(k) max), `generateGroupColors` (golden-angle HSL → hex), `getNodePropValue`, `getSupernodeDominantValue`
 
-### [bitzoom-pipeline.js](../htdocs/bitzoom-pipeline.js) (348 lines)
+### [bitzoom-pipeline.js](../docs/bitzoom-pipeline.js) (348 lines)
 
 Shared parsing, graph building, tokenization. Imports from algo. No DOM.
 
@@ -92,7 +92,7 @@ Shared parsing, graph building, tokenization. Imports from algo. No DOM.
 - **Signature**: `computeNodeSig(node)` — on-demand signature computation (signatures not stored on nodes)
 - **Full pipeline**: `computeProjections` (GC-optimized), `runPipeline(edgesText, labelsText)` (parse → build → project)
 
-### [bitzoom-renderer.js](../htdocs/bitzoom-renderer.js) (937 lines)
+### [bitzoom-renderer.js](../docs/bitzoom-renderer.js) (937 lines)
 
 Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` in layout).
 
@@ -116,7 +116,7 @@ Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` 
 
 **Other**: cubic bezier edges, Gaussian splat heatmap (additive), KDE density heatmap (1/4 resolution, persistent buffers), hit testing.
 
-### [bitzoom-canvas.js](../htdocs/bitzoom-canvas.js) (778 lines)
+### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (778 lines)
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
@@ -126,7 +126,7 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **Public API**: `setWeights()`, `setAlpha()`, `setOptions()`, `destroy()`. Callbacks: `onSelect`, `onHover`.
 
-### [bitzoom-viewer.js](../htdocs/bitzoom-viewer.js) (1336 lines)
+### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (1336 lines)
 
 `BitZoom` class — composes `BitZoomCanvas` as `this.view`. Adds application UI and orchestration.
 
@@ -144,9 +144,9 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 ### Workers (142 + 95 lines)
 
-**[bitzoom-worker.js](../htdocs/bitzoom-worker.js)**: coordinator. Imports parsers from pipeline. Fans out to up to 3 sub-workers. Merges Float64Array chunks. Passes `numericBins` for numeric tokenization.
+**[bitzoom-worker.js](../docs/bitzoom-worker.js)**: coordinator. Imports parsers from pipeline. Fans out to up to 3 sub-workers. Merges Float64Array chunks. Passes `numericBins` for numeric tokenization.
 
-**[bitzoom-proj-worker.js](../htdocs/bitzoom-proj-worker.js)**: imports from algo + pipeline — zero duplicated code. Receives node slice + neighbor groups, computes all projections.
+**[bitzoom-proj-worker.js](../docs/bitzoom-proj-worker.js)**: imports from algo + pipeline — zero duplicated code. Receives node slice + neighbor groups, computes all projections.
 
 ## Key Data Flow
 

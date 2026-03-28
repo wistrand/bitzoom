@@ -5,8 +5,8 @@ A deterministic layout and hierarchical aggregation viewer for large property gr
 ![Datasets](https://img.shields.io/badge/datasets-5-blue) ![Tests](https://img.shields.io/badge/tests-48%20passing-green)
 
 <p align="center">
-  <img src="htdocs/images/bitzoom-1.png" width="48%" alt="BitZoom density heatmap with clustered supernodes">
-  <img src="htdocs/images/bitzoom-2.png" width="48%" alt="BitZoom zoomed in with node labels visible">
+  <img src="docs/images/bitzoom-1.png" width="48%" alt="BitZoom density heatmap with clustered supernodes">
+  <img src="docs/images/bitzoom-2.png" width="48%" alt="BitZoom zoomed in with node labels visible">
 </p>
 <p align="center"><em>Left: density heatmap showing property-based clusters. Right: zoomed in with individual node labels.</em></p>
 

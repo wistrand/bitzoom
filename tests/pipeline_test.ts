@@ -7,12 +7,12 @@ import {
   buildGaussianProjection, hashToken, jaccardEstimate, cellIdAtLevel,
   normalizeAndQuantize, unifiedBlend, buildLevel, buildLevelNodes, buildLevelEdges, generateGroupColors,
   maxCountKey, getNodePropValue, getSupernodeDominantValue,
-} from "../htdocs/bitzoom-algo.js";
+} from "../docs/bitzoom-algo.js";
 
 import {
   parseEdgesFile, parseLabelsFile, buildGraph,
   degreeBucket, tokenizeLabel, tokenizeNumeric, computeProjections, runPipeline, computeNodeSig,
-} from "../htdocs/bitzoom-pipeline.js";
+} from "../docs/bitzoom-pipeline.js";
 
 // ─── Unit tests: bitzoom-algo.js ─────────────────────────────────────────────
 

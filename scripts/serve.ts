@@ -20,12 +20,12 @@ const NO_CACHE = {
 };
 
 // Map URL paths to filesystem directories.
-// /data/* serves from ./data/, everything else from ./htdocs/
+// /data/* serves from ./data/, everything else from ./docs/
 function resolve(pathname: string): string {
-  if (pathname === "/") return "htdocs/index.html";
+  if (pathname === "/") return "docs/index.html";
   const clean = pathname.replace(/^\/+/, "");
   if (clean.startsWith("data/")) return clean;
-  return `htdocs/${clean}`;
+  return `docs/${clean}`;
 }
 
 Deno.serve({ port }, async (req: Request) => {
