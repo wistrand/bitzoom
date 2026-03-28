@@ -100,14 +100,14 @@ The system requires empirical evaluation against: semantic neighbourhood preserv
 
 ## Complexity
 
-| Phase | Cost |
-|---|---|
-| Group projections | O(n · k · G) |
-| Unified blend | O(passes · (n + E)) |
-| Quantization (rank) | O(n log n) |
-| Quantization (gaussian) | O(n) |
-| Level construction | O(n + E) per level, lazy |
-| Per-node zoom-cell derivation | O(1) |
+| Phase                         | Cost                   |
+| ----------------------------- | ---------------------- |
+| Group projections             | O(n · k · G)           |
+| Unified blend                 | O(passes · (n + E))    |
+| Quantization (rank)           | O(n log n)             |
+| Quantization (gaussian)       | O(n)                   |
+| Level construction            | O(n + E) per level, lazy |
+| Per-node zoom-cell derivation | O(1)                   |
 
 **Memory per node:** 2G floats for fixed projections + four bytes for uint16 grid coordinates.
 ````
