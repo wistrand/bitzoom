@@ -243,7 +243,7 @@ export function normalizeAndQuantize(nodes) {
 const PHI_TABLE_SIZE = 8192;
 const PHI_TABLE = new Float64Array(PHI_TABLE_SIZE + 1);
 {
-  // Abramowitz & Stegun 7.1.28 erf approximation — max error 5e-4
+  // Abramowitz & Stegun 7.1.26 erf approximation — max error 5e-4
   const erfApprox = (x) => {
     const a = 0.278393, b = 0.230389, c = 0.000972, d = 0.078108;
     const ax = Math.abs(x);

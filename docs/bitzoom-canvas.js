@@ -389,6 +389,15 @@ export class BitZoomCanvas {
     this.resize(); // recomputes layout + renders, same as constructor
   }
 
+  /** Export node positions as TSV string: id\tpx\tpy\tgx\tgy */
+  exportLayout() {
+    const lines = ['# id\tpx\tpy\tgx\tgy'];
+    for (const n of this.nodes) {
+      lines.push(`${n.id}\t${n.px}\t${n.py}\t${n.gx}\t${n.gy}`);
+    }
+    return lines.join('\n');
+  }
+
   /** Reset button bounds (top-right corner). Returns {x, y, w, h} or null. */
   _resetBtnRect() {
     if (!this.showResetBtn) return null;
