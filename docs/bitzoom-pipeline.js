@@ -346,3 +346,24 @@ export function runPipeline(edgesText, nodesText) {
 
   return { ...graph, projBuf, extraPropNames };
 }
+
+/**
+ * GPU-accelerated pipeline. Parses on CPU, projects on GPU.
+ * @param {string} edgesText
+ * @param {string|null} nodesText
+ * @param {function} computeProjectionsGPU - async GPU projection function from bitzoom-gpu.js
+ * @returns {Promise<object>} same shape as runPipeline
+ */
+export async function runPipelineGPU(edgesText, nodesText, computeProjectionsGPU) {
+  const parsed = parseEdgesFile(edgesText);
+  const nodesResult = nodesText ? parseNodesFile(nodesText) : null;
+  const nodesMap = nodesResult ? nodesResult.nodes : null;
+  const extraPropNames = nodesResult ? nodesResult.extraPropNames : [];
+
+  const graph = buildGraph(parsed, nodesMap, extraPropNames);
+  const { projBuf } = await computeProjectionsGPU(
+    graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+  );
+
+  return { ...graph, projBuf, extraPropNames };
+}

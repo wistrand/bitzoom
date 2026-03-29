@@ -4,7 +4,8 @@
     "stix2snap": "deno run --allow-read --allow-write scripts/stix2snap.ts",
     "csv2snap": "deno run --allow-read --allow-write scripts/csv2snap.ts",
     "src2snap": "deno run --allow-read --allow-write scripts/src2snap.ts docs/data/bitzoom-source",
-    "test": "deno test --no-check --allow-read tests/",
+    "test": "deno test --no-check --allow-read tests/pipeline_test.ts",
+    "test:gpu": "deno test --unstable-webgpu --no-check --allow-read tests/gpu_test.ts && deno test --unstable-webgpu --no-check --allow-read tests/gpu_pipeline_test.ts && deno test --unstable-webgpu --no-check --allow-read tests/gpu_blend_test.ts",
     "bench": "deno run --allow-read scripts/bench-hashslot.js && deno run --allow-read scripts/bench-minhash.js && deno run --allow-read scripts/bench-pipeline.js && deno run --allow-read scripts/bench-render.js && deno run --allow-read scripts/bench-viewer.js"
   }
 }

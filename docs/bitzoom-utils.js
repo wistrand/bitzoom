@@ -122,8 +122,11 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   const savedPx = new Float64Array(nodes.length);
   const savedPy = new Float64Array(nodes.length);
 
-  const blendAndScore = (weights, alpha) => {
-    unifiedBlend(nodes, groupNames, weights, alpha, adjList, nodeIndexFull, 5, 'gaussian', {});
+  // Use custom blend function if provided (e.g., gpuUnifiedBlend), otherwise CPU
+  const blendFn = opts.blendFn || unifiedBlend;
+
+  const blendAndScore = async (weights, alpha) => {
+    await blendFn(nodes, groupNames, weights, alpha, adjList, nodeIndexFull, 5, 'gaussian', {});
     blends++;
     for (let i = 0; i < nodes.length; i++) { savedPx[i] = nodes[i].px; savedPy[i] = nodes[i].py; }
     let localBest = -1, localQuant = 'gaussian';
@@ -161,7 +164,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
     if (aborted) break;
     const weights = presets[pi];
     for (const alpha of alphaVals) {
-      const { score, quant } = blendAndScore(weights, alpha);
+      const { score, quant } = await blendAndScore(weights, alpha);
       if (score > bestScore) {
         bestScore = score;
         bestWeights = { ...weights };
@@ -185,7 +188,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
     for (const g of groupNames) combo[g] = (g === g1 || g === g2) ? 5 : 0;
     for (const alpha of alphaVals) {
       if (aborted) break;
-      const { score, quant } = blendAndScore(combo, alpha);
+      const { score, quant } = await blendAndScore(combo, alpha);
       if (score > bestScore) {
         bestScore = score;
         bestWeights = { ...combo };
@@ -208,7 +211,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
         let bestV = bestWeights[g];
         for (const v of WEIGHT_VALS) {
           bestWeights[g] = v;
-          const { score, quant } = blendAndScore(bestWeights, bestAlpha);
+          const { score, quant } = await blendAndScore(bestWeights, bestAlpha);
           if (score > bestScore) {
             bestScore = score;
             bestV = v;
@@ -224,7 +227,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
 
     if (doAlpha && !aborted) {
       for (const a of ALPHA_VALS) {
-        const { score, quant } = blendAndScore(bestWeights, a);
+        const { score, quant } = await blendAndScore(bestWeights, a);
         if (score > bestScore) {
           bestScore = score;
           bestAlpha = a;
@@ -240,7 +243,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   }
 
   // Final blend with best params
-  unifiedBlend(nodes, groupNames, bestWeights, bestAlpha, adjList, nodeIndexFull, 5, bestQuant, {});
+  await blendFn(nodes, groupNames, bestWeights, bestAlpha, adjList, nodeIndexFull, 5, bestQuant, {});
   if (onProgress) onProgress({ phase: 'done', step: totalEstimate, total: totalEstimate, score: bestScore });
 
   // Pick label properties: show what the layout clusters by.

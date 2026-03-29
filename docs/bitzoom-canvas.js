@@ -85,6 +85,7 @@ export class BitZoomCanvas {
     this.showLegend = opts.showLegend || false;
     this.showResetBtn = opts.showResetBtn || false;
     this._progressText = null; // overlay text shown during auto-tune
+    this._useGPU = false; // when true, blend uses GPU compute
     this._quantStats = {}; // fixed Gaussian boundaries — computed once, reused
     this.labelProps = new Set(opts.labelProps || []);
 
@@ -371,22 +372,27 @@ export class BitZoomCanvas {
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
+  /** Run blend (CPU or GPU depending on _useGPU flag) */
+  async _blend() {
+    if (this._useGPU) {
+      await gpuUnifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
+    } else {
+      unifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
+    }
+  }
+
   /** Update property weights and re-blend */
   setWeights(weights) {
     Object.assign(this.propWeights, weights);
     this._refreshPropCache();
-    unifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
-    this.layoutAll();
-    this.render();
+    this._blend().then(() => { this.layoutAll(); this.render(); });
   }
 
   /** Update topology alpha and re-blend */
   setAlpha(alpha) {
     this.smoothAlpha = alpha;
     this.levels = new Array(ZOOM_LEVELS.length).fill(null);
-    unifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
-    this.layoutAll();
-    this.render();
+    this._blend().then(() => { this.layoutAll(); this.render(); });
   }
 
   /** Set display options */
@@ -660,6 +666,7 @@ export class BitZoomCanvas {
 // ─── Factories: create a BitZoomCanvas from data ────────────────────────────
 
 import { runPipeline, computeProjections } from './bitzoom-pipeline.js';
+import { initGPU, computeProjectionsGPU, gpuUnifiedBlend } from './bitzoom-gpu.js';
 
 // Shared tail: weights, colors, blend, construct view.
 function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, hasEdgeTypes, opts) {
@@ -692,8 +699,14 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
   let smoothAlpha = opts.smoothAlpha || 0;
   let quantMode = opts.quantMode;
 
+  // Skip initial blend if autoTune will redo it anyway
+  const deferBlend = opts.autoTune;
   const quantStats = {};
-  unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, 5, quantMode, quantStats);
+  if (!deferBlend) {
+    // Use GPU blend if GPU is already initialized (e.g., viewer bootstrap probed it)
+    // Otherwise CPU blend — GPU will be available for subsequent interactive changes
+    unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, 5, quantMode, quantStats);
+  }
 
   const view = new BitZoomCanvas(canvas, {
     nodes, edges, nodeIndexFull, adjList,
@@ -711,13 +724,14 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
   if (opts.autoTune) {
     view.showProgress('Auto-tuning...');
     const tuneOpts = { ...opts.autoTune };
+    if (view._useGPU && !tuneOpts.blendFn) tuneOpts.blendFn = gpuUnifiedBlend;
     tuneOpts.onProgress = (info) => {
       const pct = Math.round(100 * info.step / Math.max(1, info.total));
       const phase = info.phase === 'presets' ? 'scanning presets'
         : info.phase === 'done' ? 'done' : 'refining';
       view.showProgress(`Auto-tuning: ${phase} (${pct}%)`);
     };
-    autoTuneWeights(view.nodes, view.groupNames, view.adjList, view.nodeIndexFull, tuneOpts).then(result => {
+    autoTuneWeights(view.nodes, view.groupNames, view.adjList, view.nodeIndexFull, tuneOpts).then(async result => {
       if (tuneOpts.weights !== false && !opts.weights) {
         for (const g of view.groupNames) view.propWeights[g] = result.weights[g] ?? 0;
       }
@@ -728,13 +742,24 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
       }
       view._quantStats = {};
       view.levels = new Array(ZOOM_LEVELS.length).fill(null);
-      unifiedBlend(view.nodes, view.groupNames, view.propWeights, view.smoothAlpha,
-        view.adjList, view.nodeIndexFull, 5, view.quantMode, view._quantStats);
+      await view._blend();
       view._progressText = null;
       view._refreshPropCache();
       view.layoutAll();
       view.render();
     });
+  }
+
+  // GPU mode for embedded views: init GPU async, enable GPU blend for interactive changes.
+  // Initial blend uses CPU (sync). GPU kicks in for subsequent weight/alpha changes.
+  // Viewer path handles this differently: GPU is pre-initialized at bootstrap.
+  if (opts.useGPU) {
+    initGPU().then(ok => {
+      if (ok) {
+        view._useGPU = true;
+        console.log('[GPU] GPU blend enabled for embedded view');
+      }
+    }).catch(() => {});
   }
 
   return view;

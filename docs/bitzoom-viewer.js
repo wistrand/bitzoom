@@ -6,9 +6,10 @@ import {
 } from './bitzoom-algo.js';
 import { autoTuneWeights } from './bitzoom-utils.js';
 import { convertStixToSnap } from './stix2snap.js';
+import { initGPU, computeProjectionsGPU, gpuUnifiedBlend } from './bitzoom-gpu.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
-import { computeNodeSig } from './bitzoom-pipeline.js';
+import { computeNodeSig, runPipelineGPU, runPipeline, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
 
 // HTML-escape user-derived strings to prevent XSS from crafted SNAP files.
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -137,11 +138,11 @@ class BitZoom {
 
     // ─── Algorithm wrappers ────────────────────────────────────────────────────
 
-    rebuildProjections() {
+    async rebuildProjections() {
         const v = this.view;
         v._refreshPropCache();
-        v.levels = new Array(ZOOM_LEVELS.length).fill(null); // invalidate level cache
-        unifiedBlend(v.nodes, v.groupNames, v.propWeights, v.smoothAlpha, v.adjList, v.nodeIndexFull, 5, v.quantMode, v._quantStats);
+        v.levels = new Array(ZOOM_LEVELS.length).fill(null);
+        await v._blend();
         v.layoutAll();
         v.render();
     }
@@ -616,7 +617,7 @@ class BitZoom {
         }
     }
 
-    _applyDatasetSettings(settings) {
+    async _applyDatasetSettings(settings) {
         const v = this.view;
         if ('weights' in settings) {
             // Zero all weights first, then apply specified values
@@ -644,7 +645,7 @@ class BitZoom {
         this._syncLabelCheckboxes();
         v._quantStats = {}; // re-snapshot boundaries from dataset-tuned weights
         v._refreshPropCache();
-        this.rebuildProjections();
+        await this.rebuildProjections();
         if (settings.initialLevel != null) {
             v.currentLevel = settings.initialLevel;
             v.baseLevel = settings.initialLevel;
@@ -700,7 +701,7 @@ class BitZoom {
 
     _scheduleRebuild() {
         if (this.rebuildTimer) clearTimeout(this.rebuildTimer);
-        this.rebuildTimer = setTimeout(() => { this.rebuildProjections(); this.rebuildTimer = null; }, 150);
+        this.rebuildTimer = setTimeout(async () => { await this.rebuildProjections(); this.rebuildTimer = null; }, 150);
     }
 
     _syncWeightUI() {
@@ -727,6 +728,9 @@ class BitZoom {
     // ─── Data loading ──────────────────────────────────────────────────────────
 
     loadGraph(edgesText, nodesText) {
+        this._lastEdgesText = edgesText;
+        this._lastNodesText = nodesText;
+        console.log('[CPU] Loading graph via worker pipeline...');
         return new Promise((resolve, reject) => {
             if (this.activeWorker) { this.activeWorker.terminate(); this.activeWorker = null; }
             const status = document.getElementById('loadStatus');
@@ -783,6 +787,78 @@ class BitZoom {
             if (progressBar) progressBar.value = 0;
             worker.postMessage({ edgesText, nodesText });
         });
+    }
+
+    /** Load graph on main thread with GPU blend. Uses GPU projections when quantMode
+     *  is gaussian (default), CPU projections when rank (float32 precision causes rank
+     *  sort instability). Yields between pipeline stages for browser responsiveness. */
+    async loadGraphGPU(edgesText, nodesText, dataset) {
+        this._lastEdgesText = edgesText;
+        this._lastNodesText = nodesText;
+        const status = document.getElementById('loadStatus');
+        const progressBar = document.getElementById('loadProgress');
+        status.classList.remove('error');
+
+        // Determine if rank quant is requested — if so, use CPU projections for precision
+        const useRankQuant = dataset?.settings?.quantMode === 'rank';
+        const projLabel = useRankQuant ? 'CPU (rank quant)' : 'GPU';
+        console.log(`[GPU] Loading graph, projections: ${projLabel}, blend: GPU`);
+
+        const t0 = performance.now();
+        const yield_ = () => new Promise(r => requestAnimationFrame(r));
+
+        status.textContent = 'Parsing edges...';
+        if (progressBar) progressBar.value = 10;
+        await yield_();
+        const parsed = parseEdgesFile(edgesText);
+
+        let nodesResult = null;
+        if (nodesText) {
+            status.textContent = 'Parsing nodes...';
+            if (progressBar) progressBar.value = 25;
+            await yield_();
+            nodesResult = parseNodesFile(nodesText);
+        }
+
+        status.textContent = 'Building graph...';
+        if (progressBar) progressBar.value = 40;
+        await yield_();
+        const nodesMap = nodesResult ? nodesResult.nodes : null;
+        const extraPropNames = nodesResult ? nodesResult.extraPropNames : [];
+        const graph = buildGraph(parsed, nodesMap, extraPropNames);
+
+        let projBuf;
+        if (useRankQuant) {
+            status.textContent = 'Computing projections (CPU)...';
+            if (progressBar) progressBar.value = 60;
+            await yield_();
+            projBuf = computeProjections(
+                graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+            ).projBuf;
+        } else {
+            status.textContent = 'Computing projections (GPU)...';
+            if (progressBar) progressBar.value = 60;
+            await yield_();
+            projBuf = (await computeProjectionsGPU(
+                graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+            )).projBuf;
+        }
+
+        status.textContent = 'Applying...';
+        if (progressBar) progressBar.value = 85;
+        await yield_();
+
+        console.log(`[GPU] Pipeline done: ${graph.nodeArray.length} nodes, ${graph.edges.length} edges in ${Math.round(performance.now() - t0)}ms`);
+
+        this.view._useGPU = true;
+        this._applyWorkerResult({
+            nodeMeta: graph.nodeArray,
+            projBuf,
+            edges: graph.edges,
+            groupNames: graph.groupNames,
+            hasEdgeTypes: graph.hasEdgeTypes,
+        });
+        if (progressBar) progressBar.value = 100;
     }
 
     _applyWorkerResult(result) {
@@ -877,7 +953,10 @@ class BitZoom {
         this._updateQuantBtn();
         this._updateEdgeBtn();
         this._updateHeatBtn();
-        unifiedBlend(v.nodes, v.groupNames, v.propWeights, v.smoothAlpha, v.adjList, v.nodeIndexFull, 5, v.quantMode, v._quantStats);
+        // Blend: skip if GPU mode — _finalizeLoad will trigger the right blend
+        if (!v._useGPU) {
+            unifiedBlend(v.nodes, v.groupNames, v.propWeights, v.smoothAlpha, v.adjList, v.nodeIndexFull, 5, v.quantMode, v._quantStats);
+        }
 
         this.dataLoaded = true;
         v.selectedId = null;
@@ -895,8 +974,15 @@ class BitZoom {
     /** Apply settings + initial render in a single rAF after loadGraph */
     _finalizeLoad(dataset) {
         const v = this.view;
-        requestAnimationFrame(() => {
-            if (dataset?.settings) this._applyDatasetSettings(dataset.settings);
+        requestAnimationFrame(async () => {
+            // _applyDatasetSettings calls rebuildProjections which blends.
+            // If no settings, we need an explicit blend (especially for GPU mode
+            // where _applyWorkerResult skips the blend).
+            if (dataset?.settings) {
+                await this._applyDatasetSettings(dataset.settings);
+            } else {
+                await v._blend();
+            }
             const params = this._restoreFromHash();
             if (params && params.d === dataset?.name) {
                 this._applyHashState(params);
@@ -908,6 +994,45 @@ class BitZoom {
             this._updateAlgoInfo();
             this._scheduleHashUpdate();
         });
+    }
+
+    /** Apply GPU projection to already-loaded data. No re-parse, no re-load. */
+    async _applyGPUToCurrentData() {
+        console.log('[GPU] Re-projecting current data on GPU...');
+        if (!this._lastEdgesText) return;
+        const v = this.view;
+        v.showProgress('GPU pipeline...');
+        const t0 = performance.now();
+        try {
+            const result = await runPipelineGPU(this._lastEdgesText, this._lastNodesText, computeProjectionsGPU);
+            const G = result.groupNames.length;
+            for (let i = 0; i < v.nodes.length; i++) {
+                for (let g = 0; g < G; g++) {
+                    const off = (i * G + g) * 2;
+                    const p = v.nodes[i].projections[result.groupNames[g]];
+                    if (p) { p[0] = result.projBuf[off]; p[1] = result.projBuf[off + 1]; }
+                }
+            }
+            v._quantStats = {};
+            v.levels = new Array(ZOOM_LEVELS.length).fill(null);
+            v._progressText = null;
+            await this.rebuildProjections();
+            this._updateOverview();
+            console.log(`GPU pipeline: ${Math.round(performance.now() - t0)}ms`);
+        } catch (err) {
+            v._progressText = null;
+            v.render();
+            console.error('GPU pipeline failed:', err);
+        }
+    }
+
+    /** Full reload with CPU pipeline and dataset settings. */
+    async _reloadCPU() {
+        console.log('[CPU] Reloading with CPU worker pipeline...');
+        if (!this._lastEdgesText) return;
+        await this.loadGraph(this._lastEdgesText, this._lastNodesText);
+        const ds = this._currentDatasetId ? DATASETS.find(d => d.id === this._currentDatasetId) : null;
+        this._finalizeLoad(ds);
     }
 
     async loadDataset(dataset) {
@@ -934,7 +1059,12 @@ class BitZoom {
                     nodesText = await this._fetchText(dataset.nodes).catch(() => null);
                 }
             }
-            await this.loadGraph(edgesText, nodesText);
+            console.log(`[Load] Dataset: ${dataset.name}, GPU: ${!!this._useGPU}`);
+            if (this._useGPU) {
+                await this.loadGraphGPU(edgesText, nodesText, dataset);
+            } else {
+                await this.loadGraph(edgesText, nodesText);
+            }
             this._currentDatasetId = dataset.id;
             this._finalizeLoad(dataset);
         } catch (err) {
@@ -1055,7 +1185,7 @@ class BitZoom {
         // Auto-tune button (click to start, click again to stop)
         const autoBtn = document.getElementById('autoTuneBtn');
         let tuneAbort = null;
-        const applyTuneResult = (result) => {
+        const applyTuneResult = async (result) => {
             for (const g of v.groupNames) v.propWeights[g] = result.weights[g] ?? 0;
             v.smoothAlpha = result.alpha;
             v.quantMode = result.quantMode;
@@ -1073,7 +1203,7 @@ class BitZoom {
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
             this._updateQuantBtn();
             v._progressText = null;
-            this.rebuildProjections();
+            await this.rebuildProjections();
             this._updateOverview();
             autoBtn.textContent = 'Auto';
             autoBtn.style.background = '';
@@ -1089,8 +1219,9 @@ class BitZoom {
             autoBtn.style.color = '#fff';
             autoBtn.textContent = 'Stop';
             const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
-                weights: true, alpha: true, quant: true,
+                weights: true, alpha: true, quant: false,
                 signal: tuneAbort.signal,
+                blendFn: this._useGPU ? gpuUnifiedBlend : undefined,
                 onProgress: (info) => {
                     const pct = Math.round(100 * info.step / Math.max(1, info.total));
                     const phase = info.phase === 'presets' ? 'scanning presets'
@@ -1098,8 +1229,48 @@ class BitZoom {
                     v.showProgress(`Auto-tuning: ${phase} (${pct}%) — click Stop to apply`);
                 },
             });
-            applyTuneResult(result);
+            await applyTuneResult(result);
             console.log(`Auto-tune: ${result.blends} blends, ${result.quants} quants in ${result.timeMs}ms, score=${result.score.toFixed(3)}`);
+        }, sig);
+
+        // GPU toggle: re-project using WebGPU compute. When active, new data loads also use GPU.
+        const gpuBtn = document.getElementById('gpuBtn');
+        const updateGpuBtn = () => {
+            gpuBtn.style.background = this._useGPU ? 'var(--accent)' : '';
+            gpuBtn.style.color = this._useGPU ? '#fff' : '';
+            gpuBtn.textContent = this._gpuUnavailable ? 'N/A' : 'GPU';
+        };
+        gpuBtn.addEventListener('click', async () => {
+            if (this._gpuUnavailable) return;
+
+            // Toggle off: reload with CPU pipeline
+            if (this._useGPU) {
+                this._useGPU = false;
+                v._useGPU = false;
+                updateGpuBtn();
+                await this._reloadCPU();
+                return;
+            }
+
+            // Toggle on: init GPU, then re-project current data
+            gpuBtn.disabled = true;
+            gpuBtn.textContent = '...';
+            v.showProgress('Initializing GPU...');
+
+            const ok = await initGPU();
+            if (!ok) {
+                v.showProgress(null);
+                this._gpuUnavailable = true;
+                updateGpuBtn();
+                gpuBtn.disabled = true;
+                return;
+            }
+
+            this._useGPU = true;
+            v._useGPU = true;
+            await this._applyGPUToCurrentData();
+            updateGpuBtn();
+            gpuBtn.disabled = false;
         }, sig);
 
         // Sidebar
@@ -1293,9 +1464,9 @@ class BitZoom {
             v.smoothAlpha = parseFloat(e.target.value);
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
             if (this.smoothDebounceTimer) clearTimeout(this.smoothDebounceTimer);
-            this.smoothDebounceTimer = setTimeout(() => {
+            this.smoothDebounceTimer = setTimeout(async () => {
                 v.levels = new Array(ZOOM_LEVELS.length).fill(null);
-                unifiedBlend(v.nodes, v.groupNames, v.propWeights, v.smoothAlpha, v.adjList, v.nodeIndexFull, 5, v.quantMode, v._quantStats);
+                await v._blend();
                 v.layoutAll();
                 v.render();
                 this.smoothDebounceTimer = null;
@@ -1336,7 +1507,11 @@ class BitZoom {
             progressBar.style.display = 'block';
             progressBar.value = 0;
             document.getElementById('loadBtn').disabled = true;
-            try { await this.loadGraph(this.pendingEdgesText, this.pendingNodesText); this._finalizeLoad(null); }
+            try {
+                if (this._useGPU) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
+                else await this.loadGraph(this.pendingEdgesText, this.pendingNodesText);
+                this._finalizeLoad(null);
+            }
             catch (_err) { /* shown by worker handler */ }
         }, sig);
     }
@@ -1460,10 +1635,31 @@ class BitZoom {
 const bz = new BitZoom();
 window.bz = bz;
 
-const hashParams = bz._restoreFromHash();
-const hashDataset = hashParams?.d ? DATASETS.find(d => d.id === hashParams.d) : null;
-const startDataset = hashDataset || DATASETS.find(d => d.id === 'epstein');
-if (startDataset) bz.loadDataset(startDataset);
+// Probe WebGPU, then load initial dataset
+(async () => {
+  try {
+    const gpuOk = await initGPU();
+    const gpuBtn = document.getElementById('gpuBtn');
+    if (gpuOk) {
+      bz._useGPU = true;
+      bz.view._useGPU = true;
+      console.log('[GPU] WebGPU available — GPU mode enabled');
+      if (gpuBtn) { gpuBtn.style.background = 'var(--accent)'; gpuBtn.style.color = '#fff'; }
+    } else {
+      console.log('[GPU] WebGPU not available — using CPU pipeline');
+      if (gpuBtn) { gpuBtn.textContent = 'N/A'; gpuBtn.disabled = true; bz._gpuUnavailable = true; }
+    }
+  } catch (err) {
+    console.error('[GPU] WebGPU probe failed:', err);
+    const gpuBtn = document.getElementById('gpuBtn');
+    if (gpuBtn) { gpuBtn.textContent = 'N/A'; gpuBtn.disabled = true; bz._gpuUnavailable = true; }
+  }
+
+  const hashParams = bz._restoreFromHash();
+  const hashDataset = hashParams?.d ? DATASETS.find(d => d.id === hashParams.d) : null;
+  const startDataset = hashDataset || DATASETS.find(d => d.id === 'epstein');
+  if (startDataset) bz.loadDataset(startDataset);
+})();
 
 window.addEventListener('hashchange', () => {
     const params = bz._restoreFromHash();

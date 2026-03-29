@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BitZoom — GPU vs CPU Comparison</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #7c6af7;
+    --accent3: #6af7c8;
+    --text: #c8c8d8;
+    --text-dim: #8888a0;
+    --text-bright: #eeeef8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+    padding: 24px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+  }
+  h1 span { color: var(--accent); }
+
+  .subtitle { font-size: 13px; color: var(--text-dim); margin-bottom: 24px; }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-top: 32px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pair {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0 24px;
+    flex-wrap: wrap;
+  }
+  .panel {
+    flex: 1;
+    min-width: 320px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .panel-header {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+  .panel-header .tag {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .tag-cpu { background: var(--border); color: var(--text); }
+  .tag-gpu { background: var(--accent); color: #fff; }
+
+  canvas {
+    width: 100%;
+    height: 280px;
+    display: block;
+    background: var(--bg);
+  }
+
+  #status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<h1>GPU vs <span>CPU</span> Comparison</h1>
+<p class="subtitle">Each dataset rendered side by side: CPU (left) and GPU (right). Same data, same weights, same alpha. GPU projections use float32 (vs CPU float64). Small precision differences change rank quantization sort order for tightly packed nodes, producing visually different but statistically equivalent layouts. Cluster structure and color grouping should match.</p>
+<div id="status">Initializing...</div>
+
+<h2>Karate Club — 34 nodes, group weight</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">Karate · group:8 · α=0 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="karate-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Karate · group:8 · α=0 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="karate-gpu"></canvas>
+  </div>
+</div>
+
+<h2>Karate Club — topology α=0.75</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">Karate · balanced · α=0.75 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="karate-topo-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Karate · balanced · α=0.75 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="karate-topo-gpu"></canvas>
+  </div>
+</div>
+
+<h2>Epstein — 364 nodes, edge types</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">Epstein · edgetype:8 · α=0 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="epstein-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Epstein · edgetype:8 · α=0 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="epstein-gpu"></canvas>
+  </div>
+</div>
+
+<h2>Epstein — topology α=0.75</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">Epstein · group:5 edgetype:8 · α=0.75 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="epstein-topo-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Epstein · group:5 edgetype:8 · α=0.75 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="epstein-topo-gpu"></canvas>
+  </div>
+</div>
+
+<h2>BitZoom Source — 433 nodes, kind weight</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">BZ Source · kind:8 group:3 · α=0 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="bzsource-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">BZ Source · kind:8 group:3 · α=0 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="bzsource-gpu"></canvas>
+  </div>
+</div>
+
+<h2>BitZoom Source — topology α=0.5</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">BZ Source · kind:8 group:3 · α=0.5 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="bzsource-topo-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">BZ Source · kind:8 group:3 · α=0.5 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="bzsource-topo-gpu"></canvas>
+  </div>
+</div>
+
+<h2>MITRE ATT&CK — 4736 nodes, property weighted</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">MITRE · platforms:6 killchain:4 · α=0 <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="mitre-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">MITRE · platforms:6 killchain:4 · α=0 <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="mitre-gpu"></canvas>
+  </div>
+</div>
+
+<h2>Email-EU — 1005 nodes, edge-only, topology</h2>
+<div class="pair">
+  <div class="panel">
+    <div class="panel-header">Email-EU · α=0.75 · rank quant <span class="tag tag-cpu">CPU</span></div>
+    <canvas id="email-cpu"></canvas>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Email-EU · α=0.75 · rank quant <span class="tag tag-gpu">GPU</span></div>
+    <canvas id="email-gpu"></canvas>
+  </div>
+</div>
+
+<script type="module">
+import { createBitZoomView } from './bitzoom-canvas.js';
+import { initGPU } from './bitzoom-gpu.js';
+
+const status = document.getElementById('status');
+const results = [];
+
+async function loadPair(name, edgesFile, nodesFile, cpuId, gpuId, opts = {}) {
+  const t0 = performance.now();
+  const [edgesRes, nodesRes] = await Promise.all([
+    fetch(edgesFile).then(r => r.text()),
+    nodesFile ? fetch(nodesFile).then(r => r.text()).catch(() => null) : Promise.resolve(null),
+  ]);
+
+  const cpuOpts = { initialLevel: 4, edgeMode: 'lines', showLegend: true, showResetBtn: true, ...opts };
+  const gpuOpts = { ...cpuOpts, useGPU: true };
+
+  const cpuView = createBitZoomView(document.getElementById(cpuId), edgesRes, nodesRes, cpuOpts);
+  const gpuView = createBitZoomView(document.getElementById(gpuId), edgesRes, nodesRes, gpuOpts);
+
+  // Log comparison after GPU finishes (give it time)
+  setTimeout(() => {
+    if (cpuView.nodes && gpuView.nodes && cpuView.nodes.length === gpuView.nodes.length) {
+      let maxD = 0;
+      for (let i = 0; i < cpuView.nodes.length; i++) {
+        const dx = Math.abs(cpuView.nodes[i].px - gpuView.nodes[i].px);
+        const dy = Math.abs(cpuView.nodes[i].py - gpuView.nodes[i].py);
+        maxD = Math.max(maxD, dx, dy);
+      }
+      console.log(`[${name}] px/py maxDelta: ${maxD.toFixed(6)}, nodes: ${cpuView.nodes.length}`);
+      const gxD = cpuView.nodes.reduce((m, n, i) => Math.max(m, Math.abs(n.gx - gpuView.nodes[i].gx)), 0);
+      console.log(`[${name}] gx maxDelta: ${gxD}`);
+    }
+  }, 3000);
+
+  const elapsed = Math.round(performance.now() - t0);
+  results.push(`${name}: ${elapsed}ms`);
+  status.textContent = `Loaded: ${results.join(' · ')}`;
+}
+
+// Init GPU first
+const gpuOk = await initGPU();
+status.textContent = gpuOk
+  ? 'WebGPU available. Loading datasets...'
+  : 'WebGPU NOT available — GPU panels will fall back to CPU. Loading datasets...';
+
+// Load all pairs sequentially to avoid overwhelming GPU
+await loadPair('Karate',
+  'data/karate.edges', 'data/karate.nodes',
+  'karate-cpu', 'karate-gpu',
+  { weights: { group: 8 }, labelProps: ['group'] });
+
+await loadPair('Karate topo',
+  'data/karate.edges', 'data/karate.nodes',
+  'karate-topo-cpu', 'karate-topo-gpu',
+  { smoothAlpha: 0.75, labelProps: ['group'] });
+
+await loadPair('Epstein',
+  'data/epstein.edges', 'data/epstein.nodes',
+  'epstein-cpu', 'epstein-gpu',
+  { weights: { edgetype: 8 }, labelProps: ['label'] });
+
+await loadPair('Epstein topo',
+  'data/epstein.edges', 'data/epstein.nodes',
+  'epstein-topo-cpu', 'epstein-topo-gpu',
+  { weights: { group: 5, edgetype: 8 }, smoothAlpha: 0.75, labelProps: ['label'] });
+
+await loadPair('BZ Source',
+  'data/bitzoom-source.edges', 'data/bitzoom-source.nodes',
+  'bzsource-cpu', 'bzsource-gpu',
+  { weights: { kind: 8, group: 3 }, labelProps: ['kind'] });
+
+await loadPair('BZ Source topo',
+  'data/bitzoom-source.edges', 'data/bitzoom-source.nodes',
+  'bzsource-topo-cpu', 'bzsource-topo-gpu',
+  { weights: { kind: 8, group: 3 }, smoothAlpha: 0.5, labelProps: ['kind'] });
+
+await loadPair('MITRE',
+  'data/mitre-attack.edges', 'data/mitre-attack.nodes',
+  'mitre-cpu', 'mitre-gpu',
+  { weights: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'] });
+
+await loadPair('Email-EU',
+  'data/email-eu.edges', null,
+  'email-cpu', 'email-gpu',
+  { weights: {}, smoothAlpha: 0.75, quantMode: 'rank' });
+
+status.textContent = `Done. ${results.join(' · ')}`;
+</script>
+
+</body>
+</html>
