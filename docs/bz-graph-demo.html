@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BitZoom — &lt;bz-graph&gt; Web Component Demo</title>
+<script type="module" src="bz-graph.js"></script>
+<style>
+  body { margin: 0; background: #0a0a0f; color: #c8c8d8; font-family: monospace; padding: 16px; }
+  h2 { font-size: 14px; color: #eeeef8; margin: 24px 0 8px; }
+  p { font-size: 12px; color: #8888a0; margin: 0 0 8px; }
+  bz-graph:not(:defined) { visibility: hidden; }
+  bz-graph { height: 350px; border: 1px solid #2a2a4a; border-radius: 6px; }
+  .light bz-graph { --bz-bg: #e8e8f0; border-color: #c0c0d0; }
+</style>
+</head>
+<body>
+
+<h2>File attributes</h2>
+<p>edges + nodes from URL, with legend, heatmap, and weights</p>
+<bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
+          level="3" heatmap="density" edge-mode="curves" legend
+          weights="group:5,edgetype:8" label-props="label">
+</bz-graph>
+
+<h2>Inline JSON</h2>
+<p>Nodes and edges as inline JSON</p>
+<bz-graph format="json" level="2" legend color-scheme="6">
+{
+  "nodes": [
+    {"id": "alice",  "group": "eng", "label": "Alice",  "lang": "Go"},
+    {"id": "bob",    "group": "eng", "label": "Bob",    "lang": "Go"},
+    {"id": "carol",  "group": "des", "label": "Carol",  "lang": "JS"},
+    {"id": "dave",   "group": "des", "label": "Dave",   "lang": "JS"},
+    {"id": "eve",    "group": "mgr", "label": "Eve",    "lang": "Py"},
+    {"id": "frank",  "group": "eng", "label": "Frank",  "lang": "Rust"}
+  ],
+  "edges": [
+    {"src": "alice", "dst": "bob"},   {"src": "alice", "dst": "carol"},
+    {"src": "bob",   "dst": "frank"}, {"src": "carol", "dst": "dave"},
+    {"src": "eve",   "dst": "alice"}, {"src": "eve",   "dst": "dave"}
+  ]
+}
+</bz-graph>
+
+<h2>Inline SNAP</h2>
+<p>Tab-delimited edges as raw text</p>
+<bz-graph level="2" legend edge-mode="lines" heatmap="splat">
+a	b
+b	c
+c	d
+d	a
+a	c
+b	d
+</bz-graph>
+
+<h2 class="light">Light mode with viridis</h2>
+<div class="light">
+<bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
+          level="2" legend light-mode color-scheme="1"
+          weights="group:8" label-props="group">
+</bz-graph>
+</div>
+
+
+</body>
+</html>

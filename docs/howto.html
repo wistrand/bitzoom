@@ -14,7 +14,9 @@
 <meta name="twitter:description" content="Embed graph views or run the pipeline offline. ES modules, no dependencies.">
 <meta name="twitter:image" content="images/bitzoom-2.png">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
+<script type="module" src="bz-graph.js"></script>
 <style>
+  bz-graph:not(:defined) { visibility: hidden; }
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
 
   :root {
@@ -134,6 +136,7 @@
   <a href="#similarity">Similarity Queries</a>
   <a href="#levels">Hierarchy Access</a>
   <a href="#webgl">WebGL Rendering</a>
+  <a href="#webcomponent">Web Component</a>
   <a href="#files">Required Files</a>
 </nav>
 
@@ -671,6 +674,81 @@ viewGL.useWebGL = <span class="keyword">true</span>;   <span class="comment">// 
   WebGL rendering produces identical visual output to Canvas 2D. The benefit is reduced CPU load for large views &mdash; geometry draw calls are offloaded to the GPU via instanced rendering. See <a href="webgl.html">WebGL Rendering</a> for the full architecture: SDF circles, GPU-tessellated Bezier curves, two-pass density heatmap.
 </div>
 
+<h2 id="webcomponent">&lt;bz-graph&gt; Web Component</h2>
+
+<p>Embed a graph with a single HTML element &mdash; no JavaScript needed for basic use. Include <code>bz-graph.js</code> in your page and use the <code>&lt;bz-graph&gt;</code> tag.</p>
+
+<h3>From files</h3>
+
+<pre>&lt;script type="module" src="bz-graph.js"&gt;&lt;/script&gt;
+&lt;style&gt;bz-graph:not(:defined) { visibility: hidden; }&lt;/style&gt;
+
+&lt;bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
+          level="3" heatmap="density" legend
+          weights="group:5,edgetype:8" label-props="label"&gt;
+&lt;/bz-graph&gt;</pre>
+
+<bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
+          level="3" heatmap="density" edge-mode="curves" legend
+          weights="group:5,edgetype:8" label-props="label"
+          style="height:280px;border:1px solid var(--border);border-radius:8px;margin:16px 0">
+</bz-graph>
+
+<h3>Inline JSON</h3>
+
+<pre>&lt;bz-graph format="json" level="2" legend color-scheme="6"&gt;
+{
+  "nodes": [
+    {"id": "alice", "group": "eng", "label": "Alice", "lang": "Go"},
+    {"id": "bob",   "group": "eng", "label": "Bob",   "lang": "Go"},
+    {"id": "carol", "group": "des", "label": "Carol", "lang": "JS"}
+  ],
+  "edges": [
+    {"src": "alice", "dst": "bob"},
+    {"src": "bob", "dst": "carol"}
+  ]
+}
+&lt;/bz-graph&gt;</pre>
+
+<h3>Inline SNAP</h3>
+
+<pre>&lt;bz-graph level="2" legend edge-mode="lines"&gt;
+alice	bob
+bob	carol
+carol	alice
+&lt;/bz-graph&gt;</pre>
+
+<h3>Attributes</h3>
+
+<table>
+  <tr><th>Attribute</th><th>Example</th><th>Description</th></tr>
+  <tr><td><code>edges</code></td><td><code>"data/karate.edges"</code></td><td>URL to .edges file</td></tr>
+  <tr><td><code>nodes</code></td><td><code>"data/karate.nodes"</code></td><td>URL to .nodes file (optional)</td></tr>
+  <tr><td><code>format</code></td><td><code>"json"</code></td><td>Inline data format: <code>json</code> or <code>snap</code> (default)</td></tr>
+  <tr><td><code>level</code></td><td><code>"3"</code></td><td>Initial zoom level (0-indexed)</td></tr>
+  <tr><td><code>heatmap</code></td><td><code>"density"</code></td><td>Heatmap mode: <code>off</code>, <code>density</code>, <code>splat</code></td></tr>
+  <tr><td><code>edge-mode</code></td><td><code>"curves"</code></td><td>Edge mode: <code>curves</code>, <code>lines</code>, <code>none</code></td></tr>
+  <tr><td><code>alpha</code></td><td><code>"0.5"</code></td><td>Topology blend alpha (0&ndash;1)</td></tr>
+  <tr><td><code>color-scheme</code></td><td><code>"1"</code></td><td>Color scheme index (0&ndash;8)</td></tr>
+  <tr><td><code>weights</code></td><td><code>"group:5,kind:8"</code></td><td>Property weights</td></tr>
+  <tr><td><code>label-props</code></td><td><code>"label,group"</code></td><td>Properties shown as labels</td></tr>
+  <tr><td><code>legend</code></td><td>(boolean)</td><td>Show color legend</td></tr>
+  <tr><td><code>reset-btn</code></td><td>(boolean)</td><td>Show reset button</td></tr>
+  <tr><td><code>light-mode</code></td><td>(boolean)</td><td>Light theme</td></tr>
+  <tr><td><code>webgl</code></td><td>(boolean)</td><td>WebGL2 rendering</td></tr>
+</table>
+
+<p>Access the underlying <code>BitZoomCanvas</code> via <code>element.view</code> for programmatic control:</p>
+
+<pre><span class="keyword">const</span> el = document.querySelector(<span class="string">'bz-graph'</span>);
+el.view.colorScheme = 3;      <span class="comment">// change at runtime</span>
+el.view.cycleColorScheme();   <span class="comment">// next scheme</span>
+el.setAttribute(<span class="string">'level'</span>, <span class="string">'5'</span>); <span class="comment">// reactive attribute</span></pre>
+
+<p>See the <a href="bz-graph-demo.html">full demo page</a> for more examples.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+
 <h2 id="files">Required Files</h2>
 
 <p>BitZoom has no build step and no npm package. Copy the files you need into your project:</p>
@@ -695,8 +773,10 @@ viewGL.useWebGL = <span class="keyword">true</span>;   <span class="comment">// 
   <tr><td><code>bitzoom-utils.js</code></td><td>Auto-tune optimizer</td></tr>
   <tr><td><code>bitzoom-gl-renderer.js</code></td><td>WebGL2 instanced rendering (optional feature, always imported)</td></tr>
   <tr><td><code>bitzoom-gpu.js</code></td><td>WebGPU compute acceleration (optional feature, always imported)</td></tr>
+  <tr><td><code>bitzoom-colors.js</code></td><td>Color schemes (vivid, viridis, plasma, etc.)</td></tr>
+  <tr><td><code>bz-graph.js</code></td><td><code>&lt;bz-graph&gt;</code> web component (optional, imports bitzoom-canvas.js)</td></tr>
 </table>
-<p>All seven files are ES modules. Place them in the same directory and import <code>bitzoom-canvas.js</code>. Your HTML page needs <code>&lt;script type="module"&gt;</code>. No bundler required.</p>
+<p>The first seven files are required for <code>createBitZoomView</code>. Add <code>bz-graph.js</code> for the web component. All are ES modules. Place them in the same directory. No bundler required.</p>
 
 <p style="margin-top:48px;color:var(--text-dim);font-size:13px;text-align:center;">
   <a href="about.html">How It Works</a> &middot; <a href="viewer.html">Viewer</a> &middot; <a href="https://github.com/wistrand/bitzoom">GitHub</a>

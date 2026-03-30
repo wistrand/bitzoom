@@ -14,7 +14,9 @@
 <meta name="twitter:description" content="MinHash signatures, Gaussian projection, weighted blend, bit-shift zoom hierarchy.">
 <meta name="twitter:image" content="images/bitzoom-1.png">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
+<script type="module" src="bz-graph.js"></script>
 <style>
+  bz-graph:not(:defined) { visibility: hidden; }
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
 
   :root {
@@ -1404,8 +1406,36 @@
   <tr><td><a href="bitzoom-renderer.js"><code>bitzoom-renderer.js</code></a></td><td>5-layer canvas rendering, heatmaps, edge sampling, hit testing</td></tr>
   <tr><td><a href="bitzoom-worker.js"><code>bitzoom-worker.js</code></a></td><td>Web Worker coordinator, fans out to projection sub-workers</td></tr>
   <tr><td><a href="https://github.com/wistrand/bitzoom/blob/main/agent_docs/SPEC.md">SPEC.md</a></td><td>Algorithm specification: similarity model, blend formula, complexity, open questions</td></tr>
+  <tr><td><a href="bz-graph.js"><code>&lt;bz-graph&gt;</code></a></td><td>Web component: embed a graph with one HTML tag</td></tr>
   <tr><td><a href="https://github.com/wistrand/bitzoom">GitHub</a></td><td>Source, datasets, tests, SNAP converters</td></tr>
 </table>
+
+<p>Embed a graph with a single HTML element:</p>
+
+<div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap">
+  <div style="flex:1;min-width:280px">
+    <bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
+              level="2" heatmap="density" edge-mode="curves" legend
+              weights="group:8" label-props="group"
+              style="height:260px;border-radius:8px;border:1px solid var(--border)">
+    </bz-graph>
+  </div>
+  <div style="flex:1;min-width:280px">
+    <bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
+              level="2" heatmap="density" edge-mode="curves" legend
+              weights="group:8" label-props="group"
+              light-mode color-scheme="6"
+              style="height:260px;border-radius:8px;border:1px solid #c0c0d0;--bz-bg:#e8e8f0">
+    </bz-graph>
+  </div>
+</div>
+
+<pre style="font-size:11px">&lt;script type="module" src="bz-graph.js"&gt;&lt;/script&gt;
+
+&lt;bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
+          level="2" heatmap="density" legend
+          weights="group:8" label-props="group"&gt;
+&lt;/bz-graph&gt;</pre>
 
 <script type="module">
 import { createBitZoomView } from './bitzoom-canvas.js';
