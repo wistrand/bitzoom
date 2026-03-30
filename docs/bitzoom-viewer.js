@@ -31,7 +31,7 @@ const DATASETS = [
     { id: 'facebook',   name: 'Facebook',        edges: 'data/facebook.edges',                                                    desc: '4K nodes, social',
         settings: { weights: {}, initialLevel: 4, quantMode: 'rank', smoothAlpha: 1.0 } },
     { id: 'marvel',     name: 'Marvel Comics',   edges: 'data/marvel.edges',             nodes: 'data/marvel.nodes',             desc: '327 characters',
-        settings: { weights: { group: 2, alignment: 5, sex: 2 }, labelProps: ['label', 'alignment'] } },
+        settings: { weights: { group: 2, alignment: 5, gender: 2 }, labelProps: ['label', 'alignment'] } },
     { id: 'pokemon',    name: 'Pokemon',         edges: 'data/pokemon.edges',            nodes: 'data/pokemon.nodes',            desc: '959 Pokemon',
         settings: { weights: { type1: 8, type2: 4, generation: 3, rarity: 2 }, labelProps: ['label', 'type1'] } },
 { id: 'amazon',     name: 'Amazon',          edges: 'data/amazon-copurchase.edges.gz',nodes: 'data/amazon-copurchase.nodes.gz',desc: '367K nodes' },
