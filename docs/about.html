@@ -405,7 +405,7 @@
 <!-- Step 2: MinHash -->
 <h2 id="minhash">Step 2: MinHash Signatures</h2>
 
-<p>For each property group, the token set is hashed into a <a href="https://en.wikipedia.org/wiki/MinHash"><em>MinHash</em></a> signature of length k=128 using <a href="https://en.wikipedia.org/wiki/Universal_hashing">universal hashing</a>. The probability that two nodes share a hash minimum equals their <a href="https://en.wikipedia.org/wiki/Jaccard_index">Jaccard similarity</a>:</p>
+<p>For each property group, the token set is hashed into a <a href="https://en.wikipedia.org/wiki/MinHash"><em>MinHash</em></a> signature of length k=128 using <a href="https://en.wikipedia.org/wiki/Universal_hashing">universal hashing</a> (k-mins variant; see <a href="http://www.cohenwang.com/edith/Surveys/minhash.pdf">Cohen 2016</a> for a survey of MinHash sketch constructions). The probability that two nodes share a hash minimum equals their <a href="https://en.wikipedia.org/wiki/Jaccard_index">Jaccard similarity</a>:</p>
 
 <div class="math-block">
 <math display="block">

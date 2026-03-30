@@ -112,4 +112,19 @@ The system requires empirical evaluation against: semantic neighbourhood preserv
 | Per-node zoom-cell derivation | O(1)                   |
 
 **Memory per node:** 2G floats for fixed projections + four bytes for uint16 grid coordinates.
+
+---
+
+## References
+
+- E. Cohen, "MinHash Sketches: A Brief Survey," *Encyclopedia of Algorithms*, 2016.
+  Authoritative survey on MinHash sketch variants (k-mins, bottom-k, k-partition),
+  Jaccard estimation, mergeability, and weighted extensions. BitZoom uses k-mins
+  sketches at k=128 as described in this survey.
+- A. Z. Broder, "On the resemblance and containment of documents," *Compression and
+  Complexity of Sequences*, IEEE, 1997. Coined the term MinHash; classic application
+  for near-duplicate detection via set similarity.
+- P. Li, A. B. Owen, and C-H Zhang, "One permutation hashing," *NIPS*, 2012.
+  OPH with densification, used by BitZoom for nodes with >= 12 tokens to reduce
+  from k hash evaluations per token to one.
 ````
