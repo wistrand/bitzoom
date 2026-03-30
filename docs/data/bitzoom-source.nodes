@@ -1,35 +1,57 @@
 # NodeId	Label	Group	Kind	File	Lines	Bytes	AgeHours
-file:scripts/bench-hashslot.js	scripts/bench-hashslot.js	scripts	file	scripts	109	3305	11
-file:scripts/bench-minhash.js	scripts/bench-minhash.js	scripts	file	scripts	77	3073	
-file:scripts/bench-oph-threshold.js	scripts/bench-oph-threshold.js	scripts	file	scripts	79	2811	
-file:scripts/bench-viewer.js	scripts/bench-viewer.js	scripts	file	scripts	224	9805	2
-file:scripts/csv2snap.ts	scripts/csv2snap.ts	scripts	file	scripts	252	8160	2
-file:scripts/bench-pipeline.js	scripts/bench-pipeline.js	scripts	file	scripts	84	3627	2
-file:scripts/serve.ts	scripts/serve.ts	scripts	file	scripts	46	1240	3
-file:scripts/stix2snap.ts	scripts/stix2snap.ts	scripts	file	scripts	384	13326	2
-file:scripts/bench-render.js	scripts/bench-render.js	scripts	file	scripts	115	4659	2
-file:scripts/src2snap.ts	scripts/src2snap.ts	scripts	file	scripts	503	19419	2
-file:scripts/bench-3M.js	scripts/bench-3M.js	scripts	file	scripts	185	7579	1
-file:tests/pipeline_test.ts	tests/pipeline_test.ts	tests	file	tests	805	32915	
-file:agent_docs/SPEC.md	agent_docs/SPEC.md	agent_docs	file	agent_docs	113	10785	4
-file:agent_docs/RESEARCH-precompute-optimizations.md	agent_docs/RESEARCH-precompute-optimizations.md	agent_docs	file	agent_docs	177	6850	1
-file:agent_docs/PLAN-30M-incremental.md	agent_docs/PLAN-30M-incremental.md	agent_docs	file	agent_docs	332	12966	1
-file:agent_docs/ARCHITECTURE.md	agent_docs/ARCHITECTURE.md	agent_docs	file	agent_docs	243	15705	2
-file:CLAUDE.md	CLAUDE.md	.	file	.	102	6243	2
-file:deno.json	deno.json	.	file	.	11	670	2
-file:README.md	README.md	.	file	.	144	6334	2
-file:docs/bitzoom-renderer.js	docs/bitzoom-renderer.js	docs	file	docs	939	35408	3
-file:docs/index.html	docs/index.html	docs	file	docs	266	7759	
-file:docs/bitzoom-worker.js	docs/bitzoom-worker.js	docs	file	docs	143	4413	2
-file:docs/bitzoom-viewer.js	docs/bitzoom-viewer.js	docs	file	docs	1338	60572	
-file:docs/howto.html	docs/howto.html	docs	file	docs	514	30912	3
-file:docs/bitzoom.css	docs/bitzoom.css	docs	file	docs	647	15386	5
-file:docs/about.html	docs/about.html	docs	file	docs	1479	85748	
-file:docs/bitzoom-pipeline.js	docs/bitzoom-pipeline.js	docs	file	docs	349	12655	
-file:docs/bitzoom-canvas.js	docs/bitzoom-canvas.js	docs	file	docs	774	29961	
-file:docs/bitzoom-proj-worker.js	docs/bitzoom-proj-worker.js	docs	file	docs	96	3420	
-file:docs/viewer.html	docs/viewer.html	docs	file	docs	106	4873	3
-file:docs/bitzoom-algo.js	docs/bitzoom-algo.js	docs	file	docs	501	19280	
+file:scripts/bench-hashslot.js	scripts/bench-hashslot.js	scripts	file	scripts	109	3305	54
+file:scripts/bench-minhash.js	scripts/bench-minhash.js	scripts	file	scripts	77	3073	43
+file:scripts/bench-oph-threshold.js	scripts/bench-oph-threshold.js	scripts	file	scripts	79	2811	43
+file:scripts/bench-viewer.js	scripts/bench-viewer.js	scripts	file	scripts	224	9805	45
+file:scripts/csv2snap.ts	scripts/csv2snap.ts	scripts	file	scripts	252	8160	46
+file:scripts/bench-gpu.js	scripts/bench-gpu.js	scripts	file	scripts	174	7083	10
+file:scripts/bench-pipeline.js	scripts/bench-pipeline.js	scripts	file	scripts	84	3627	45
+file:scripts/serve.ts	scripts/serve.ts	scripts	file	scripts	46	1240	46
+file:scripts/stix2snap.ts	scripts/stix2snap.ts	scripts	file	scripts	384	13326	46
+file:scripts/bench-render.js	scripts/bench-render.js	scripts	file	scripts	115	4659	45
+file:scripts/src2snap.ts	scripts/src2snap.ts	scripts	file	scripts	503	19419	46
+file:scripts/bench-3M.js	scripts/bench-3M.js	scripts	file	scripts	185	7579	44
+file:tests/gen_ground_truth.ts	tests/gen_ground_truth.ts	tests	file	tests	108	4458	12
+file:tests/gpu_blend_test.ts	tests/gpu_blend_test.ts	tests	file	tests	152	6752	25
+file:tests/pipeline_test.ts	tests/pipeline_test.ts	tests	file	tests	805	32923	11
+file:tests/gpu_test.ts	tests/gpu_test.ts	tests	file	tests	230	8817	24
+file:tests/gpu_pipeline_test.ts	tests/gpu_pipeline_test.ts	tests	file	tests	140	5615	25
+file:tests/ground_truth_test.ts	tests/ground_truth_test.ts	tests	file	tests	108	4745	12
+file:agent_docs/PLAN-topology-smoothing.md	agent_docs/PLAN-topology-smoothing.md	agent_docs	file	agent_docs	216	8792	30
+file:agent_docs/SPEC.md	agent_docs/SPEC.md	agent_docs	file	agent_docs	138	12711	
+file:agent_docs/RESEARCH-precompute-optimizations.md	agent_docs/RESEARCH-precompute-optimizations.md	agent_docs	file	agent_docs	177	6850	44
+file:agent_docs/PLAN-30M-incremental.md	agent_docs/PLAN-30M-incremental.md	agent_docs	file	agent_docs	332	12966	44
+file:agent_docs/ARCHITECTURE-auto-tune.md	agent_docs/ARCHITECTURE-auto-tune.md	agent_docs	file	agent_docs	167	6398	28
+file:agent_docs/ARCHITECTURE-webgpu.md	agent_docs/ARCHITECTURE-webgpu.md	agent_docs	file	agent_docs	294	11746	5
+file:agent_docs/ARCHITECTURE-webgl.md	agent_docs/ARCHITECTURE-webgl.md	agent_docs	file	agent_docs	221	9064	5
+file:agent_docs/ARCHITECTURE.md	agent_docs/ARCHITECTURE.md	agent_docs	file	agent_docs	306	20935	3
+file:CLAUDE.md	CLAUDE.md	.	file	.	121	9350	3
+file:deno.json	deno.json	.	file	.	13	1015	10
+file:README.md	README.md	.	file	.	148	6654	4
+file:benchmarks/results/REPORT.md	benchmarks/results/REPORT.md	benchmarks/results	file	benchmarks/results	349	21567	30
+file:benchmarks/export-layout.ts	benchmarks/export-layout.ts	benchmarks	file	benchmarks	136	5034	30
+file:docs/bitzoom-renderer.js	docs/bitzoom-renderer.js	docs	file	docs	985	37604	
+file:docs/webgl.html	docs/webgl.html	docs	file	docs	489	23295	4
+file:docs/webgpu.html	docs/webgpu.html	docs	file	docs	793	38949	4
+file:docs/index.html	docs/index.html	docs	file	docs	309	8499	4
+file:docs/webgl-test.html	docs/webgl-test.html	docs	file	docs	247	7669	9
+file:docs/bitzoom-worker.js	docs/bitzoom-worker.js	docs	file	docs	143	4413	45
+file:docs/bitzoom-viewer.js	docs/bitzoom-viewer.js	docs	file	docs	1751	79454	1
+file:docs/howto.html	docs/howto.html	docs	file	docs	763	46477	3
+file:docs/bitzoom.css	docs/bitzoom.css	docs	file	docs	658	15747	6
+file:docs/bitzoom-gl-renderer.js	docs/bitzoom-gl-renderer.js	docs	file	docs	1236	40902	4
+file:docs/about.html	docs/about.html	docs	file	docs	1533	89208	1
+file:docs/bitzoom-pipeline.js	docs/bitzoom-pipeline.js	docs	file	docs	370	13546	26
+file:docs/bitzoom-canvas.js	docs/bitzoom-canvas.js	docs	file	docs	1012	38860	5
+file:docs/stix2snap.js	docs/stix2snap.js	docs	file	docs	228	9164	28
+file:docs/comparison.html	docs/comparison.html	docs	file	docs	548	24858	4
+file:docs/bitzoom-utils.js	docs/bitzoom-utils.js	docs	file	docs	278	10274	9
+file:docs/bitzoom-proj-worker.js	docs/bitzoom-proj-worker.js	docs	file	docs	96	3420	43
+file:docs/viewer.html	docs/viewer.html	docs	file	docs	109	5485	4
+file:docs/bitzoom-gpu.js	docs/bitzoom-gpu.js	docs	file	docs	672	25619	24
+file:docs/gpu-test.html	docs/gpu-test.html	docs	file	docs	299	9821	24
+file:docs/bitzoom-algo.js	docs/bitzoom-algo.js	docs	file	docs	517	20071	12
+file:docs/example.html	docs/example.html	docs	file	docs	54	1822	3
 const:scripts/bench-hashslot.js:LARGE_PRIME	LARGE_PRIME	scripts/bench-hashslot.js	constant	scripts/bench-hashslot.js	1		
 const:scripts/bench-hashslot.js:MINHASH_K	MINHASH_K	scripts/bench-hashslot.js	constant	scripts/bench-hashslot.js	1		
 fn:scripts/bench-hashslot.js:mulberry32	mulberry32	scripts/bench-hashslot.js	function	scripts/bench-hashslot.js	8		
@@ -63,6 +85,13 @@ const:scripts/bench-viewer.js:SCALES	SCALES	scripts/bench-viewer.js	constant	scr
 fn:scripts/csv2snap.ts:parseCsvLine	parseCsvLine	scripts/csv2snap.ts	function	scripts/csv2snap.ts	32		
 fn:scripts/csv2snap.ts:truncate	truncate	scripts/csv2snap.ts	function	scripts/csv2snap.ts	5		
 fn:scripts/csv2snap.ts:main	main	scripts/csv2snap.ts	function	scripts/csv2snap.ts	195		
+const:scripts/bench-gpu.js:DATASETS	DATASETS	scripts/bench-gpu.js	constant	scripts/bench-gpu.js	2		
+const:scripts/bench-gpu.js:WARMUP_DEFAULT	WARMUP_DEFAULT	scripts/bench-gpu.js	constant	scripts/bench-gpu.js	1		
+const:scripts/bench-gpu.js:RUNS_DEFAULT	RUNS_DEFAULT	scripts/bench-gpu.js	constant	scripts/bench-gpu.js	1		
+const:scripts/bench-gpu.js:WARMUP_LARGE	WARMUP_LARGE	scripts/bench-gpu.js	constant	scripts/bench-gpu.js	1		
+const:scripts/bench-gpu.js:RUNS_LARGE	RUNS_LARGE	scripts/bench-gpu.js	constant	scripts/bench-gpu.js	1		
+fn:scripts/bench-gpu.js:fmt	fmt	scripts/bench-gpu.js	function	scripts/bench-gpu.js	1		
+fn:scripts/bench-gpu.js:median	median	scripts/bench-gpu.js	function	scripts/bench-gpu.js	3		
 const:scripts/bench-pipeline.js:DATASETS	DATASETS	scripts/bench-pipeline.js	constant	scripts/bench-pipeline.js	2		
 fn:scripts/bench-pipeline.js:fmt	fmt	scripts/bench-pipeline.js	function	scripts/bench-pipeline.js	72		
 const:scripts/serve.ts:NO_CACHE	NO_CACHE	scripts/serve.ts	constant	scripts/serve.ts	5		
@@ -94,6 +123,11 @@ const:scripts/bench-3M.js:LINEAR_LOOKUPS	LINEAR_LOOKUPS	scripts/bench-3M.js	cons
 const:tests/pipeline_test.ts:SAMPLE_EDGES	SAMPLE_EDGES	tests/pipeline_test.ts	constant	tests/pipeline_test.ts	1		
 const:tests/pipeline_test.ts:SAMPLE_LABELS	SAMPLE_LABELS	tests/pipeline_test.ts	constant	tests/pipeline_test.ts	1		
 fn:tests/pipeline_test.ts:jaccardTokens	jaccardTokens	tests/pipeline_test.ts	function	tests/pipeline_test.ts	447		
+fn:tests/gpu_test.ts:buildGPUInput	buildGPUInput	tests/gpu_test.ts	function	tests/gpu_test.ts	40		
+fn:tests/gpu_test.ts:cpuMinHashProject	cpuMinHashProject	tests/gpu_test.ts	function	tests/gpu_test.ts	175		
+fn:tests/ground_truth_test.ts:loadGroundTruth	loadGroundTruth	tests/ground_truth_test.ts	function	tests/ground_truth_test.ts	69		
+fn:benchmarks/export-layout.ts:parseArgs	parseArgs	benchmarks/export-layout.ts	function	benchmarks/export-layout.ts	21		
+const:benchmarks/export-layout.ts:nodes	nodes	benchmarks/export-layout.ts	constant	benchmarks/export-layout.ts	8		
 fn:docs/bitzoom-renderer.js:maxEdgesToDraw	maxEdgesToDraw	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	5		
 fn:docs/bitzoom-renderer.js:hexToRgb	hexToRgb	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	11		
 fn:docs/bitzoom-renderer.js:fontStr	fontStr	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	9		
@@ -106,9 +140,9 @@ fn:docs/bitzoom-renderer.js:wts	wts	docs/bitzoom-renderer.js	function	docs/bitzo
 fn:docs/bitzoom-renderer.js:worldToScreen	worldToScreen	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	4		
 fn:docs/bitzoom-renderer.js:screenToWorld	screenToWorld	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	6		
 fn:docs/bitzoom-renderer.js:layoutAll	layoutAll	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	61		
-fn:docs/bitzoom-renderer.js:render	render	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	37		
-fn:docs/bitzoom-renderer.js:renderSupernodes	renderSupernodes	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	200		
-fn:docs/bitzoom-renderer.js:renderNodes	renderNodes	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	147		
+fn:docs/bitzoom-renderer.js:render	render	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	43		
+fn:docs/bitzoom-renderer.js:renderSupernodes	renderSupernodes	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	221		
+fn:docs/bitzoom-renderer.js:renderNodes	renderNodes	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	166		
 fn:docs/bitzoom-renderer.js:renderHeatmapSplat	renderHeatmapSplat	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	44		
 fn:docs/bitzoom-renderer.js:_densityCacheKey	_densityCacheKey	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	5		
 fn:docs/bitzoom-renderer.js:renderHeatmapDensity	renderHeatmapDensity	docs/bitzoom-renderer.js	function	docs/bitzoom-renderer.js	127		
@@ -119,16 +153,15 @@ const:docs/bitzoom-worker.js:MAX_WORKERS	MAX_WORKERS	docs/bitzoom-worker.js	cons
 fn:docs/bitzoom-worker.js:progress	progress	docs/bitzoom-worker.js	function	docs/bitzoom-worker.js	136		
 fn:docs/bitzoom-viewer.js:esc	esc	docs/bitzoom-viewer.js	function	docs/bitzoom-viewer.js	3		
 const:docs/bitzoom-viewer.js:DATASETS	DATASETS	docs/bitzoom-viewer.js	constant	docs/bitzoom-viewer.js	2		
-class:docs/bitzoom-viewer.js:BitZoom	BitZoom	docs/bitzoom-viewer.js	class	docs/bitzoom-viewer.js	1291		
+class:docs/bitzoom-viewer.js:BitZoom	BitZoom	docs/bitzoom-viewer.js	class	docs/bitzoom-viewer.js	1667		
 method:docs/bitzoom-viewer.js:BitZoom.constructor	BitZoom.constructor	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	37		
 method:docs/bitzoom-viewer.js:BitZoom._serializeHash	BitZoom._serializeHash	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	12		
 method:docs/bitzoom-viewer.js:BitZoom._scheduleHashUpdate	BitZoom._scheduleHashUpdate	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	10		
 method:docs/bitzoom-viewer.js:BitZoom._restoreFromHash	BitZoom._restoreFromHash	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	10		
 method:docs/bitzoom-viewer.js:BitZoom._applyHashState	BitZoom._applyHashState	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	19		
-method:docs/bitzoom-viewer.js:BitZoom.rebuildProjections	BitZoom.rebuildProjections	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	7		
-method:docs/bitzoom-viewer.js:BitZoom.unifiedBlend	BitZoom.unifiedBlend	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
+method:docs/bitzoom-viewer.js:BitZoom.rebuildProjections	BitZoom.rebuildProjections	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	8		
 method:docs/bitzoom-viewer.js:BitZoom.switchLevel	BitZoom.switchLevel	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	96		
-method:docs/bitzoom-viewer.js:BitZoom.requestAnimationFrame	BitZoom.requestAnimationFrame	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	7		
+method:docs/bitzoom-viewer.js:BitZoom.requestAnimationFrame	BitZoom.requestAnimationFrame	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	20		
 method:docs/bitzoom-viewer.js:BitZoom._checkAutoLevel	BitZoom._checkAutoLevel	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	9		
 method:docs/bitzoom-viewer.js:BitZoom._animateZoom	BitZoom._animateZoom	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	29		
 method:docs/bitzoom-viewer.js:BitZoom.zoomToNode	BitZoom.zoomToNode	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	43		
@@ -140,30 +173,77 @@ method:docs/bitzoom-viewer.js:BitZoom._updateStepperUI	BitZoom._updateStepperUI	
 method:docs/bitzoom-viewer.js:BitZoom._updateOverview	BitZoom._updateOverview	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	23		
 method:docs/bitzoom-viewer.js:BitZoom._updateAlgoInfo	BitZoom._updateAlgoInfo	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	10		
 method:docs/bitzoom-viewer.js:BitZoom._showDetail	BitZoom._showDetail	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	159		
-method:docs/bitzoom-viewer.js:BitZoom._applyDatasetSettings	BitZoom._applyDatasetSettings	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	19		
+method:docs/bitzoom-viewer.js:BitZoom._applyDatasetSettings	BitZoom._applyDatasetSettings	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	34		
 method:docs/bitzoom-viewer.js:BitZoom._syncLabelCheckboxes	BitZoom._syncLabelCheckboxes	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	7		
 method:docs/bitzoom-viewer.js:BitZoom._buildDynamicUI	BitZoom._buildDynamicUI	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	38		
 method:docs/bitzoom-viewer.js:BitZoom._scheduleRebuild	BitZoom._scheduleRebuild	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	4		
 method:docs/bitzoom-viewer.js:BitZoom._syncWeightUI	BitZoom._syncWeightUI	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	8		
 method:docs/bitzoom-viewer.js:BitZoom._applyPreset	BitZoom._applyPreset	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	11		
-method:docs/bitzoom-viewer.js:BitZoom.loadGraph	BitZoom.loadGraph	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	58		
+method:docs/bitzoom-viewer.js:BitZoom.loadGraph	BitZoom.loadGraph	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	61		
 method:docs/bitzoom-viewer.js:BitZoom.reject	BitZoom.reject	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom.resolve	BitZoom.resolve	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
-method:docs/bitzoom-viewer.js:BitZoom._applyWorkerResult	BitZoom._applyWorkerResult	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	112		
-method:docs/bitzoom-viewer.js:BitZoom.loadDataset	BitZoom.loadDataset	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	30		
-method:docs/bitzoom-viewer.js:BitZoom.showLoaderScreen	BitZoom.showLoaderScreen	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	17		
-method:docs/bitzoom-viewer.js:BitZoom._bindEvents	BitZoom._bindEvents	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	320		
+method:docs/bitzoom-viewer.js:BitZoom.loadGraphGPU	BitZoom.loadGraphGPU	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	71		
+method:docs/bitzoom-viewer.js:BitZoom._applyWorkerResult	BitZoom._applyWorkerResult	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	110		
+method:docs/bitzoom-viewer.js:BitZoom._finalizeLoad	BitZoom._finalizeLoad	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	23		
+method:docs/bitzoom-viewer.js:BitZoom._applyGPUToCurrentData	BitZoom._applyGPUToCurrentData	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	32		
+method:docs/bitzoom-viewer.js:BitZoom._reloadCPU	BitZoom._reloadCPU	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	7		
+method:docs/bitzoom-viewer.js:BitZoom.loadDataset	BitZoom.loadDataset	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	40		
+method:docs/bitzoom-viewer.js:BitZoom.showLoaderScreen	BitZoom.showLoaderScreen	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	23		
+method:docs/bitzoom-viewer.js:BitZoom._bindEvents	BitZoom._bindEvents	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	482		
 method:docs/bitzoom-viewer.js:BitZoom.updateSizeButtons	BitZoom.updateSizeButtons	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom.updateLogBtn	BitZoom.updateLogBtn	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom.updateQuantBtn	BitZoom.updateQuantBtn	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom.updateEdgeBtn	BitZoom.updateEdgeBtn	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom.updateHeatBtn	BitZoom.updateHeatBtn	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
+method:docs/bitzoom-viewer.js:BitZoom.updateGpuBtn	BitZoom.updateGpuBtn	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
+method:docs/bitzoom-viewer.js:BitZoom.updateGlBtn	BitZoom.updateGlBtn	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom.catch	BitZoom.catch	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	1		
 method:docs/bitzoom-viewer.js:BitZoom._toggleSidebar	BitZoom._toggleSidebar	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	7		
 method:docs/bitzoom-viewer.js:BitZoom._fetchText	BitZoom._fetchText	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	19		
 method:docs/bitzoom-viewer.js:BitZoom._handleFileSelect	BitZoom._handleFileSelect	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	26		
+method:docs/bitzoom-viewer.js:BitZoom._handleStixFile	BitZoom._handleStixFile	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	37		
 method:docs/bitzoom-viewer.js:BitZoom._updateLoadStatus	BitZoom._updateLoadStatus	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	9		
 method:docs/bitzoom-viewer.js:BitZoom._buildDatasetButtons	BitZoom._buildDatasetButtons	docs/bitzoom-viewer.js	method	docs/bitzoom-viewer.js	10		
+fn:docs/bitzoom-gl-renderer.js:isWebGL2Available	isWebGL2Available	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	16		
+fn:docs/bitzoom-gl-renderer.js:initGL	initGL	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	85		
+const:docs/bitzoom-gl-renderer.js:CIRCLE_VS	CIRCLE_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:CIRCLE_FS	CIRCLE_FS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:GLOW_VS	GLOW_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:GLOW_FS	GLOW_FS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:HEAT_SPLAT_VS	HEAT_SPLAT_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:HEAT_SPLAT_FS	HEAT_SPLAT_FS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:HEAT_RESOLVE_VS	HEAT_RESOLVE_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:HEAT_RESOLVE_FS	HEAT_RESOLVE_FS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:GRID_VS	GRID_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:GRID_FS	GRID_FS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:EDGE_LINE_VS	EDGE_LINE_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:EDGE_CURVE_VS	EDGE_CURVE_VS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+const:docs/bitzoom-gl-renderer.js:EDGE_FS	EDGE_FS	docs/bitzoom-gl-renderer.js	constant	docs/bitzoom-gl-renderer.js	1		
+fn:docs/bitzoom-gl-renderer.js:_compileShader	_compileShader	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	12		
+fn:docs/bitzoom-gl-renderer.js:_linkProgram	_linkProgram	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	13		
+fn:docs/bitzoom-gl-renderer.js:_createCircleProgram	_createCircleProgram	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	20		
+fn:docs/bitzoom-gl-renderer.js:_createGridProgram	_createGridProgram	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	12		
+fn:docs/bitzoom-gl-renderer.js:_createHeatSplatProgram	_createHeatSplatProgram	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	10		
+fn:docs/bitzoom-gl-renderer.js:_createHeatResolveProgram	_createHeatResolveProgram	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	11		
+fn:docs/bitzoom-gl-renderer.js:_setupHeatResolveVAO	_setupHeatResolveVAO	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	10		
+fn:docs/bitzoom-gl-renderer.js:_ensureHeatFBO	_ensureHeatFBO	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	47		
+fn:docs/bitzoom-gl-renderer.js:_createEdgeProgram	_createEdgeProgram	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	11		
+fn:docs/bitzoom-gl-renderer.js:_setupEdgeVAO	_setupEdgeVAO	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	33		
+fn:docs/bitzoom-gl-renderer.js:_setupCircleVAO	_setupCircleVAO	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	41		
+fn:docs/bitzoom-gl-renderer.js:hexToRgb01	hexToRgb01	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	10		
+fn:docs/bitzoom-gl-renderer.js:scaleSize	scaleSize	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	6		
+fn:docs/bitzoom-gl-renderer.js:_ensureBuf	_ensureBuf	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	7		
+fn:docs/bitzoom-gl-renderer.js:edgeHash	edgeHash	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	5		
+fn:docs/bitzoom-gl-renderer.js:maxEdgesToDraw	maxEdgesToDraw	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	6		
+fn:docs/bitzoom-gl-renderer.js:_buildEdgeInstances	_buildEdgeInstances	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	124		
+fn:docs/bitzoom-gl-renderer.js:_buildCircleInstances	_buildCircleInstances	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	118		
+fn:docs/bitzoom-gl-renderer.js:_buildHeatInstances	_buildHeatInstances	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	54		
+fn:docs/bitzoom-gl-renderer.js:_computeHeatMaxW	_computeHeatMaxW	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	33		
+fn:docs/bitzoom-gl-renderer.js:_heatmapCacheKey	_heatmapCacheKey	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	4		
+fn:docs/bitzoom-gl-renderer.js:_renderHeatmapDensity	_renderHeatmapDensity	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	68		
+fn:docs/bitzoom-gl-renderer.js:_buildSplatInstances	_buildSplatInstances	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	45		
+fn:docs/bitzoom-gl-renderer.js:_renderHeatmapSplat	_renderHeatmapSplat	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	28		
+fn:docs/bitzoom-gl-renderer.js:renderGL	renderGL	docs/bitzoom-gl-renderer.js	function	docs/bitzoom-gl-renderer.js	91		
 fn:docs/bitzoom-pipeline.js:parseEdgesFile	parseEdgesFile	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	45		
 fn:docs/bitzoom-pipeline.js:parseNodesFile	parseNodesFile	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	48		
 fn:docs/bitzoom-pipeline.js:buildGraph	buildGraph	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	78		
@@ -172,9 +252,9 @@ fn:docs/bitzoom-pipeline.js:tokenizeLabel	tokenizeLabel	docs/bitzoom-pipeline.js
 fn:docs/bitzoom-pipeline.js:tokenizeNumeric	tokenizeNumeric	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	29		
 fn:docs/bitzoom-pipeline.js:computeProjections	computeProjections	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	79		
 fn:docs/bitzoom-pipeline.js:computeNodeSig	computeNodeSig	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	12		
-fn:docs/bitzoom-pipeline.js:runPipeline	runPipeline	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	14		
-class:docs/bitzoom-canvas.js:BitZoomCanvas	BitZoomCanvas	docs/bitzoom-canvas.js	class	docs/bitzoom-canvas.js	603		
-method:docs/bitzoom-canvas.js:BitZoomCanvas.constructor	BitZoomCanvas.constructor	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	82		
+fn:docs/bitzoom-pipeline.js:runPipeline	runPipeline	docs/bitzoom-pipeline.js	function	docs/bitzoom-pipeline.js	35		
+class:docs/bitzoom-canvas.js:BitZoomCanvas	BitZoomCanvas	docs/bitzoom-canvas.js	class	docs/bitzoom-canvas.js	792		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.constructor	BitZoomCanvas.constructor	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	92		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.renderZoom	BitZoomCanvas.renderZoom	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	3		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.selectedId	BitZoomCanvas.selectedId	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	5		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.isSelected	BitZoomCanvas.isSelected	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
@@ -192,30 +272,53 @@ method:docs/bitzoom-canvas.js:BitZoomCanvas._scheduleEdgeBuild	BitZoomCanvas._sc
 method:docs/bitzoom-canvas.js:BitZoomCanvas.layoutAll	BitZoomCanvas.layoutAll	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.render	BitZoomCanvas.render	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.requestAnimationFrame	BitZoomCanvas.requestAnimationFrame	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
+method:docs/bitzoom-canvas.js:BitZoomCanvas._drawFps	BitZoomCanvas._drawFps	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	12		
 method:docs/bitzoom-canvas.js:BitZoomCanvas._postRender	BitZoomCanvas._postRender	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.showProgress	BitZoomCanvas.showProgress	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	19		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.renderNow	BitZoomCanvas.renderNow	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.worldToScreen	BitZoomCanvas.worldToScreen	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.screenToWorld	BitZoomCanvas.screenToWorld	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.hitTest	BitZoomCanvas.hitTest	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
-method:docs/bitzoom-canvas.js:BitZoomCanvas.resize	BitZoomCanvas.resize	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	9		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.resize	BitZoomCanvas.resize	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	13		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.zoomForLevel	BitZoomCanvas.zoomForLevel	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	6		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.switchLevel	BitZoomCanvas.switchLevel	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	8		
 method:docs/bitzoom-canvas.js:BitZoomCanvas._checkAutoLevel	BitZoomCanvas._checkAutoLevel	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	20		
-method:docs/bitzoom-canvas.js:BitZoomCanvas.setWeights	BitZoomCanvas.setWeights	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	7		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.useGPU	BitZoomCanvas.useGPU	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.useWebGL	BitZoomCanvas.useWebGL	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	6		
+method:docs/bitzoom-canvas.js:BitZoomCanvas._initWebGL	BitZoomCanvas._initWebGL	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	58		
+method:docs/bitzoom-canvas.js:BitZoomCanvas._destroyWebGL	BitZoomCanvas._destroyWebGL	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	25		
+method:docs/bitzoom-canvas.js:BitZoomCanvas._blend	BitZoomCanvas._blend	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	13		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.unifiedBlend	BitZoomCanvas.unifiedBlend	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	1		
-method:docs/bitzoom-canvas.js:BitZoomCanvas.setAlpha	BitZoomCanvas.setAlpha	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	7		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.setWeights	BitZoomCanvas.setWeights	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	5		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.setAlpha	BitZoomCanvas.setAlpha	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	5		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.setOptions	BitZoomCanvas.setOptions	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	11		
 method:docs/bitzoom-canvas.js:BitZoomCanvas.resetView	BitZoomCanvas.resetView	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	9		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.exportLayout	BitZoomCanvas.exportLayout	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	7		
 method:docs/bitzoom-canvas.js:BitZoomCanvas._resetBtnRect	BitZoomCanvas._resetBtnRect	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	5		
-method:docs/bitzoom-canvas.js:BitZoomCanvas._bindEvents	BitZoomCanvas._bindEvents	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	156		
-method:docs/bitzoom-canvas.js:BitZoomCanvas.destroy	BitZoomCanvas.destroy	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	5		
+method:docs/bitzoom-canvas.js:BitZoomCanvas._bindEvents	BitZoomCanvas._bindEvents	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	163		
+method:docs/bitzoom-canvas.js:BitZoomCanvas.destroy	BitZoomCanvas.destroy	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	6		
 method:docs/bitzoom-canvas.js:BitZoomCanvas._zoomBy	BitZoomCanvas._zoomBy	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	9		
 method:docs/bitzoom-canvas.js:BitZoomCanvas._animateZoom	BitZoomCanvas._animateZoom	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	21		
 method:docs/bitzoom-canvas.js:BitZoomCanvas._zoomToHit	BitZoomCanvas._zoomToHit	docs/bitzoom-canvas.js	method	docs/bitzoom-canvas.js	26		
-fn:docs/bitzoom-canvas.js:_finalize	_finalize	docs/bitzoom-canvas.js	function	docs/bitzoom-canvas.js	42		
+fn:docs/bitzoom-canvas.js:_finalize	_finalize	docs/bitzoom-canvas.js	function	docs/bitzoom-canvas.js	88		
 fn:docs/bitzoom-canvas.js:_hydrateAndLink	_hydrateAndLink	docs/bitzoom-canvas.js	function	docs/bitzoom-canvas.js	29		
 fn:docs/bitzoom-canvas.js:createBitZoomView	createBitZoomView	docs/bitzoom-canvas.js	function	docs/bitzoom-canvas.js	15		
 fn:docs/bitzoom-canvas.js:createBitZoomFromGraph	createBitZoomFromGraph	docs/bitzoom-canvas.js	function	docs/bitzoom-canvas.js	57		
+fn:docs/stix2snap.js:truncate	truncate	docs/stix2snap.js	function	docs/stix2snap.js	5		
+fn:docs/stix2snap.js:nodeLabel	nodeLabel	docs/stix2snap.js	function	docs/stix2snap.js	12		
+fn:docs/stix2snap.js:subType	subType	docs/stix2snap.js	function	docs/stix2snap.js	19		
+fn:docs/stix2snap.js:killChain	killChain	docs/stix2snap.js	function	docs/stix2snap.js	6		
+fn:docs/stix2snap.js:aliases	aliases	docs/stix2snap.js	function	docs/stix2snap.js	6		
+fn:docs/stix2snap.js:sophisticationLevel	sophisticationLevel	docs/stix2snap.js	function	docs/stix2snap.js	8		
+fn:docs/stix2snap.js:platforms	platforms	docs/stix2snap.js	function	docs/stix2snap.js	6		
+const:docs/stix2snap.js:SINGLE_REF_FIELDS	SINGLE_REF_FIELDS	docs/stix2snap.js	constant	docs/stix2snap.js	14		
+const:docs/stix2snap.js:ARRAY_REF_FIELDS	ARRAY_REF_FIELDS	docs/stix2snap.js	constant	docs/stix2snap.js	9		
+fn:docs/stix2snap.js:convertStixToSnap	convertStixToSnap	docs/stix2snap.js	function	docs/stix2snap.js	130		
+fn:docs/bitzoom-utils.js:layoutScore	layoutScore	docs/bitzoom-utils.js	function	docs/bitzoom-utils.js	20		
+fn:docs/bitzoom-utils.js:quantizeOnly	quantizeOnly	docs/bitzoom-utils.js	function	docs/bitzoom-utils.js	5		
+const:docs/bitzoom-gpu.js:WGSL	WGSL	docs/bitzoom-gpu.js	constant	docs/bitzoom-gpu.js	1		
+const:docs/bitzoom-gpu.js:BLEND_WGSL	BLEND_WGSL	docs/bitzoom-gpu.js	constant	docs/bitzoom-gpu.js	1		
+fn:docs/bitzoom-gpu.js:destroyGPU	destroyGPU	docs/bitzoom-gpu.js	function	docs/bitzoom-gpu.js	4		
 fn:docs/bitzoom-algo.js:maxCountKey	maxCountKey	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	8		
 const:docs/bitzoom-algo.js:MINHASH_K	MINHASH_K	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 const:docs/bitzoom-algo.js:LARGE_PRIME	LARGE_PRIME	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
@@ -224,17 +327,19 @@ const:docs/bitzoom-algo.js:GRID_SIZE	GRID_SIZE	docs/bitzoom-algo.js	constant	doc
 const:docs/bitzoom-algo.js:ZOOM_LEVELS	ZOOM_LEVELS	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 const:docs/bitzoom-algo.js:RAW_LEVEL	RAW_LEVEL	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 const:docs/bitzoom-algo.js:LEVEL_LABELS	LEVEL_LABELS	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
+const:docs/bitzoom-algo.js:WEIGHT_FLOOR_RATIO	WEIGHT_FLOOR_RATIO	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
+const:docs/bitzoom-algo.js:WEIGHT_FLOOR_MIN	WEIGHT_FLOOR_MIN	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 fn:docs/bitzoom-algo.js:mulberry32	mulberry32	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	9		
 const:docs/bitzoom-algo.js:HASH_PARAMS_A	HASH_PARAMS_A	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 const:docs/bitzoom-algo.js:HASH_PARAMS_B	HASH_PARAMS_B	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
-fn:docs/bitzoom-algo.js:hashToken	hashToken	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	10		
+fn:docs/bitzoom-algo.js:hashToken	hashToken	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	11		
 fn:docs/bitzoom-algo.js:mersMod	mersMod	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	4		
 fn:docs/bitzoom-algo.js:hashSlot	hashSlot	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	12		
 fn:docs/bitzoom-algo.js:computeMinHashInto	computeMinHashInto	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	41		
 fn:docs/bitzoom-algo.js:computeMinHash	computeMinHash	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	8		
 fn:docs/bitzoom-algo.js:jaccardEstimate	jaccardEstimate	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	12		
 fn:docs/bitzoom-algo.js:buildGaussianProjection	buildGaussianProjection	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	17		
-fn:docs/bitzoom-algo.js:projectInto	projectInto	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	25		
+fn:docs/bitzoom-algo.js:projectInto	projectInto	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	24		
 fn:docs/bitzoom-algo.js:projectWith	projectWith	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	8		
 fn:docs/bitzoom-algo.js:cellIdAtLevel	cellIdAtLevel	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	9		
 fn:docs/bitzoom-algo.js:hslToHex	hslToHex	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	11		
@@ -243,8 +348,8 @@ fn:docs/bitzoom-algo.js:normalizeAndQuantize	normalizeAndQuantize	docs/bitzoom-a
 const:docs/bitzoom-algo.js:PHI_TABLE_SIZE	PHI_TABLE_SIZE	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 const:docs/bitzoom-algo.js:PHI_TABLE	PHI_TABLE	docs/bitzoom-algo.js	constant	docs/bitzoom-algo.js	1		
 fn:docs/bitzoom-algo.js:phiLookup	phiLookup	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	14		
-fn:docs/bitzoom-algo.js:gaussianQuantize	gaussianQuantize	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	32		
-fn:docs/bitzoom-algo.js:unifiedBlend	unifiedBlend	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	70		
+fn:docs/bitzoom-algo.js:gaussianQuantize	gaussianQuantize	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	34		
+fn:docs/bitzoom-algo.js:unifiedBlend	unifiedBlend	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	82		
 fn:docs/bitzoom-algo.js:buildLevelNodes	buildLevelNodes	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	57		
 fn:docs/bitzoom-algo.js:buildLevelEdges	buildLevelEdges	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	36		
 fn:docs/bitzoom-algo.js:buildLevel	buildLevel	docs/bitzoom-algo.js	function	docs/bitzoom-algo.js	9		
@@ -255,15 +360,69 @@ task:stix2snap	stix2snap	deno.json	task	deno.json	1
 task:csv2snap	csv2snap	deno.json	task	deno.json	1		
 task:src2snap	src2snap	deno.json	task	deno.json	1		
 task:test	test	deno.json	task	deno.json	1		
+task:test:gt	test:gt	deno.json	task	deno.json	1		
+task:test:gpu	test:gpu	deno.json	task	deno.json	1		
 task:bench	bench	deno.json	task	deno.json	1		
-region:docs/index.html:style:17	inline-style:17	docs/index.html	style	docs/index.html	151		
+region:docs/webgl.html:style:17	inline-style:17	docs/webgl.html	style	docs/webgl.html	156		
+elem:docs/webgl.html:#toc	#toc	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#overview	#overview	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#dual-canvas	#dual-canvas	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#arr-d	#arr-d	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#shaders	#shaders	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#circles	#circles	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#edges	#edges	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#heatmap	#heatmap	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#arr-h	#arr-h	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#arr-g2	#arr-g2	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#grid	#grid	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#render-order	#render-order	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#instancing	#instancing	docs/webgl.html	element	docs/webgl.html	1		
+elem:docs/webgl.html:#fallback	#fallback	docs/webgl.html	element	docs/webgl.html	1		
+region:docs/webgl.html:script:473	inline-script:473	docs/webgl.html	script	docs/webgl.html	13		
+region:docs/webgpu.html:style:17	inline-style:17	docs/webgpu.html	style	docs/webgpu.html	214		
+elem:docs/webgpu.html:#toc	#toc	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#overview	#overview	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#performance	#performance	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#architecture	#architecture	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#arrow	#arrow	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#arrow-gpu	#arrow-gpu	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#minhash-shader	#minhash-shader	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#blend-shader	#blend-shader	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#buffers	#buffers	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#arr	#arr	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#overflow	#overflow	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#precision	#precision	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#integration	#integration	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#fallback	#fallback	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#arr-g	#arr-g	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#arr-r	#arr-r	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#prior-art	#prior-art	docs/webgpu.html	element	docs/webgpu.html	1		
+elem:docs/webgpu.html:#limitations	#limitations	docs/webgpu.html	element	docs/webgpu.html	1		
+region:docs/webgpu.html:script:777	inline-script:777	docs/webgpu.html	script	docs/webgpu.html	13		
+region:docs/index.html:style:17	inline-style:17	docs/index.html	style	docs/index.html	197		
 elem:docs/index.html:#demo-dataset	#demo-dataset	docs/index.html	element	docs/index.html	1		
 elem:docs/index.html:#demo-canvas	#demo-canvas	docs/index.html	element	docs/index.html	1		
-region:docs/index.html:script:219	inline-script:219	docs/index.html	script	docs/index.html	44		
-region:docs/howto.html:style:17	inline-style:17	docs/howto.html	style	docs/howto.html	94		
+region:docs/index.html:script:262	inline-script:262	docs/index.html	script	docs/index.html	44		
+region:docs/webgl-test.html:style:8	inline-style:8	docs/webgl-test.html	style	docs/webgl-test.html	96		
+elem:docs/webgl-test.html:#status	#status	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#karate-2d	#karate-2d	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#karate-gl	#karate-gl	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#epstein-2d	#epstein-2d	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#epstein-gl	#epstein-gl	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#epstein-curves-2d	#epstein-curves-2d	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#epstein-curves-gl	#epstein-curves-gl	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#bzsource-2d	#bzsource-2d	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#bzsource-gl	#bzsource-gl	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#mitre-2d	#mitre-2d	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#mitre-gl	#mitre-gl	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#email-2d	#email-2d	docs/webgl-test.html	element	docs/webgl-test.html	1		
+elem:docs/webgl-test.html:#email-gl	#email-gl	docs/webgl-test.html	element	docs/webgl-test.html	1		
+region:docs/webgl-test.html:script:183	inline-script:183	docs/webgl-test.html	script	docs/webgl-test.html	61		
+region:docs/howto.html:style:17	inline-style:17	docs/howto.html	style	docs/howto.html	102		
 elem:docs/howto.html:#toc	#toc	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#quick-start	#quick-start	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#demo-epstein	#demo-epstein	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#data-format	#data-format	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#embed	#embed	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#from-js	#from-js	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#demo-from-js	#demo-from-js	docs/howto.html	element	docs/howto.html	1		
@@ -272,18 +431,26 @@ elem:docs/howto.html:#callbacks	#callbacks	docs/howto.html	element	docs/howto.ht
 elem:docs/howto.html:#weights	#weights	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#demo-kind	#demo-kind	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#demo-group	#demo-group	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#autotune	#autotune	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#demo-autotune-default	#demo-autotune-default	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#demo-autotune-tuned	#demo-autotune-tuned	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#offline	#offline	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#performance	#performance	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#pitfalls	#pitfalls	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#similarity	#similarity	docs/howto.html	element	docs/howto.html	1		
 elem:docs/howto.html:#levels	#levels	docs/howto.html	element	docs/howto.html	1		
-elem:docs/howto.html:#data-format	#data-format	docs/howto.html	element	docs/howto.html	1		
-elem:docs/howto.html:#modules	#modules	docs/howto.html	element	docs/howto.html	1		
-region:docs/howto.html:script:450	inline-script:450	docs/howto.html	script	docs/howto.html	61		
-region:docs/about.html:style:17	inline-style:17	docs/about.html	style	docs/about.html	207		
+elem:docs/howto.html:#webgl	#webgl	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#demo-gl-canvas2d	#demo-gl-canvas2d	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#demo-gl-webgl	#demo-gl-webgl	docs/howto.html	element	docs/howto.html	1		
+elem:docs/howto.html:#files	#files	docs/howto.html	element	docs/howto.html	1		
+region:docs/howto.html:script:674	inline-script:674	docs/howto.html	script	docs/howto.html	86		
+region:docs/about.html:style:17	inline-style:17	docs/about.html	style	docs/about.html	239		
 elem:docs/about.html:#toc	#toc	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#demo-dataset	#demo-dataset	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#demo-alpha	#demo-alpha	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#demo-canvas	#demo-canvas	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#problem	#problem	docs/about.html	element	docs/about.html	1		
+elem:docs/about.html:#tldr	#tldr	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#pipeline	#pipeline	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#tokenize	#tokenize	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#arrow	#arrow	docs/about.html	element	docs/about.html	1		
@@ -311,7 +478,18 @@ elem:docs/about.html:#why	#why	docs/about.html	element	docs/about.html	1
 elem:docs/about.html:#complexity	#complexity	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#limitations	#limitations	docs/about.html	element	docs/about.html	1		
 elem:docs/about.html:#code	#code	docs/about.html	element	docs/about.html	1		
-region:docs/about.html:script:1356	inline-script:1356	docs/about.html	script	docs/about.html	120		
+region:docs/about.html:script:1410	inline-script:1410	docs/about.html	script	docs/about.html	120		
+region:docs/comparison.html:style:9	inline-style:9	docs/comparison.html	style	docs/comparison.html	154		
+elem:docs/comparison.html:#toc	#toc	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#why	#why	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#guide	#guide	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#metrics	#metrics	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#summary	#summary	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#datasets	#datasets	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#methods	#methods	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#quant	#quant	docs/comparison.html	element	docs/comparison.html	1		
+elem:docs/comparison.html:#caveats	#caveats	docs/comparison.html	element	docs/comparison.html	1		
+region:docs/comparison.html:script:453	inline-script:453	docs/comparison.html	script	docs/comparison.html	92		
 elem:docs/viewer.html:#loadNewBtn	#loadNewBtn	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#zoomPrev	#zoomPrev	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#zoomCurrent	#zoomCurrent	docs/viewer.html	element	docs/viewer.html	1		
@@ -325,12 +503,16 @@ elem:docs/viewer.html:#sizeLogBtn	#sizeLogBtn	docs/viewer.html	element	docs/view
 elem:docs/viewer.html:#quantModeBtn	#quantModeBtn	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#edgeModeBtn	#edgeModeBtn	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#heatmapBtn	#heatmapBtn	docs/viewer.html	element	docs/viewer.html	1		
+elem:docs/viewer.html:#autoTuneBtn	#autoTuneBtn	docs/viewer.html	element	docs/viewer.html	1		
+elem:docs/viewer.html:#gpuBtn	#gpuBtn	docs/viewer.html	element	docs/viewer.html	1		
+elem:docs/viewer.html:#glBtn	#glBtn	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#loader-screen	#loader-screen	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#dropZone	#dropZone	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#datasetList	#datasetList	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#edgesFile	#edgesFile	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#nodesFile	#nodesFile	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#loadBtn	#loadBtn	docs/viewer.html	element	docs/viewer.html	1		
+elem:docs/viewer.html:#cancelLoadBtn	#cancelLoadBtn	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#loadProgress	#loadProgress	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#loadStatus	#loadStatus	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#canvas	#canvas	docs/viewer.html	element	docs/viewer.html	1		
@@ -344,6 +526,29 @@ elem:docs/viewer.html:#nodePanelClose	#nodePanelClose	docs/viewer.html	element	d
 elem:docs/viewer.html:#node-detail	#node-detail	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#sidebarBackdrop	#sidebarBackdrop	docs/viewer.html	element	docs/viewer.html	1		
 elem:docs/viewer.html:#sidebarToggle	#sidebarToggle	docs/viewer.html	element	docs/viewer.html	1		
+region:docs/gpu-test.html:style:8	inline-style:8	docs/gpu-test.html	style	docs/gpu-test.html	96		
+elem:docs/gpu-test.html:#status	#status	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#karate-cpu	#karate-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#karate-gpu	#karate-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#karate-topo-cpu	#karate-topo-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#karate-topo-gpu	#karate-topo-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#epstein-cpu	#epstein-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#epstein-gpu	#epstein-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#epstein-topo-cpu	#epstein-topo-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#epstein-topo-gpu	#epstein-topo-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#bzsource-cpu	#bzsource-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#bzsource-gpu	#bzsource-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#bzsource-topo-cpu	#bzsource-topo-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#bzsource-topo-gpu	#bzsource-topo-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#mitre-cpu	#mitre-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#mitre-gpu	#mitre-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#email-cpu	#email-cpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+elem:docs/gpu-test.html:#email-gpu	#email-gpu	docs/gpu-test.html	element	docs/gpu-test.html	1		
+region:docs/gpu-test.html:script:207	inline-script:207	docs/gpu-test.html	script	docs/gpu-test.html	89		
+region:docs/example.html:style:7	inline-style:7	docs/example.html	style	docs/example.html	5		
+elem:docs/example.html:#c1	#c1	docs/example.html	element	docs/example.html	1		
+elem:docs/example.html:#c2	#c2	docs/example.html	element	docs/example.html	1		
+region:docs/example.html:script:21	inline-script:21	docs/example.html	script	docs/example.html	31		
 rule:docs/bitzoom.css:5	:root	docs/bitzoom.css	rule	docs/bitzoom.css	12		
 cssvar:docs/bitzoom.css:--bg	--bg	docs/bitzoom.css	variable	docs/bitzoom.css	1		
 cssvar:docs/bitzoom.css:--surface	--surface	docs/bitzoom.css	variable	docs/bitzoom.css	1		
@@ -356,86 +561,87 @@ cssvar:docs/bitzoom.css:--text-dim	--text-dim	docs/bitzoom.css	variable	docs/bit
 cssvar:docs/bitzoom.css:--text-bright	--text-bright	docs/bitzoom.css	variable	docs/bitzoom.css	1		
 cssvar:docs/bitzoom.css:--node-r	--node-r	docs/bitzoom.css	variable	docs/bitzoom.css	1		
 rule:docs/bitzoom.css:18	body	docs/bitzoom.css	rule	docs/bitzoom.css	11		
-rule:docs/bitzoom.css:85	.sidebar-toggle	docs/bitzoom.css	rule	docs/bitzoom.css	18		
-rule:docs/bitzoom.css:104	header	docs/bitzoom.css	rule	docs/bitzoom.css	9		
-rule:docs/bitzoom.css:114	header h1	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:122	header .subtitle	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:129	.zoom-controls	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:137	.zoom-label	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:145	.zoom-stepper	docs/bitzoom.css	rule	docs/bitzoom.css	8		
-rule:docs/bitzoom.css:154	.zoom-step-btn	docs/bitzoom.css	rule	docs/bitzoom.css	12		
-rule:docs/bitzoom.css:166	.zoom-step-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:167	.zoom-step-btn:disabled	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:169	.zoom-current	docs/bitzoom.css	rule	docs/bitzoom.css	13		
-rule:docs/bitzoom.css:183	.reset-btn	docs/bitzoom.css	rule	docs/bitzoom.css	13		
-rule:docs/bitzoom.css:196	.reset-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:198	#canvas	docs/bitzoom.css	rule	docs/bitzoom.css	9		
-rule:docs/bitzoom.css:207	#canvas:active	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:209	.sidebar	docs/bitzoom.css	rule	docs/bitzoom.css	11		
-rule:docs/bitzoom.css:221	.sidebar::-webkit-scrollbar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:222	.sidebar::-webkit-scrollbar-track	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:223	.sidebar::-webkit-scrollbar-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:225	.algo-info	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:233	.panel-title	docs/bitzoom.css	rule	docs/bitzoom.css	8		
-rule:docs/bitzoom.css:242	.stat-row	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:249	.stat-label	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:250	.stat-value	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:252	.node-title	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:260	.node-badge	docs/bitzoom.css	rule	docs/bitzoom.css	9		
-rule:docs/bitzoom.css:270	.prop-row	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:277	.prop-key	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:278	.prop-val	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:280	.minhash-display	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:286	.mh-bit	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:293	.neighbor-list	docs/bitzoom.css	rule	docs/bitzoom.css	5		
-rule:docs/bitzoom.css:298	.neighbor-item	docs/bitzoom.css	rule	docs/bitzoom.css	11		
-rule:docs/bitzoom.css:309	.neighbor-item:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:311	.nudge-control	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:318	.nudge-control input[type=range]	docs/bitzoom.css	rule	docs/bitzoom.css	8		
-rule:docs/bitzoom.css:327	.nudge-control input[type=range]::-webkit-slider-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	8		
-rule:docs/bitzoom.css:336	.nudge-val	docs/bitzoom.css	rule	docs/bitzoom.css	5		
-rule:docs/bitzoom.css:351	.bucket-id	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:359	.weight-row	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:365	.weight-row input[type=checkbox]	docs/bitzoom.css	rule	docs/bitzoom.css	14		
-rule:docs/bitzoom.css:379	.weight-row input[type=checkbox]:hover	docs/bitzoom.css	rule	docs/bitzoom.css	3		
-rule:docs/bitzoom.css:382	.weight-row input[type=checkbox]:checked	docs/bitzoom.css	rule	docs/bitzoom.css	4		
-rule:docs/bitzoom.css:386	.weight-row input[type=checkbox]:checked::after	docs/bitzoom.css	rule	docs/bitzoom.css	11		
-rule:docs/bitzoom.css:397	.weight-label	docs/bitzoom.css	rule	docs/bitzoom.css	8		
-rule:docs/bitzoom.css:405	.weight-slider	docs/bitzoom.css	rule	docs/bitzoom.css	8		
-rule:docs/bitzoom.css:413	.weight-slider::-webkit-slider-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:420	.weight-val	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:427	.preset-row	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:433	.preset-btn	docs/bitzoom.css	rule	docs/bitzoom.css	13		
-rule:docs/bitzoom.css:446	.preset-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:447	.preset-btn.active	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:455	.loader-screen	docs/bitzoom.css	rule	docs/bitzoom.css	9		
-rule:docs/bitzoom.css:464	.loader-screen.hidden	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:466	.drop-zone	docs/bitzoom.css	rule	docs/bitzoom.css	9		
-rule:docs/bitzoom.css:475	.drop-zone.dragover	docs/bitzoom.css	rule	docs/bitzoom.css	4		
-rule:docs/bitzoom.css:479	.drop-title	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:486	.drop-hint	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:492	.file-input-row	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:499	.file-input-row label	docs/bitzoom.css	rule	docs/bitzoom.css	10		
-rule:docs/bitzoom.css:509	.file-input-row input[type=file]	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:515	.file-input-row input[type=file]::file-selector-button	docs/bitzoom.css	rule	docs/bitzoom.css	11		
-rule:docs/bitzoom.css:526	.file-input-row input[type=file]::file-selector-button:hover	docs/bitzoom.css	rule	docs/bitzoom.css	4		
-rule:docs/bitzoom.css:530	.load-btn	docs/bitzoom.css	rule	docs/bitzoom.css	13		
-rule:docs/bitzoom.css:543	.load-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:544	.load-btn:disabled	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:545	.load-status	docs/bitzoom.css	rule	docs/bitzoom.css	6		
-rule:docs/bitzoom.css:551	.load-status.error	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:553	.dataset-list	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:560	.dataset-btn	docs/bitzoom.css	rule	docs/bitzoom.css	12		
-rule:docs/bitzoom.css:572	.dataset-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:573	.dataset-btn:disabled	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:576	progress	docs/bitzoom.css	rule	docs/bitzoom.css	7		
-rule:docs/bitzoom.css:583	progress::-webkit-progress-bar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:584	progress::-webkit-progress-value	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:585	progress::-moz-progress-bar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:587	.node-panel	docs/bitzoom.css	rule	docs/bitzoom.css	18		
-rule:docs/bitzoom.css:605	.node-panel.open	docs/bitzoom.css	rule	docs/bitzoom.css	3		
-rule:docs/bitzoom.css:608	.node-panel::-webkit-scrollbar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:609	.node-panel::-webkit-scrollbar-track	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:610	.node-panel::-webkit-scrollbar-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	1		
-rule:docs/bitzoom.css:612	.node-panel-close	docs/bitzoom.css	rule	docs/bitzoom.css	17		
-rule:docs/bitzoom.css:629	.node-panel-close:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:90	.sidebar-toggle	docs/bitzoom.css	rule	docs/bitzoom.css	18		
+rule:docs/bitzoom.css:109	header	docs/bitzoom.css	rule	docs/bitzoom.css	9		
+rule:docs/bitzoom.css:119	header h1	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:127	header .subtitle	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:134	.zoom-controls	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:142	.zoom-label	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:150	.zoom-stepper	docs/bitzoom.css	rule	docs/bitzoom.css	8		
+rule:docs/bitzoom.css:159	.zoom-step-btn	docs/bitzoom.css	rule	docs/bitzoom.css	12		
+rule:docs/bitzoom.css:171	.zoom-step-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:172	.zoom-step-btn:disabled	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:174	.zoom-current	docs/bitzoom.css	rule	docs/bitzoom.css	13		
+rule:docs/bitzoom.css:188	.reset-btn	docs/bitzoom.css	rule	docs/bitzoom.css	13		
+rule:docs/bitzoom.css:201	.reset-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:203	#canvas	docs/bitzoom.css	rule	docs/bitzoom.css	10		
+rule:docs/bitzoom.css:213	#canvas:active	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:215	.sidebar	docs/bitzoom.css	rule	docs/bitzoom.css	11		
+rule:docs/bitzoom.css:227	.sidebar::-webkit-scrollbar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:228	.sidebar::-webkit-scrollbar-track	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:229	.sidebar::-webkit-scrollbar-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:231	.algo-info	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:239	.hint	docs/bitzoom.css	rule	docs/bitzoom.css	5		
+rule:docs/bitzoom.css:245	.panel-title	docs/bitzoom.css	rule	docs/bitzoom.css	8		
+rule:docs/bitzoom.css:254	.stat-row	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:261	.stat-label	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:262	.stat-value	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:264	.node-title	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:272	.node-badge	docs/bitzoom.css	rule	docs/bitzoom.css	9		
+rule:docs/bitzoom.css:282	.prop-row	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:289	.prop-key	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:290	.prop-val	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:292	.minhash-display	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:298	.mh-bit	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:305	.neighbor-list	docs/bitzoom.css	rule	docs/bitzoom.css	5		
+rule:docs/bitzoom.css:310	.neighbor-item	docs/bitzoom.css	rule	docs/bitzoom.css	11		
+rule:docs/bitzoom.css:321	.neighbor-item:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:323	.nudge-control	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:330	.nudge-control input[type=range]	docs/bitzoom.css	rule	docs/bitzoom.css	8		
+rule:docs/bitzoom.css:339	.nudge-control input[type=range]::-webkit-slider-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	8		
+rule:docs/bitzoom.css:348	.nudge-val	docs/bitzoom.css	rule	docs/bitzoom.css	5		
+rule:docs/bitzoom.css:362	.bucket-id	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:370	.weight-row	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:376	.weight-row input[type=checkbox]	docs/bitzoom.css	rule	docs/bitzoom.css	14		
+rule:docs/bitzoom.css:390	.weight-row input[type=checkbox]:hover	docs/bitzoom.css	rule	docs/bitzoom.css	3		
+rule:docs/bitzoom.css:393	.weight-row input[type=checkbox]:checked	docs/bitzoom.css	rule	docs/bitzoom.css	4		
+rule:docs/bitzoom.css:397	.weight-row input[type=checkbox]:checked::after	docs/bitzoom.css	rule	docs/bitzoom.css	11		
+rule:docs/bitzoom.css:408	.weight-label	docs/bitzoom.css	rule	docs/bitzoom.css	8		
+rule:docs/bitzoom.css:416	.weight-slider	docs/bitzoom.css	rule	docs/bitzoom.css	8		
+rule:docs/bitzoom.css:424	.weight-slider::-webkit-slider-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:431	.weight-val	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:438	.preset-row	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:444	.preset-btn	docs/bitzoom.css	rule	docs/bitzoom.css	13		
+rule:docs/bitzoom.css:457	.preset-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:458	.preset-btn.active	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:466	.loader-screen	docs/bitzoom.css	rule	docs/bitzoom.css	9		
+rule:docs/bitzoom.css:475	.loader-screen.hidden	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:477	.drop-zone	docs/bitzoom.css	rule	docs/bitzoom.css	9		
+rule:docs/bitzoom.css:486	.drop-zone.dragover	docs/bitzoom.css	rule	docs/bitzoom.css	4		
+rule:docs/bitzoom.css:490	.drop-title	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:497	.drop-hint	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:503	.file-input-row	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:510	.file-input-row label	docs/bitzoom.css	rule	docs/bitzoom.css	10		
+rule:docs/bitzoom.css:520	.file-input-row input[type=file]	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:526	.file-input-row input[type=file]::file-selector-button	docs/bitzoom.css	rule	docs/bitzoom.css	11		
+rule:docs/bitzoom.css:537	.file-input-row input[type=file]::file-selector-button:hover	docs/bitzoom.css	rule	docs/bitzoom.css	4		
+rule:docs/bitzoom.css:541	.load-btn	docs/bitzoom.css	rule	docs/bitzoom.css	13		
+rule:docs/bitzoom.css:554	.load-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:555	.load-btn:disabled	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:556	.load-status	docs/bitzoom.css	rule	docs/bitzoom.css	6		
+rule:docs/bitzoom.css:562	.load-status.error	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:564	.dataset-list	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:571	.dataset-btn	docs/bitzoom.css	rule	docs/bitzoom.css	12		
+rule:docs/bitzoom.css:583	.dataset-btn:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:584	.dataset-btn:disabled	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:587	progress	docs/bitzoom.css	rule	docs/bitzoom.css	7		
+rule:docs/bitzoom.css:594	progress::-webkit-progress-bar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:595	progress::-webkit-progress-value	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:596	progress::-moz-progress-bar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:598	.node-panel	docs/bitzoom.css	rule	docs/bitzoom.css	18		
+rule:docs/bitzoom.css:616	.node-panel.open	docs/bitzoom.css	rule	docs/bitzoom.css	3		
+rule:docs/bitzoom.css:619	.node-panel::-webkit-scrollbar	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:620	.node-panel::-webkit-scrollbar-track	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:621	.node-panel::-webkit-scrollbar-thumb	docs/bitzoom.css	rule	docs/bitzoom.css	1		
+rule:docs/bitzoom.css:623	.node-panel-close	docs/bitzoom.css	rule	docs/bitzoom.css	17		
+rule:docs/bitzoom.css:640	.node-panel-close:hover	docs/bitzoom.css	rule	docs/bitzoom.css	1		
