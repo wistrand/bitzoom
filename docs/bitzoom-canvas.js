@@ -372,7 +372,11 @@ export class BitZoomCanvas {
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
-  /** Run blend (CPU or GPU depending on _useGPU flag) */
+  /** Whether GPU compute is used for blend operations */
+  get useGPU() { return this._useGPU; }
+  set useGPU(val) { this._useGPU = !!val; }
+
+  /** Run blend (CPU or GPU depending on useGPU) */
   async _blend() {
     if (this._useGPU) {
       await gpuUnifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
@@ -724,7 +728,8 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
   if (opts.autoTune) {
     view.showProgress('Auto-tuning...');
     const tuneOpts = { ...opts.autoTune };
-    if (view._useGPU && !tuneOpts.blendFn) tuneOpts.blendFn = gpuUnifiedBlend;
+    // Auto-tune always uses CPU blend (fast, no GPU buffer overhead per eval).
+    // The final rebuildProjections after auto-tune uses GPU blend if active.
     tuneOpts.onProgress = (info) => {
       const pct = Math.round(100 * info.step / Math.max(1, info.total));
       const phase = info.phase === 'presets' ? 'scanning presets'
@@ -756,7 +761,7 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
   if (opts.useGPU) {
     initGPU().then(ok => {
       if (ok) {
-        view._useGPU = true;
+        view.useGPU = true;
         console.log('[GPU] GPU blend enabled for embedded view');
       }
     }).catch(() => {});

@@ -52,8 +52,9 @@ export function hashToken(token) {
 }
 
 // Reusable signature buffer — avoids allocating per call.
+// Stores integer MinHash values in [0, p). Sentinel: -1 (empty token set).
 // Callers must read/copy _sig before the next call to computeMinHashInto.
-export const _sig = new Float64Array(MINHASH_K);
+export const _sig = new Int32Array(MINHASH_K);
 
 // #5b: True universal hash: (a * tv + b) mod p, computed without overflow.
 // a < 2^31, tv < 2^32. Split tv into 16-bit halves so each partial product
@@ -74,13 +75,13 @@ function hashSlot(a, tv, b) {
 // Uses OPH+DOPH (Li et al. 2012, Shrivastava & Li 2014) when tokenCount >= 12,
 // falls back to standard k-hash MinHash for small sets where OPH's densification
 // overhead exceeds the savings from fewer hashes.
-// If tokenCount is 0, fills with NaN (sentinel).
+// If tokenCount is 0, fills with -1 (sentinel for empty token set).
 
 const _occupied = new Uint8Array(MINHASH_K); // reusable for OPH
 
 export function computeMinHashInto(tokens, tokenCount) {
   if (tokenCount === 0) {
-    for (let i = 0; i < MINHASH_K; i++) _sig[i] = NaN;
+    for (let i = 0; i < MINHASH_K; i++) _sig[i] = -1;
     return;
   }
 
@@ -118,18 +119,18 @@ export function computeMinHashInto(tokens, tokenCount) {
   }
 }
 
-// Allocating version — returns a new Float64Array copy of the signature.
+// Allocating version — returns a new Int32Array copy of the signature.
 export function computeMinHash(tokens, tokenCount) {
   if (tokenCount === undefined) tokenCount = tokens.length;
   computeMinHashInto(tokens, tokenCount);
-  const result = new Float64Array(MINHASH_K);
+  const result = new Int32Array(MINHASH_K);
   result.set(_sig);
   return result;
 }
 
 export function jaccardEstimate(sigA, sigB) {
-  // NaN sentinel: two empty sigs are identical; empty vs non-empty are disjoint
-  const aEmpty = sigA[0] !== sigA[0], bEmpty = sigB[0] !== sigB[0];
+  // -1 sentinel: two empty sigs are identical; empty vs non-empty are disjoint
+  const aEmpty = sigA[0] === -1, bEmpty = sigB[0] === -1;
   if (aEmpty || bEmpty) return (aEmpty && bEmpty) ? 1 : 0;
   let matches = 0;
   for (let i = 0; i < MINHASH_K; i++) if (sigA[i] === sigB[i]) matches++;
@@ -155,10 +156,9 @@ export function buildGaussianProjection(seed, cols) {
 }
 
 // #6: Write projection directly into output buffer at offset.
-// If signature is NaN (empty token sentinel), writes [0,0] (neutral).
+// If signature is -1 (empty token sentinel), writes [0,0] (neutral).
 export function projectInto(sig, ROT, buf, offset) {
-  // NaN !== NaN — single-slot check, zero false positives
-  if (sig[0] !== sig[0]) {
+  if (sig[0] === -1) {
     buf[offset] = 0;
     buf[offset + 1] = 0;
     return;

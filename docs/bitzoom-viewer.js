@@ -6,7 +6,7 @@ import {
 } from './bitzoom-algo.js';
 import { autoTuneWeights } from './bitzoom-utils.js';
 import { convertStixToSnap } from './stix2snap.js';
-import { initGPU, computeProjectionsGPU, gpuUnifiedBlend } from './bitzoom-gpu.js';
+import { initGPU, computeProjectionsGPU } from './bitzoom-gpu.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
 import { computeNodeSig, runPipelineGPU, runPipeline, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
@@ -799,10 +799,7 @@ class BitZoom {
         const progressBar = document.getElementById('loadProgress');
         status.classList.remove('error');
 
-        // Determine if rank quant is requested — if so, use CPU projections for precision
-        const useRankQuant = dataset?.settings?.quantMode === 'rank';
-        const projLabel = useRankQuant ? 'CPU (rank quant)' : 'GPU';
-        console.log(`[GPU] Loading graph, projections: ${projLabel}, blend: GPU`);
+        console.log('[GPU] Loading graph, projections: GPU, blend: GPU');
 
         const t0 = performance.now();
         const yield_ = () => new Promise(r => requestAnimationFrame(r));
@@ -827,22 +824,12 @@ class BitZoom {
         const extraPropNames = nodesResult ? nodesResult.extraPropNames : [];
         const graph = buildGraph(parsed, nodesMap, extraPropNames);
 
-        let projBuf;
-        if (useRankQuant) {
-            status.textContent = 'Computing projections (CPU)...';
-            if (progressBar) progressBar.value = 60;
-            await yield_();
-            projBuf = computeProjections(
-                graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
-            ).projBuf;
-        } else {
-            status.textContent = 'Computing projections (GPU)...';
-            if (progressBar) progressBar.value = 60;
-            await yield_();
-            projBuf = (await computeProjectionsGPU(
-                graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
-            )).projBuf;
-        }
+        status.textContent = 'Computing projections (GPU)...';
+        if (progressBar) progressBar.value = 60;
+        await yield_();
+        const projBuf = (await computeProjectionsGPU(
+            graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+        )).projBuf;
 
         status.textContent = 'Applying...';
         if (progressBar) progressBar.value = 85;
@@ -850,7 +837,6 @@ class BitZoom {
 
         console.log(`[GPU] Pipeline done: ${graph.nodeArray.length} nodes, ${graph.edges.length} edges in ${Math.round(performance.now() - t0)}ms`);
 
-        this.view._useGPU = true;
         this._applyWorkerResult({
             nodeMeta: graph.nodeArray,
             projBuf,
@@ -953,10 +939,7 @@ class BitZoom {
         this._updateQuantBtn();
         this._updateEdgeBtn();
         this._updateHeatBtn();
-        // Blend: skip if GPU mode — _finalizeLoad will trigger the right blend
-        if (!v._useGPU) {
-            unifiedBlend(v.nodes, v.groupNames, v.propWeights, v.smoothAlpha, v.adjList, v.nodeIndexFull, 5, v.quantMode, v._quantStats);
-        }
+        // Blend is deferred to _finalizeLoad which calls v._blend() (GPU or CPU)
 
         this.dataLoaded = true;
         v.selectedId = null;
@@ -1059,8 +1042,8 @@ class BitZoom {
                     nodesText = await this._fetchText(dataset.nodes).catch(() => null);
                 }
             }
-            console.log(`[Load] Dataset: ${dataset.name}, GPU: ${!!this._useGPU}`);
-            if (this._useGPU) {
+            console.log(`[Load] Dataset: ${dataset.name}, GPU: ${!!this.view.useGPU}`);
+            if (this.view.useGPU) {
                 await this.loadGraphGPU(edgesText, nodesText, dataset);
             } else {
                 await this.loadGraph(edgesText, nodesText);
@@ -1221,7 +1204,6 @@ class BitZoom {
             const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
                 weights: true, alpha: true, quant: false,
                 signal: tuneAbort.signal,
-                blendFn: this._useGPU ? gpuUnifiedBlend : undefined,
                 onProgress: (info) => {
                     const pct = Math.round(100 * info.step / Math.max(1, info.total));
                     const phase = info.phase === 'presets' ? 'scanning presets'
@@ -1236,17 +1218,16 @@ class BitZoom {
         // GPU toggle: re-project using WebGPU compute. When active, new data loads also use GPU.
         const gpuBtn = document.getElementById('gpuBtn');
         const updateGpuBtn = () => {
-            gpuBtn.style.background = this._useGPU ? 'var(--accent)' : '';
-            gpuBtn.style.color = this._useGPU ? '#fff' : '';
+            gpuBtn.style.background = v.useGPU ? 'var(--accent)' : '';
+            gpuBtn.style.color = v.useGPU ? '#fff' : '';
             gpuBtn.textContent = this._gpuUnavailable ? 'N/A' : 'GPU';
         };
         gpuBtn.addEventListener('click', async () => {
             if (this._gpuUnavailable) return;
 
             // Toggle off: reload with CPU pipeline
-            if (this._useGPU) {
-                this._useGPU = false;
-                v._useGPU = false;
+            if (v.useGPU) {
+                v.useGPU = false;
                 updateGpuBtn();
                 await this._reloadCPU();
                 return;
@@ -1266,8 +1247,7 @@ class BitZoom {
                 return;
             }
 
-            this._useGPU = true;
-            v._useGPU = true;
+            v.useGPU = true;
             await this._applyGPUToCurrentData();
             updateGpuBtn();
             gpuBtn.disabled = false;
@@ -1508,7 +1488,7 @@ class BitZoom {
             progressBar.value = 0;
             document.getElementById('loadBtn').disabled = true;
             try {
-                if (this._useGPU) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
+                if (v.useGPU) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
                 else await this.loadGraph(this.pendingEdgesText, this.pendingNodesText);
                 this._finalizeLoad(null);
             }
@@ -1641,8 +1621,7 @@ window.bz = bz;
     const gpuOk = await initGPU();
     const gpuBtn = document.getElementById('gpuBtn');
     if (gpuOk) {
-      bz._useGPU = true;
-      bz.view._useGPU = true;
+      bz.view.useGPU = true;
       console.log('[GPU] WebGPU available — GPU mode enabled');
       if (gpuBtn) { gpuBtn.style.background = 'var(--accent)'; gpuBtn.style.color = '#fff'; }
     } else {

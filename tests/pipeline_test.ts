@@ -428,7 +428,7 @@ F\tFrank\tb\t`;
   const scoreIdx = result.groupNames.indexOf("score");
   assert(scoreIdx >= 0, "score should be a group");
 
-  // Node F (index 5) should have [0,0] for the score projection (undefined → NaN → neutral)
+  // Node F (index 5) should have [0,0] for the score projection (undefined → -1 sentinel → neutral)
   const fIdx = result.nodeArray.findIndex(n => n.id === 'F');
   const fOff = (fIdx * G + scoreIdx) * 2;
   assertEquals(result.projBuf[fOff], 0, "Undefined score px should be 0");
