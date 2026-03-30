@@ -7,6 +7,7 @@ import {
 import { autoTuneWeights } from './bitzoom-utils.js';
 import { convertStixToSnap } from './stix2snap.js';
 import { initGPU, computeProjectionsGPU } from './bitzoom-gpu.js';
+import { isWebGL2Available } from './bitzoom-gl-renderer.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
 import { computeNodeSig, runPipelineGPU, runPipeline, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
@@ -799,8 +800,6 @@ class BitZoom {
         const progressBar = document.getElementById('loadProgress');
         status.classList.remove('error');
 
-        console.log('[GPU] Loading graph, projections: GPU, blend: GPU');
-
         const t0 = performance.now();
         const yield_ = () => new Promise(r => requestAnimationFrame(r));
 
@@ -824,12 +823,31 @@ class BitZoom {
         const extraPropNames = nodesResult ? nodesResult.extraPropNames : [];
         const graph = buildGraph(parsed, nodesMap, extraPropNames);
 
-        status.textContent = 'Computing projections (GPU)...';
+        // Adaptive GPU/CPU projection: GPU when N×G > 2000 and gaussian quant
+        const N = graph.nodeArray.length;
+        const G = graph.groupNames.length;
+        const qm = dataset?.settings?.quantMode || 'gaussian';
+        const useGPUProj = qm !== 'rank' && N * G > 2000;
+
+        if (useGPUProj) {
+            status.textContent = 'Computing projections (GPU)...';
+        } else {
+            status.textContent = 'Computing projections...';
+        }
         if (progressBar) progressBar.value = 60;
         await yield_();
-        const projBuf = (await computeProjectionsGPU(
-            graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
-        )).projBuf;
+        console.log(`[GPU] Pipeline: N=${N}, G=${G}, proj=${useGPUProj ? 'GPU' : 'CPU'}, blend=${N > 50000 ? 'GPU' : 'CPU'}`);
+
+        let projBuf;
+        if (useGPUProj) {
+            projBuf = (await computeProjectionsGPU(
+                graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+            )).projBuf;
+        } else {
+            projBuf = computeProjections(
+                graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+            ).projBuf;
+        }
 
         status.textContent = 'Applying...';
         if (progressBar) progressBar.value = 85;
@@ -945,7 +963,11 @@ class BitZoom {
         v.selectedId = null;
         document.getElementById('node-panel').classList.remove('open');
         document.getElementById('loader-screen').classList.add('hidden');
-        document.getElementById('canvas').style.display = 'block';
+        const canvasEl = document.getElementById('canvas');
+        canvasEl.style.display = 'block';
+        if (canvasEl.parentElement && canvasEl.parentElement !== document.body) {
+            canvasEl.parentElement.style.display = ''; // show GL wrapper
+        }
         document.getElementById('loadNewBtn').style.display = '';
         history.replaceState(null, '', location.pathname);
 
@@ -967,7 +989,7 @@ class BitZoom {
                 await v._blend();
             }
             const params = this._restoreFromHash();
-            if (params && params.d === dataset?.name) {
+            if (params && params.d === dataset?.id) {
                 this._applyHashState(params);
             }
             v.resize();
@@ -981,13 +1003,17 @@ class BitZoom {
 
     /** Apply GPU projection to already-loaded data. No re-parse, no re-load. */
     async _applyGPUToCurrentData() {
-        console.log('[GPU] Re-projecting current data on GPU...');
         if (!this._lastEdgesText) return;
         const v = this.view;
-        v.showProgress('GPU pipeline...');
+        const N = v.nodes.length;
+        const G = v.groupNames.length;
+        const useGPUProj = v.quantMode !== 'rank' && N * G > 2000;
+        console.log(`[GPU] Re-projecting current data, proj=${useGPUProj ? 'GPU' : 'CPU'}`);
+        v.showProgress('Re-projecting...');
         const t0 = performance.now();
         try {
-            const result = await runPipelineGPU(this._lastEdgesText, this._lastNodesText, computeProjectionsGPU);
+            const projFn = useGPUProj ? computeProjectionsGPU : computeProjections;
+            const result = await runPipelineGPU(this._lastEdgesText, this._lastNodesText, projFn);
             const G = result.groupNames.length;
             for (let i = 0; i < v.nodes.length; i++) {
                 for (let g = 0; g < G; g++) {
@@ -1060,6 +1086,7 @@ class BitZoom {
 
     showLoaderScreen() {
         if (this.activeWorker) { this.activeWorker.terminate(); this.activeWorker = null; }
+        const hadData = this.view && this.view.nodes && this.view.nodes.length > 0;
         this.dataLoaded = false;
         this.pendingEdgesText = null;
         this.pendingNodesText = null;
@@ -1070,9 +1097,14 @@ class BitZoom {
         document.getElementById('loadStatus').classList.remove('error');
         document.getElementById('loadProgress').style.display = 'none';
         document.getElementById('loadProgress').value = 0;
-        document.getElementById('canvas').style.display = 'none';
+        const canvasEl = document.getElementById('canvas');
+        canvasEl.style.display = 'none';
+        if (canvasEl.parentElement && canvasEl.parentElement !== document.body) {
+            canvasEl.parentElement.style.display = 'none'; // hide GL wrapper
+        }
         document.getElementById('loader-screen').classList.remove('hidden');
         document.getElementById('loadNewBtn').style.display = 'none';
+        document.getElementById('cancelLoadBtn').style.display = hadData ? '' : 'none';
         document.querySelectorAll('.dataset-btn').forEach(b => b.disabled = false);
     }
 
@@ -1252,6 +1284,26 @@ class BitZoom {
             updateGpuBtn();
             gpuBtn.disabled = false;
         }, sig);
+
+        // GL toggle: switch between Canvas 2D and WebGL2 rendering
+        const glBtn = document.getElementById('glBtn');
+        if (glBtn) {
+            const updateGlBtn = () => {
+                glBtn.style.background = v.useWebGL ? 'var(--accent)' : '';
+                glBtn.style.color = v.useWebGL ? '#fff' : '';
+                glBtn.textContent = isWebGL2Available() ? 'GL' : 'N/A';
+            };
+            if (!isWebGL2Available()) {
+                glBtn.textContent = 'N/A';
+                glBtn.disabled = true;
+            }
+            glBtn.addEventListener('click', () => {
+                if (!isWebGL2Available()) return;
+                v.useWebGL = !v.useWebGL;
+                updateGlBtn();
+            }, sig);
+            updateGlBtn();
+        }
 
         // Sidebar
         document.getElementById('sidebarToggle').addEventListener('click', () => this._toggleSidebar(), sig);
@@ -1457,6 +1509,17 @@ class BitZoom {
 
         // Load button + file inputs + drop zone
         document.getElementById('loadNewBtn').addEventListener('click', () => this.showLoaderScreen(), sig);
+        document.getElementById('cancelLoadBtn').addEventListener('click', () => {
+            this.dataLoaded = true;
+            document.getElementById('loader-screen').classList.add('hidden');
+            const canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+            if (canvasEl.parentElement && canvasEl.parentElement !== document.body) {
+                canvasEl.parentElement.style.display = '';
+            }
+            document.getElementById('loadNewBtn').style.display = '';
+            v.resize();
+        }, sig);
         document.getElementById('edgesFile').addEventListener('change', e => {
             const f = e.target.files[0];
             if (!f) return;

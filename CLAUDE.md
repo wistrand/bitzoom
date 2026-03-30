@@ -8,6 +8,8 @@ BitZoom is a deterministic layout and hierarchical aggregation viewer for large 
 
 - [`agent_docs/SPEC.md`](agent_docs/SPEC.md) — algorithm theory, tradeoffs, complexity analysis
 - [`agent_docs/ARCHITECTURE.md`](agent_docs/ARCHITECTURE.md) — implementation details, module responsibilities, data flow, caching, design rationale
+- [`agent_docs/ARCHITECTURE-webgl.md`](agent_docs/ARCHITECTURE-webgl.md) — WebGL2 rendering layer: shaders, dual canvas, GPU tessellation
+- [`agent_docs/ARCHITECTURE-webgpu.md`](agent_docs/ARCHITECTURE-webgpu.md) — WebGPU compute: projection, blend, adaptive GPU/CPU selection
 
 ## Running
 
@@ -30,12 +32,14 @@ docs/                    Web app (ES modules, no build step)
   bitzoom.css              Styles (646 lines)
   bitzoom-algo.js          Pure algorithm functions and constants (516 lines)
   bitzoom-pipeline.js      Parsers, graph building, tokenization, projection (348 lines)
-  bitzoom-renderer.js      Canvas rendering, heatmaps, hit testing (938 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (843 lines)
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1415 lines)
-  bitzoom-utils.js         Auto-tune optimizer (276 lines)
+  bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing (944 lines)
+  bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1202 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (977 lines)
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1714 lines)
+  bitzoom-utils.js         Auto-tune optimizer (277 lines)
   bitzoom-worker.js        Web Worker coordinator (142 lines)
   bitzoom-proj-worker.js   Web Worker projection (95 lines)
+  webgl-test.html          Side-by-side Canvas 2D vs WebGL2 comparison page (246 lines)
 
 docs/data/                 9 SNAP-format datasets (.edges + .nodes, Amazon .gz compressed)
 benchmarks/                Layout comparison suite (export, compare, Docker runner)
@@ -73,14 +77,17 @@ scripts/
 
 - **ES modules** — `import`/`export` everywhere. Module workers. `<script type="module">` in each HTML page.
 - **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in [bitzoom-algo.js](docs/bitzoom-algo.js), imported by pipeline and workers.
-- **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `skipEvents`/`onRender`/`autoTune` options for embedding.
-- **Auto-tune** — `autoTuneWeights` in [bitzoom-utils.js](docs/bitzoom-utils.js) optimizes weights/alpha/quant by maximizing spread × clumpiness at L5. Async with yield-based progress. Supports `AbortSignal` and timeout. Viewer has "Auto" button; embedded views accept `autoTune` option.
+- **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `skipEvents`/`onRender`/`autoTune`/`webgl` options for embedding.
+- **WebGL2 rendering** — optional GPU-accelerated layer for grid, edges, heatmap, and circles via 7 shader programs in [bitzoom-gl-renderer.js](docs/bitzoom-gl-renderer.js). Text stays on Canvas 2D overlay. Dual canvas architecture: wrapper div with GL canvas behind, original canvas transparent on top. Toggle via `webgl: true` option or GL button in viewer toolbar. Falls back silently if WebGL2 unavailable (`isWebGL2Available()` probe).
+- **Auto-tune** — `autoTuneWeights` in [bitzoom-utils.js](docs/bitzoom-utils.js) optimizes weights/alpha/quant by maximizing spread × clumpiness at L5. Async with yield-based progress. Supports `AbortSignal` and timeout. Accepts `blendFn` option (defaults to CPU `unifiedBlend`). Viewer has "Auto" button; embedded views accept `autoTune` option.
 - **Web Workers** — coordinator fans out to up to 3 projection sub-workers. Transferable Float64Array buffers.
 - **Supernode color/label cached at build time** — not recomputed per frame. `_refreshPropCache()` invalidates level cache.
 - **Two-zoom system** — logical zoom triggers level changes; `renderZoom = max(1, zoom * 2^levelOffset)` keeps visual scale continuous.
 - **Multi-select** — Ctrl+click toggles; `selectedIds` Set; edges highlight for all selected.
 - **Adaptive rendering** — edge sampling scales with visible nodes; labels/counts hide at high density, appear on zoom-in; node opacity scales with importance.
-- **5-layer render order** — edges → heatmap → highlighted edges → circles → labels.
+- **5-layer render order** — edges → heatmap → highlighted edges → circles → labels. WebGL2 renders geometry layers (grid through circles); Canvas 2D overlay handles text (labels, legend, reset button).
+- **Cancel button** — load screen shows a cancel button when data is already loaded, allowing return to the current view without reloading.
+- **GL wrapper visibility** — viewer hides the GL wrapper div alongside the canvas when showing the loader screen, restores it on cancel or load completion.
 - **URL hash state** — dataset + zoom + pan + level + selection. `replaceState` on render.
 
 ## Important Invariants

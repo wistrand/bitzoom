@@ -170,31 +170,37 @@ export function render(bz) {
   const W = bz.W, H = bz.H;
   ctx.clearRect(0, 0, W, H);
 
-  // Background grid
-  ctx.strokeStyle = 'rgba(60,60,100,0.6)';
-  ctx.lineWidth = 0.5;
-  const gridSize = 40 * bz.renderZoom;
-  if (gridSize >= 4) { // skip sub-pixel grid lines
-    const ox = bz.pan.x % gridSize;
-    const oy = bz.pan.y % gridSize;
-    ctx.beginPath();
-    for (let x = ox; x < W; x += gridSize) { ctx.moveTo(x,0); ctx.lineTo(x,H); }
-    for (let y = oy; y < H; y += gridSize) { ctx.moveTo(0,y); ctx.lineTo(W,y); }
-    ctx.stroke();
-  }
-
-  // Layer order: edges → heatmap → hilited edges → circles → labels/counts
-  setEdgeMode(bz.edgeMode);
+  const glActive = !!bz._gl;
   const isRaw = bz.currentLevel === RAW_LEVEL;
   const renderFn = isRaw ? renderNodes : renderSupernodes;
-  if (bz.edgeMode !== 'none') renderFn(bz, 'edges');
-  if (bz.heatmapMode === 'splat') renderHeatmapSplat(bz);
-  else if (bz.heatmapMode === 'density') renderHeatmapDensity(bz);
-  const savedMode = _edgeMode;
-  if (_edgeMode === 'none') setEdgeMode('lines'); // hilite edges always visible
-  renderFn(bz, 'hilite');
-  setEdgeMode(savedMode);
-  renderFn(bz, 'circles');
+
+  if (!glActive) {
+    // Background grid
+    ctx.strokeStyle = 'rgba(60,60,100,0.6)';
+    ctx.lineWidth = 0.5;
+    const gridSize = 40 * bz.renderZoom;
+    if (gridSize >= 4) {
+      const ox = bz.pan.x % gridSize;
+      const oy = bz.pan.y % gridSize;
+      ctx.beginPath();
+      for (let x = ox; x < W; x += gridSize) { ctx.moveTo(x,0); ctx.lineTo(x,H); }
+      for (let y = oy; y < H; y += gridSize) { ctx.moveTo(0,y); ctx.lineTo(W,y); }
+      ctx.stroke();
+    }
+
+    // Layer order: edges → heatmap → hilited edges → circles → labels/counts
+    setEdgeMode(bz.edgeMode);
+    if (bz.edgeMode !== 'none') renderFn(bz, 'edges');
+    if (bz.heatmapMode === 'splat') renderHeatmapSplat(bz);
+    else if (bz.heatmapMode === 'density') renderHeatmapDensity(bz);
+    const savedMode = _edgeMode;
+    if (_edgeMode === 'none') setEdgeMode('lines');
+    renderFn(bz, 'hilite');
+    setEdgeMode(savedMode);
+    renderFn(bz, 'circles');
+  }
+
+  // Text overlay: labels, legend, reset — always drawn (on Canvas 2D overlay in GL mode)
   renderFn(bz, 'labels');
   if (bz.showLegend) renderLegend(bz);
   if (bz.showResetBtn) renderResetBtn(bz);

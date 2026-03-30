@@ -122,8 +122,9 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   const savedPx = new Float64Array(nodes.length);
   const savedPy = new Float64Array(nodes.length);
 
+  const blendFn = opts.blendFn || unifiedBlend;
   const blendAndScore = (weights, alpha) => {
-    unifiedBlend(nodes, groupNames, weights, alpha, adjList, nodeIndexFull, 5, 'gaussian', {});
+    blendFn(nodes, groupNames, weights, alpha, adjList, nodeIndexFull, 5, 'gaussian', {});
     blends++;
     for (let i = 0; i < nodes.length; i++) { savedPx[i] = nodes[i].px; savedPy[i] = nodes[i].py; }
     let localBest = -1, localQuant = 'gaussian';

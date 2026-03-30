@@ -132,6 +132,7 @@
   <a href="#levels">Hierarchy Access</a>
   <a href="#data-format">Data Format</a>
   <a href="#modules">Module Map</a>
+  <a href="#webgl">WebGL Rendering</a>
 </nav>
 
 <div class="site-nav">
@@ -139,6 +140,8 @@
   <a href="viewer.html">Viewer</a> &middot;
   <a href="about.html">How It Works</a> &middot;
   <a href="comparison.html">Comparison</a> &middot;
+  <a href="webgpu.html">WebGPU</a> &middot;
+  <a href="webgl.html">WebGL</a> &middot;
   <a href="https://github.com/wistrand/bitzoom">GitHub</a>
 </div>
 
@@ -252,6 +255,8 @@
   <tr><td><code>showLegend</code></td><td>boolean</td><td>false</td><td>Draw color legend in bottom-right corner</td></tr>
   <tr><td><code>showResetBtn</code></td><td>boolean</td><td>false</td><td>Draw reset button in top-right corner</td></tr>
   <tr><td><code>skipEvents</code></td><td>boolean</td><td>false</td><td>Disable built-in mouse/touch/keyboard events</td></tr>
+  <tr><td><code>webgl</code></td><td>boolean</td><td>false</td><td>Use WebGL2 instanced rendering for geometry (<a href="#webgl">details</a>)</td></tr>
+  <tr><td><code>useGPU</code></td><td>boolean</td><td>false</td><td>Use WebGPU compute for projection and blend (<a href="webgpu.html">details</a>)</td></tr>
 </table>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
@@ -541,6 +546,46 @@ JP Morgan	JP Morgan	Organization	Bank
 
 <p>The first two modules have zero DOM dependencies. Import them in Deno, Node, or a worker. The canvas modules need a <code>&lt;canvas&gt;</code> element but no other DOM.</p>
 
+<!-- ═══════════════════════════════════════════════════════════════════════════ -->
+
+<h2 id="webgl">WebGL Rendering</h2>
+
+<p>Pass <code>webgl: true</code> to render geometry (circles, edges, heatmaps, grid) via WebGL2 instanced draw calls. Text (labels, counts, legend) stays on a Canvas 2D overlay. The two canvases are stacked automatically.</p>
+
+<p>Epstein dataset: Canvas 2D (left) vs WebGL2 (right). Same data, same layout, same interaction.</p>
+
+<div style="display:flex;gap:12px;margin:24px 0;flex-wrap:wrap">
+  <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Canvas 2D (default)</div>
+    <canvas id="demo-gl-canvas2d" style="width:100%;height:240px;display:block;background:var(--bg)"></canvas>
+  </div>
+  <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">webgl: true</div>
+    <canvas id="demo-gl-webgl" style="width:100%;height:240px;display:block;background:var(--bg)"></canvas>
+  </div>
+</div>
+
+<pre><span class="keyword">import</span> { createBitZoomView } <span class="keyword">from</span> <span class="string">'./bitzoom-canvas.js'</span>;
+
+<span class="comment">// Canvas 2D (default)</span>
+<span class="keyword">const</span> view2d = <span class="fn">createBitZoomView</span>(canvas1, edges, nodes, {
+  edgeMode: <span class="string">'curves'</span>, showLegend: <span class="keyword">true</span>,
+});
+
+<span class="comment">// WebGL2</span>
+<span class="keyword">const</span> viewGL = <span class="fn">createBitZoomView</span>(canvas2, edges, nodes, {
+  webgl: <span class="keyword">true</span>,
+  edgeMode: <span class="string">'curves'</span>, showLegend: <span class="keyword">true</span>,
+});
+
+<span class="comment">// Toggle at runtime</span>
+viewGL.useWebGL = <span class="keyword">false</span>;  <span class="comment">// switch back to Canvas 2D</span>
+viewGL.useWebGL = <span class="keyword">true</span>;   <span class="comment">// switch to WebGL2</span></pre>
+
+<div class="note">
+  WebGL rendering produces identical visual output to Canvas 2D. The benefit is reduced CPU load for large views &mdash; geometry draw calls are offloaded to the GPU via instanced rendering. See <a href="webgl.html">WebGL Rendering</a> for the full architecture: SDF circles, GPU-tessellated Bezier curves, two-pass density heatmap.
+</div>
+
 <p style="margin-top:48px;color:var(--text-dim);font-size:13px;text-align:center;">
   <a href="about.html">How It Works</a> &middot; <a href="viewer.html">Viewer</a> &middot; <a href="https://github.com/wistrand/bitzoom">GitHub</a>
 </p>
@@ -605,6 +650,18 @@ fetch('data/synth-packages.edges').then(r => r.text()).then(edges => {
       initialLevel: 4, edgeMode: 'lines', showLegend: true, showResetBtn: true,
       autoTune: { weights: true, alpha: true, quant: true },
     });
+  });
+});
+
+// WebGL comparison demo
+fetch('data/epstein.edges').then(r => r.text()).then(edges => {
+  fetch('data/epstein.nodes').then(r => r.text()).then(nodes => {
+    const shared = {
+      initialLevel: 3, edgeMode: 'curves', showLegend: true, showResetBtn: true,
+      weights: { group: 8, edgetype: 4 }, labelProps: ['label'],
+    };
+    createBitZoomView(document.getElementById('demo-gl-canvas2d'), edges, nodes, shared);
+    createBitZoomView(document.getElementById('demo-gl-webgl'), edges, nodes, { ...shared, webgl: true });
   });
 });
 

@@ -50,6 +50,7 @@
     <button class="reset-btn" id="heatmapBtn" title="Toggle heatmap">H</button>
     <button class="reset-btn" id="autoTuneBtn" title="Auto-tune weights, alpha, and quantization">Auto</button>
     <button class="reset-btn" id="gpuBtn" title="Re-project using WebGPU compute">GPU</button>
+    <button class="reset-btn" id="glBtn" title="Toggle WebGL2 rendering">GL</button>
   </div>
 </header>
 
@@ -68,6 +69,7 @@
       </label>
     </div>
     <button class="load-btn" id="loadBtn" disabled>Load Graph</button>
+    <button class="load-btn" id="cancelLoadBtn" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text-dim);margin-left:8px">Cancel</button>
     <progress id="loadProgress" value="0" max="100" style="width:80%;height:4px;margin-top:12px;display:none"></progress>
     <div class="load-status" id="loadStatus"></div>
   </div>

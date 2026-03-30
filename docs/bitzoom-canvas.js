@@ -18,6 +18,7 @@ import {
   getNodePropValue, getSupernodeDominantValue, maxCountKey,
 } from './bitzoom-algo.js';
 import { autoTuneWeights } from './bitzoom-utils.js';
+import { initGL, renderGL } from './bitzoom-gl-renderer.js';
 
 import { layoutAll, render, worldToScreen, screenToWorld, hitTest } from './bitzoom-renderer.js';
 
@@ -86,7 +87,13 @@ export class BitZoomCanvas {
     this.showResetBtn = opts.showResetBtn || false;
     this._progressText = null; // overlay text shown during auto-tune
     this._useGPU = false; // when true, blend uses GPU compute
+    this._gl = null;       // WebGL2 context (null = Canvas 2D mode)
+    this._glCanvas = null; // WebGL canvas element
+    this._glWrapper = null; // wrapper div for GL canvas pair
     this._quantStats = {}; // fixed Gaussian boundaries — computed once, reused
+
+    // Initialize WebGL if requested
+    if (opts.webgl) this._initWebGL(canvas);
     this.labelProps = new Set(opts.labelProps || []);
 
     // Store initial state for reset
@@ -287,6 +294,7 @@ export class BitZoomCanvas {
     this._renderPending = true;
     requestAnimationFrame(() => {
       this._renderPending = false;
+      if (this._gl) renderGL(this._gl, this);
       render(this);
       this._postRender();
     });
@@ -322,11 +330,16 @@ export class BitZoomCanvas {
   hitTest(sx, sy) { return hitTest(this, sx, sy); }
 
   resize() {
-    const rect = this.canvas.getBoundingClientRect();
+    const el = this._glWrapper || this.canvas;
+    const rect = el.getBoundingClientRect();
     this.W = Math.floor(rect.width) || this.canvas.offsetWidth || 300;
     this.H = Math.floor(rect.height) || this.canvas.offsetHeight || 300;
     this.canvas.width = this.W;
     this.canvas.height = this.H;
+    if (this._glCanvas) {
+      this._glCanvas.width = this.W;
+      this._glCanvas.height = this.H;
+    }
     this.layoutAll();
     this.render();
   }
@@ -376,13 +389,116 @@ export class BitZoomCanvas {
   get useGPU() { return this._useGPU; }
   set useGPU(val) { this._useGPU = !!val; }
 
-  /** Run blend (CPU or GPU depending on useGPU) */
-  async _blend() {
-    if (this._useGPU) {
-      await gpuUnifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
-    } else {
-      unifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
+  /** Whether WebGL2 is used for rendering */
+  get useWebGL() { return !!this._gl; }
+  set useWebGL(val) {
+    if (val && !this._gl) this._initWebGL(this.canvas);
+    else if (!val && this._gl) this._destroyWebGL();
+    this.resize();
+    this.render();
+  }
+
+  /** Initialize WebGL: wrap canvas in a container, add GL canvas behind it */
+  _initWebGL(canvas) {
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    // Wrap canvas in a relative container so absolute children don't collapse layout
+    const wrapper = document.createElement('div');
+    // Copy canvas layout properties to wrapper so it fills the same grid/flex slot
+    const cs = getComputedStyle(canvas);
+    wrapper.style.cssText = `position:relative;width:100%;height:100%;min-height:0;overflow:hidden;border:${cs.border};grid-column:${cs.gridColumn};grid-row:${cs.gridRow}`;
+    parent.insertBefore(wrapper, canvas);
+    wrapper.appendChild(canvas);
+    this._glWrapper = wrapper;
+
+    this._glCanvas = document.createElement('canvas');
+    // GL canvas behind: copies any CSS background from the original canvas
+    this._glCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none';
+    const canvasBg = getComputedStyle(canvas).backgroundColor;
+    if (canvasBg && canvasBg !== 'rgba(0, 0, 0, 0)') {
+      this._glCanvas.style.background = canvasBg;
+      this._origCanvasBg = canvas.style.background;
     }
+    canvas.style.position = 'absolute';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    // Original canvas must be transparent so GL canvas shows through
+    canvas.style.background = 'transparent';
+    canvas.style.border = 'none';
+    // Insert GL canvas BEFORE the original so it's behind (lower z-order)
+    wrapper.insertBefore(this._glCanvas, canvas);
+
+    this._gl = initGL(this._glCanvas);
+    if (!this._gl) {
+      // Unwrap on failure — restore canvas styles
+      wrapper.parentElement.insertBefore(canvas, wrapper);
+      wrapper.remove();
+      canvas.style.position = '';
+      canvas.style.top = '';
+      canvas.style.left = '';
+      canvas.style.width = '';
+      canvas.style.height = '';
+      canvas.style.border = '';
+      if (this._origCanvasBg !== undefined) {
+        canvas.style.background = this._origCanvasBg;
+        this._origCanvasBg = undefined;
+      } else {
+        canvas.style.background = '';
+      }
+      this._glCanvas = null;
+      this._glWrapper = null;
+      return;
+    }
+    // Parse CSS background into GL clear color
+    if (canvasBg) {
+      const m = canvasBg.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      if (m) { this._gl._clearR = +m[1] / 255; this._gl._clearG = +m[2] / 255; this._gl._clearB = +m[3] / 255; }
+    }
+    console.log('[GL] WebGL2 rendering enabled');
+  }
+
+  /** Tear down WebGL canvas and unwrap */
+  _destroyWebGL() {
+    if (this._glCanvas) {
+      this._glCanvas.remove();
+      this._glCanvas = null;
+      this._gl = null;
+    }
+    if (this._glWrapper) {
+      const parent = this._glWrapper.parentElement;
+      if (parent) {
+        parent.insertBefore(this.canvas, this._glWrapper);
+        this._glWrapper.remove();
+      }
+      this._glWrapper = null;
+      this.canvas.style.position = '';
+      this.canvas.style.top = '';
+      this.canvas.style.left = '';
+      this.canvas.style.width = '';
+      this.canvas.style.height = '';
+      this.canvas.style.border = '';
+      if (this._origCanvasBg !== undefined) {
+        this.canvas.style.background = this._origCanvasBg;
+        this._origCanvasBg = undefined;
+      }
+      console.log('[GL] WebGL2 rendering disabled');
+    }
+  }
+
+  /** Run blend (GPU for large datasets when useGPU, else CPU) */
+  async _blend() {
+    if (this._useGPU && this.nodes.length > 50000) {
+      try {
+        await gpuUnifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
+        return;
+      } catch (e) {
+        console.warn('[GPU] Blend failed, falling back to CPU:', e.message);
+      }
+    }
+    unifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
   }
 
   /** Update property weights and re-blend */
@@ -601,6 +717,7 @@ export class BitZoomCanvas {
   /** Clean up all event listeners and observers */
   destroy() {
     this._abortController.abort();
+    if (this._gl) this._destroyWebGL();
     if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
     if (this._edgeBuildRaf) { cancelAnimationFrame(this._edgeBuildRaf); this._edgeBuildRaf = null; }
   }

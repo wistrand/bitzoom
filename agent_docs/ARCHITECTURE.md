@@ -15,12 +15,14 @@ docs/                    Web application (ES modules, served by Deno)
   bitzoom.css              Styles — dark theme, responsive, loader, detail panel overlay
   bitzoom-algo.js          Pure algorithm functions and constants (no DOM)
   bitzoom-pipeline.js      Shared parsers, graph building, tokenization, projection
-  bitzoom-renderer.js      Canvas rendering, heatmaps, hit testing (no state mutation)
+  bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing (no state mutation)
+  bitzoom-gl-renderer.js   WebGL2 instanced renderer — 7 shader programs (~1202 lines)
   bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering
   bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading
   bitzoom-utils.js         Auto-tune optimizer (async, yield-based, AbortSignal + timeout)
   bitzoom-worker.js        Web Worker coordinator — uses pipeline, fans out projection
   bitzoom-proj-worker.js   Web Worker — imports from algo+pipeline, computes projections
+  webgl-test.html          Side-by-side Canvas 2D vs WebGL2 visual comparison
 
 tests/pipeline_test.ts     48 Deno tests: algo unit, pipeline, numeric, undefined, E2E
 
@@ -47,14 +49,14 @@ bitzoom-pipeline.js          (imports from algo)
   ↑             ↑
 bitzoom-utils.js             (imports from algo — autoTuneWeights)
   ↑
-bitzoom-canvas.js            (imports from algo + renderer + utils)
+bitzoom-canvas.js            (imports from algo + renderer + gl-renderer + utils)
   ↑             ↑
 bitzoom-viewer.js  bitzoom-worker.js → bitzoom-proj-worker.js
   (composes                            ↑
    BitZoomCanvas)            (imports from algo + pipeline)
   ↑
-bitzoom-renderer.js
-  (imports from algo)
+bitzoom-renderer.js          bitzoom-gl-renderer.js
+  (imports from algo)          (imports from algo — WebGL2 shaders + draw)
 ```
 
 No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) live once in [bitzoom-algo.js](../docs/bitzoom-algo.js). `BitZoom` composes `BitZoomCanvas` (`this.view`) — all graph state, rendering, and interaction primitives live on the canvas component.
@@ -96,18 +98,21 @@ Shared parsing, graph building, tokenization. Imports from algo. No DOM.
 - **Signature**: `computeNodeSig(node)` — on-demand signature computation (signatures not stored on nodes)
 - **Full pipeline**: `computeProjections` (GC-optimized), `runPipeline(edgesText, nodesText)` (parse → build → project)
 
-### [bitzoom-renderer.js](../docs/bitzoom-renderer.js) (938 lines)
+### [bitzoom-renderer.js](../docs/bitzoom-renderer.js) (944 lines)
 
-Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` in layout).
+Canvas 2D rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` in layout).
+When WebGL2 is active (`bz._gl` set), `render()` skips geometry drawing (grid, edges, heatmap,
+circles) and only draws text (labels, counts, legend, reset button) on the transparent overlay.
 
 **GC caches**: `_rgbCache`, `_fontCache`, `_rgbaCache`, persistent density heatmap buffers.
 
-**5-layer render order**:
+**5-layer render order** (Canvas 2D draws all 5; WebGL2 draws layers 1-4, Canvas 2D overlay
+draws layer 5):
 1. Normal edges (sampled, distance-faded, behind heatmap)
 2. Heatmap (splat or density)
 3. Highlighted edges (selected/hovered, on top of heatmap)
 4. Node circles (opacity-scaled by importance)
-5. Labels/counts (topmost, never occluded)
+5. Labels/counts (topmost, never occluded — always Canvas 2D)
 
 **Adaptive rendering** (based on visible supernode count):
 - <=50 visible: all counts, all labels (if cellPx >= 20)
@@ -120,17 +125,37 @@ Canvas rendering. Reads BitZoom instance, no state mutation (except `n.x`/`n.y` 
 
 **Other**: cubic bezier edges, Gaussian splat heatmap (additive), KDE density heatmap (1/4 resolution, persistent buffers), hit testing.
 
-### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (773 lines)
+### [bitzoom-gl-renderer.js](../docs/bitzoom-gl-renderer.js) (~1202 lines)
+
+WebGL2 instanced renderer. 7 shader programs compiled at `initGL()`. Geometry only — text stays
+on Canvas 2D overlay. See [`ARCHITECTURE-webgl.md`](ARCHITECTURE-webgl.md) for full details.
+
+- **Programs**: circle (SDF fill+stroke), glow (selection halo), edge line, edge curve (GPU
+  Bezier tessellation, 16 segments), heatmap splat (to RGBA16F FBO), heatmap resolve (fullscreen
+  quad), grid (procedural lines)
+- **GPU Bezier curves**: vertex shader evaluates cubic Bezier at 16 `t` values from a static
+  curve strip VBO (34 vertices). No per-frame CPU tessellation.
+- **Two-pass heatmap density**: additive splat to quarter-res RGBA16F FBO, then resolve to screen.
+  Requires `EXT_color_buffer_half_float`.
+- **Instance data**: circles (11 floats), edges (8 floats), rebuilt per frame into shared
+  `_instanceVBO` with `DYNAMIC_DRAW`.
+- **Exports**: `initGL(gl)`, `renderGL(gl, bz)`, `destroyGL(gl)`, `isWebGL2Available()`
+
+### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (977 lines)
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
-**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Constructor accepts `skipEvents` (for composition), `onRender` callback, `showLegend`, and `showResetBtn` options.
+**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Constructor accepts `skipEvents` (for composition), `onRender` callback, `showLegend`, `showResetBtn`, and `webgl` options.
 
-**`createBitZoomView(canvas, edgesText, nodesText, opts)`**: convenience factory — parses SNAP data, hydrates nodes, blends, returns ready-to-use canvas view.
+**WebGL2 integration**: `_initWebGL()` creates a wrapper div, inserts a GL canvas behind the original (transparent overlay), and calls `initGL()`. `_destroyWebGL()` unwraps and restores. `useWebGL` getter/setter toggles at runtime. `resize()` measures wrapper when GL is active.
+
+**Dual canvas layout**: wrapper div (position: relative) → GL canvas (geometry, `pointer-events: none`) + original canvas (text, events, `background: transparent`). All mouse/touch events stay on the original canvas.
+
+**`createBitZoomView(canvas, edgesText, nodesText, opts)`**: convenience factory — parses SNAP data, hydrates nodes, blends, returns ready-to-use canvas view. Accepts `webgl: true` to enable WebGL2.
 
 **Public API**: `setWeights()`, `setAlpha()`, `setOptions()`, `destroy()`. Callbacks: `onSelect`, `onHover`.
 
-### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (1407 lines)
+### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (1714 lines)
 
 `BitZoom` class — composes `BitZoomCanvas` as `this.view`. Adds application UI and orchestration.
 
@@ -144,7 +169,7 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **URL hash**: `d=name&l=level&z=zoom&x=pan&y=pan&bl=base&s=selected`. Updates via `replaceState` on each render (via `onRender` callback).
 
-**UI**: dynamic weight sliders, preset buttons, label checkboxes, size-by toggle (members/edges), quantization mode toggle (gaussian/rank), heatmap mode cycle (off/splat/density), edge mode cycle (curves/lines/none), detail panel (slide-in overlay with grouped linked nodes), single-click delayed 250ms for dblclick disambiguation.
+**UI**: dynamic weight sliders, preset buttons, label checkboxes, size-by toggle (members/edges), quantization mode toggle (gaussian/rank), heatmap mode cycle (off/splat/density), edge mode cycle (curves/lines/none), GL toggle button (WebGL2 on/off, shows "N/A" when unavailable), detail panel (slide-in overlay with grouped linked nodes), single-click delayed 250ms for dblclick disambiguation. Cancel button on load screen (visible when data already loaded) returns to current view. GL wrapper div hidden/shown with loader screen.
 
 ### Workers (142 + 95 lines)
 
@@ -165,6 +190,7 @@ Weight/alpha change:
 
 Zoom/pan:
   → render (levels cached, just transform + draw)
+  → if WebGL2: renderGL (rebuild instance buffers from screen coords) + Canvas 2D text overlay
 
 Level change (auto or manual):
   → adjusts zoom to preserve renderZoom → lazy getLevel → buildLevelNodes → layoutAll → render
@@ -209,6 +235,27 @@ Early design included 1-hop and 2-hop neighbor tokens in MinHash. These became r
 
 Numeric values emit 3 tokens (coarse/medium/fine bins). Nearby values share coarse tokens → smooth Jaccard. Non-numeric falls back to categorical. Empty values emit nothing.
 
+### WebGL2 optional rendering layer
+
+Geometry rendering (grid, edges, heatmap, circles) can run on WebGL2 via
+[bitzoom-gl-renderer.js](../docs/bitzoom-gl-renderer.js). Text (labels, counts, legend) stays on
+Canvas 2D because GPU text rendering adds complexity with no visual benefit at BitZoom's scale.
+
+The dual canvas architecture (GL behind, transparent Canvas 2D on top) keeps all event handling
+unchanged and allows toggling at runtime without re-binding listeners. The GL canvas uses
+`pointer-events: none`; hit testing uses the existing CPU spatial index.
+
+See [`ARCHITECTURE-webgl.md`](ARCHITECTURE-webgl.md) for shader details, instance layouts, and
+buffer management.
+
+### Adaptive GPU/CPU selection
+
+| Operation  | GPU when                              | Reason                                        |
+| ---------- | ------------------------------------- | --------------------------------------------- |
+| Projection | N x G > 2000 and quantMode != rank   | GPU crossover ~400 nodes; rank needs float64   |
+| Blend      | N > 50,000                            | GPU has ~13ms fixed overhead; faster at scale  |
+| Auto-tune  | always CPU (via `blendFn` default)    | 50-80 blend evals faster on CPU except Amazon  |
+
 ## Known Limitations
 
 - Jaccard on discretised tokens is crude for continuous/ordinal properties.
@@ -232,6 +279,7 @@ Individual components (MinHash, random projection, hierarchical grids, graph smo
 5. Multi-resolution numeric tokenization — smooth similarity for continuous properties
 6. Gaussian quantization as default — reasonable CDF fit for roughly bell-shaped blended coordinates
 7. Adaptive density rendering — visibility thresholds based on visible node count
+8. Optional WebGL2 instanced rendering with GPU Bezier tessellation and two-pass FBO heatmap
 
 ## Test Coverage (48 tests)
 
