@@ -318,6 +318,8 @@
 
 <p>BitZoom inverts the priority: <strong>property similarity first, topology second</strong>. Proximity means "these nodes have similar properties," not "these nodes are connected."</p>
 
+<p style="font-size:13px;color:var(--text-dim)">BitZoom started as a side project: <a href="https://melker.sh" style="color:var(--accent)">melker.sh</a> (a terminal UI framework for document-based apps) needed a fast graph layout that clusters by properties rather than connectivity. No existing algorithm did this well, so we built one.</p>
+
 <div class="tldr" id="tldr">
   <div class="tldr-title">TL;DR — The Pipeline in 30 Seconds</div>
   <p>Each node's properties (labels, categories, numeric fields) are broken into short string tokens. Those tokens are hashed through <strong>MinHash</strong> to produce a fixed-size signature per property group — a compact fingerprint where similar nodes naturally share more hash values. Each signature is then projected onto a 2D point using Gaussian random vectors, so similarity in property space becomes proximity on the canvas.</p>
