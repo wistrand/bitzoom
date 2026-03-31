@@ -1,6 +1,7 @@
 // bitzoom-svg.js — SVG export for BitZoom.
 
-import { RAW_LEVEL, ZOOM_LEVELS, getNodePropValue, getSupernodeDominantValue, maxCountKey } from './bitzoom-algo.js';
+import { RAW_LEVEL, ZOOM_LEVELS, buildLevel } from './bitzoom-algo.js';
+import { generateGroupColors } from './bitzoom-colors.js';
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
@@ -17,9 +18,311 @@ function maxEdgesToDraw(nodeCount) {
   return Math.min(5000, Math.max(200, nodeCount * 3));
 }
 
+// ─── Density heatmap as SVG contour bands ─────────────────────────────────────
+
+// Marching squares: trace iso-contours on a scalar grid.
+// Uses a simple bitmap flood-fill approach: for each threshold, find all cells
+// above threshold, trace the boundary, simplify, and smooth.
+
+function traceThresholdRegions(grid, gw, gh, threshold) {
+  // Trace boundaries of connected regions above threshold using Moore neighborhood
+  // contour tracing. Produces properly ordered closed polygons without spikes.
+  const above = new Uint8Array(gw * gh);
+  for (let i = 0; i < gw * gh; i++) above[i] = grid[i] >= threshold ? 1 : 0;
+
+  const isAbove = (x, y) => x >= 0 && x < gw && y >= 0 && y < gh && above[y * gw + x];
+  const traced = new Uint8Array(gw * gh); // marks cells that have been part of a traced boundary
+  const polys = [];
+
+  // Moore neighborhood: 8 directions clockwise from left
+  //   5 6 7
+  //   4 . 0
+  //   3 2 1
+  const dx = [1, 1, 0, -1, -1, -1, 0, 1];
+  const dy = [0, 1, 1, 1, 0, -1, -1, -1];
+
+  for (let sy = 0; sy < gh; sy++) {
+    for (let sx = 0; sx < gw; sx++) {
+      // Find boundary cell: above threshold with a non-above neighbor to the left (or at edge)
+      if (!above[sy * gw + sx]) continue;
+      if (sx > 0 && above[sy * gw + sx - 1]) continue; // not a left-edge boundary
+      if (traced[sy * gw + sx]) continue;
+
+      // Trace boundary clockwise using Moore neighbor tracing
+      const poly = [];
+      let cx = sx, cy = sy;
+      let dir = 6; // start looking up-left (came from left)
+      const maxSteps = gw * gh * 4; // must accommodate large complex contours
+      let steps = 0;
+
+      do {
+        // Avoid adding duplicate consecutive points
+        const last = poly.length > 0 ? poly[poly.length - 1] : null;
+        if (!last || last.x !== cx || last.y !== cy) {
+          poly.push({ x: cx, y: cy });
+        }
+        traced[cy * gw + cx] = 1;
+
+        // Search clockwise for next boundary cell
+        let found = false;
+        for (let i = 0; i < 8; i++) {
+          const nd = (dir + i) % 8;
+          const nx = cx + dx[nd], ny = cy + dy[nd];
+          if (isAbove(nx, ny)) {
+            cx = nx; cy = ny;
+            dir = (nd + 5) % 8;
+            found = true;
+            break;
+          }
+        }
+        if (!found) break;
+        if (++steps > maxSteps) break;
+      } while (cx !== sx || cy !== sy);
+
+      if (poly.length >= 4) polys.push(poly);
+    }
+  }
+  return polys;
+}
+
+// Ramer-Douglas-Peucker simplification
+function simplifyRDP(pts, epsilon) {
+  if (pts.length <= 2) return pts;
+  let maxDist = 0, maxIdx = 0;
+  const a = pts[0], b = pts[pts.length - 1];
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  for (let i = 1; i < pts.length - 1; i++) {
+    let dist;
+    if (lenSq === 0) {
+      const ex = pts[i].x - a.x, ey = pts[i].y - a.y;
+      dist = Math.sqrt(ex * ex + ey * ey);
+    } else {
+      const t = Math.max(0, Math.min(1, ((pts[i].x - a.x) * dx + (pts[i].y - a.y) * dy) / lenSq));
+      const px = a.x + t * dx, py = a.y + t * dy;
+      const ex = pts[i].x - px, ey = pts[i].y - py;
+      dist = Math.sqrt(ex * ex + ey * ey);
+    }
+    if (dist > maxDist) { maxDist = dist; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const left = simplifyRDP(pts.slice(0, maxIdx + 1), epsilon);
+    const right = simplifyRDP(pts.slice(maxIdx), epsilon);
+    return left.slice(0, -1).concat(right);
+  }
+  return [a, b];
+}
+
+// Chaikin corner-cutting (2 iterations for smooth curves)
+function smoothChaikin(pts, iterations = 2) {
+  let p = pts;
+  for (let iter = 0; iter < iterations; iter++) {
+    const out = [];
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], b = p[(i + 1) % p.length];
+      out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    p = out;
+  }
+  return p;
+}
+
+function polyToSVGPath(pts, scale) {
+  if (pts.length < 3) return '';
+  const p = pts.map(pt => ({ x: pt.x * scale, y: pt.y * scale }));
+  let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
+  for (let i = 1; i < p.length; i++) d += ` L${p[i].x.toFixed(1)},${p[i].y.toFixed(1)}`;
+  return d + ' Z';
+}
+
+function buildDensityContours(bz, scale) {
+  const rz = bz.renderZoom;
+  const W = bz.W, H = bz.H;
+  const isRaw = bz.currentLevel === RAW_LEVEL;
+  const allNodes = isRaw ? bz.nodes : bz.getLevel(bz.currentLevel).supernodes;
+  const gw = Math.ceil(W / scale);
+  const gh = Math.ceil(H / scale);
+  const kernelR = Math.max(8, Math.min(40, Math.min(gw, gh) / 8));
+  const kernelRSq = kernelR * kernelR;
+  const totalCells = gw * gh;
+  const light = bz._lightMode;
+
+  // Group nodes by hex color
+  const colorGroups = new Map(); // hex → [{gx, gy, weight}, ...]
+  for (const n of allNodes) {
+    const gx = (n.x * rz + bz.pan.x) / scale;
+    const gy = (n.y * rz + bz.pan.y) / scale;
+    if (gx < -kernelR || gx > gw + kernelR || gy < -kernelR || gy > gh + kernelR) continue;
+
+    let weight;
+    if (isRaw) {
+      weight = scaleSize(bz.sizeBy === 'edges' ? (n.degree + 1) : 1, bz);
+    } else {
+      weight = scaleSize(bz.sizeBy === 'edges' ? (n.totalDegree + 1) : n.members.length, bz);
+    }
+    const hex = isRaw ? bz._nodeColor(n) : n.cachedColor;
+    if (!colorGroups.has(hex)) colorGroups.set(hex, []);
+    colorGroups.get(hex).push({ gx, gy, weight });
+  }
+
+  if (colorGroups.size === 0) return '';
+
+  const thresholds = [0.08, 0.25, 0.5];
+  const parts = [];
+  parts.push('<defs><filter id="hblur"><feGaussianBlur stdDeviation="6"/></filter></defs>');
+  parts.push('<g fill-rule="evenodd" filter="url(#hblur)">');
+
+  // First pass: compute global density (all nodes) to find global maxW,
+  // matching the canvas renderer which normalizes all colors together.
+  const globalGrid = new Float32Array(totalCells);
+  for (const [, nodes] of colorGroups) {
+    for (const { gx, gy, weight } of nodes) {
+      const x0 = Math.max(0, gx - kernelR | 0);
+      const x1 = Math.min(gw - 1, gx + kernelR + 1 | 0);
+      const y0 = Math.max(0, gy - kernelR | 0);
+      const y1 = Math.min(gh - 1, gy + kernelR + 1 | 0);
+      for (let cy = y0; cy <= y1; cy++) {
+        const dy = cy - gy, dySq = dy * dy;
+        const rowOff = cy * gw;
+        for (let cx = x0; cx <= x1; cx++) {
+          const dx = cx - gx;
+          const distSq = dx * dx + dySq;
+          if (distSq > kernelRSq) continue;
+          const t = 1 - distSq / kernelRSq;
+          globalGrid[rowOff + cx] += t * t * weight;
+        }
+      }
+    }
+  }
+  let globalMaxW = 0;
+  for (let i = 0; i < totalCells; i++) if (globalGrid[i] > globalMaxW) globalMaxW = globalGrid[i];
+  if (globalMaxW < 0.001) return '';
+
+  // Second pass: per-color density grids, thresholded against the global maxW
+  const densGrid = new Float32Array(totalCells); // reused per color
+
+  for (const [hex, nodes] of colorGroups) {
+    densGrid.fill(0);
+
+    // Accumulate kernel density for this color's nodes
+    for (const { gx, gy, weight } of nodes) {
+      const x0 = Math.max(0, gx - kernelR | 0);
+      const x1 = Math.min(gw - 1, gx + kernelR + 1 | 0);
+      const y0 = Math.max(0, gy - kernelR | 0);
+      const y1 = Math.min(gh - 1, gy + kernelR + 1 | 0);
+      for (let cy = y0; cy <= y1; cy++) {
+        const dy = cy - gy, dySq = dy * dy;
+        const rowOff = cy * gw;
+        for (let cx = x0; cx <= x1; cx++) {
+          const dx = cx - gx;
+          const distSq = dx * dx + dySq;
+          if (distSq > kernelRSq) continue;
+          const t = 1 - distSq / kernelRSq;
+          densGrid[rowOff + cx] += t * t * weight;
+        }
+      }
+    }
+
+    // Extract contour bands using global maxW for thresholds
+    for (let ti = 0; ti < thresholds.length; ti++) {
+      const thresh = thresholds[ti] * globalMaxW;
+      const polys = traceThresholdRegions(densGrid, gw, gh, thresh);
+      if (polys.length === 0) continue;
+
+      const alpha = light ? 0.18 + ti * 0.12 : 0.12 + ti * 0.12;
+
+      for (const poly of polys) {
+        const simplified = simplifyRDP(poly, 0.5);
+        if (simplified.length < 3) continue;
+        const smoothed = smoothChaikin(simplified, 2);
+        const d = polyToSVGPath(smoothed, scale);
+        if (d) parts.push(`<path d="${d}" fill="${hex}" fill-opacity="${alpha.toFixed(2)}"/>`);
+      }
+    }
+  }
+
+  parts.push('</g>');
+  return parts.join('\n');
+}
+
+/**
+ * Create a lightweight view object for exportSVG from plain pipeline data.
+ * No DOM or BitZoomCanvas required — suitable for headless/server-side export and testing.
+ *
+ * @param {object[]} nodes — node array with x, y, id, label, group, degree
+ * @param {object[]} edges — edge array with src, dst
+ * @param {object}   [opts]
+ * @param {number}   [opts.width=800]
+ * @param {number}   [opts.height=600]
+ * @param {number}   [opts.zoom=1]       — renderZoom
+ * @param {{x:number,y:number}} [opts.pan] — defaults to center
+ * @param {string}   [opts.colorBy='group'] — property name for coloring
+ * @param {number}   [opts.colorScheme=0]   — scheme index for generateGroupColors
+ * @param {Record<string,string>} [opts.colorMap] — explicit value→hex map (overrides colorScheme)
+ * @param {string}   [opts.sizeBy='nodes']
+ * @param {boolean}  [opts.sizeLog=false]
+ * @param {string}   [opts.edgeMode='lines']
+ * @param {string}   [opts.heatmapMode='off']
+ * @param {boolean}  [opts.lightMode=false]
+ * @param {number|false} [opts.showLegend=false] — false or corner position 1-4
+ * @param {Set<string>}  [opts.selectedIds]
+ * @param {Set<string>}  [opts.labelProps]
+ * @param {number}   [opts.level]        — aggregated level (omit for raw)
+ * @returns {object} view compatible with exportSVG
+ */
+export function createSVGView(nodes, edges, opts = {}) {
+  const W = opts.width || 800;
+  const H = opts.height || 600;
+  const rz = opts.zoom || 1;
+  const pan = opts.pan || { x: W / 2, y: H / 2 };
+  const colorBy = opts.colorBy || 'group';
+  const sizeBy = opts.sizeBy || 'nodes';
+  const sizeLog = opts.sizeLog || false;
+  const edgeMode = opts.edgeMode || 'lines';
+  const heatmapMode = opts.heatmapMode || 'off';
+  const lightMode = opts.lightMode || false;
+  const showLegend = opts.showLegend || false;
+  const selectedIds = opts.selectedIds || new Set();
+  const labelProps = opts.labelProps || new Set(['label']);
+
+  // Build color map from node values
+  const values = [...new Set(nodes.map(n => n[colorBy] || ''))];
+  const colorMap = opts.colorMap || generateGroupColors(values, opts.colorScheme || 0);
+  const dominant = colorBy;
+
+  const nodeIndex = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  // Level cache for aggregated views
+  const levelCache = {};
+
+  const view = {
+    W, H, renderZoom: rz, pan,
+    currentLevel: opts.level !== undefined ? opts.level : RAW_LEVEL,
+    nodes, edges, nodeIndexFull: nodeIndex,
+    sizeBy, sizeLog, edgeMode, heatmapMode,
+    showLegend, selectedIds, hoveredId: null, labelProps,
+    _lightMode: lightMode,
+    _nodeColor: n => colorMap[n[colorBy] || ''] || '#888888',
+    _nodeLabel: n => n.label || n.id,
+    _nodeColorVal: n => n[colorBy] || '',
+    _cachedColorMap: colorMap,
+    _cachedDominant: dominant,
+    getLevel(l) {
+      if (!levelCache[l]) {
+        levelCache[l] = buildLevel(l, nodes, edges, nodeIndex,
+          n => n[colorBy] || '', n => n.label || n.id,
+          v => colorMap[v] || '#888888');
+      }
+      return levelCache[l];
+    },
+  };
+  return view;
+}
+
 /**
  * Export the current BitZoomCanvas state as an SVG string.
- * @param {object} bz — BitZoomCanvas instance
+ * @param {object} bz — BitZoomCanvas instance or createSVGView() result
  * @param {object} [opts] — { background: true, grid: true, edges: true, labels: true, legend: true }
  * @returns {string} SVG markup
  */
@@ -149,6 +452,12 @@ export function exportSVG(bz, opts = {}) {
       }
     }
     parts.push('</g>');
+  }
+
+  // Heatmap density contours (between edges and circles, matching render order)
+  if (opts.heatmap !== false && bz.heatmapMode === 'density') {
+    const heatSvg = buildDensityContours(bz, 4);
+    if (heatSvg) parts.push(heatSvg);
   }
 
   // Circles + labels

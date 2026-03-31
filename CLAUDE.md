@@ -10,12 +10,13 @@ BitZoom is a deterministic layout and hierarchical aggregation viewer for large 
 - [`agent_docs/ARCHITECTURE.md`](agent_docs/ARCHITECTURE.md) — implementation details, module responsibilities, data flow, caching, design rationale
 - [`agent_docs/ARCHITECTURE-webgl.md`](agent_docs/ARCHITECTURE-webgl.md) — WebGL2 rendering layer: shaders, dual canvas, GPU tessellation
 - [`agent_docs/ARCHITECTURE-webgpu.md`](agent_docs/ARCHITECTURE-webgpu.md) — WebGPU compute: projection, blend, adaptive GPU/CPU selection
+- [`agent_docs/ARCHITECTURE-svg.md`](agent_docs/ARCHITECTURE-svg.md) — SVG export: density contours, edge rendering, coordinate mapping
 
 ## Running
 
 ```sh
 deno task serve       # dev server at http://localhost:8000
-deno task test        # run pipeline tests (48 tests)
+deno task test        # run pipeline tests (68 tests)
 deno task stix2snap   # STIX 2.1 JSON → SNAP converter
 deno task csv2snap    # OpenCTI CSV → SNAP converter
 deno task src2snap    # source code → SNAP call graph
@@ -28,23 +29,23 @@ docs/                    Web app (ES modules, no build step)
   index.html               Landing page (308 lines)
   viewer.html              Viewer HTML shell (109 lines)
   about.html               How It Works page (1562 lines)
-  howto.html               Developer Guide (897 lines)
+  howto.html               Developer Guide (932 lines)
   example.html             Minimal example — two graphs, linked from developer guide (53 lines)
   bitzoom.css              Styles (673 lines)
   bitzoom-algo.js          Pure algorithm functions and constants (495 lines)
   bitzoom-pipeline.js      Parsers, graph building, tokenization, projection (369 lines)
-  bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1067 lines)
+  bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1108 lines)
   bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1235 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (1061 lines)
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1772 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (1072 lines)
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1806 lines)
   bitzoom-utils.js         Auto-tune optimizer (277 lines)
-  bitzoom-svg.js           SVG export utility — exportSVG(bz, opts) renders graph as SVG string
+  bitzoom-svg.js           SVG export — exportSVG(bz, opts), createSVGView() for headless (601 lines)
   bitzoom-colors.js        Color schemes (vivid, viridis, plasma, etc.)
   bitzoom-gpu.js           WebGPU compute acceleration (671 lines)
   bitzoom-worker.js        Web Worker coordinator (142 lines)
   bitzoom-proj-worker.js   Web Worker projection (95 lines)
   bz-graph.js              <bz-graph> web component
-  bitzoom.js               Public API entrypoint (re-exports createBitZoomView, exportSVG, autoTuneWeights, etc.)
+  bitzoom.js               Public API entrypoint (re-exports createBitZoomView, exportSVG, createSVGView, autoTuneWeights, etc.)
   webgl-test.html          Side-by-side Canvas 2D vs WebGL2 comparison page (246 lines)
 
 docs/dist/                 Bundled distribution
@@ -52,7 +53,7 @@ docs/dist/                 Bundled distribution
 
 docs/data/                 9 SNAP-format datasets (.edges + .nodes, Amazon .gz compressed)
 benchmarks/                Layout comparison suite (export, compare, Docker runner)
-tests/pipeline_test.ts     48 tests: unit, numeric, undefined values, E2E
+tests/pipeline_test.ts     68 tests: unit, numeric, undefined values, E2E, SVG export
 scripts/
   serve.ts                 Deno HTTP server (no-cache headers)
   stix2snap.ts             STIX 2.1 → SNAP converter (extracts platforms, kill chains)
@@ -88,7 +89,7 @@ scripts/
 - **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in [bitzoom-algo.js](docs/bitzoom-algo.js), imported by pipeline and workers.
 - **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `skipEvents`/`onRender`/`autoTune`/`autoGPU`/`webgl`/`colorBy` options for embedding.
 - **colorBy** — `BitZoomCanvas.colorBy` property overrides which property group controls node colors (default: auto = highest-weight group). In the viewer, click a group name label to set colorBy (underline indicates active); click again to return to auto. `<bz-graph>` supports `color-by` attribute.
-- **SVG export** — `exportSVG(bz, opts)` in [bitzoom-svg.js](docs/bitzoom-svg.js) renders the current graph view as an SVG string. In the viewer, press **S** to download an SVG file.
+- **SVG export** — `exportSVG(bz, opts)` in [bitzoom-svg.js](docs/bitzoom-svg.js) renders the current graph view as an SVG string. `createSVGView(nodes, edges, opts)` builds a headless view from plain pipeline data (no DOM needed). In the viewer, press **S** to download an SVG file.
 - **WebGL2 rendering** — optional GPU-accelerated layer for grid, edges, heatmap, and circles via 7 shader programs in [bitzoom-gl-renderer.js](docs/bitzoom-gl-renderer.js). Text stays on Canvas 2D overlay. Dual canvas architecture: wrapper div with GL canvas behind, original canvas transparent on top. Toggle via `webgl: true` option or GL button in viewer toolbar. Falls back silently if WebGL2 unavailable (`isWebGL2Available()` probe).
 - **Auto-tune** — `autoTuneWeights` in [bitzoom-utils.js](docs/bitzoom-utils.js) optimizes weights/alpha/quant by maximizing spread × clumpiness at L5. Async with yield-based progress. Supports `AbortSignal` and timeout. Accepts `blendFn` option (defaults to CPU `unifiedBlend`). Viewer has "Auto" button; embedded views accept `autoTune` option.
 - **Web Workers** — coordinator fans out to up to 3 projection sub-workers. Transferable Float64Array buffers.

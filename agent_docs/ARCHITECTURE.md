@@ -21,12 +21,12 @@ docs/                    Web application (ES modules, served by Deno)
   bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering
   bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading
   bitzoom-utils.js         Auto-tune optimizer (async, yield-based, AbortSignal + timeout)
-  bitzoom-svg.js           SVG export — exportSVG(bz, opts) renders graph as SVG string
+  bitzoom-svg.js           SVG export — exportSVG(bz, opts) + createSVGView() headless factory
   bitzoom-worker.js        Web Worker coordinator — uses pipeline, fans out projection
   bitzoom-proj-worker.js   Web Worker — imports from algo+pipeline, computes projections
   webgl-test.html          Side-by-side Canvas 2D vs WebGL2 visual comparison
 
-tests/pipeline_test.ts     48 Deno tests: algo unit, pipeline, numeric, undefined, E2E
+tests/pipeline_test.ts     68 Deno tests: algo unit, pipeline, numeric, undefined, E2E, SVG export
 
 docs/data/                 9 SNAP-format graph datasets (.edges + .nodes, Amazon .gz compressed)
 benchmarks/                Layout comparison vs ForceAtlas2, UMAP, t-SNE (Docker runner)
@@ -43,24 +43,25 @@ deno.json                  Tasks: serve, test, stix2snap, csv2snap, src2snap
 
 All JS files use **ES modules** (`import`/`export`). Web Workers use `{ type: 'module' }`. Viewer loads `<script type="module" src="bitzoom-viewer.js">`.
 
-Dependency graph:
+Dependency graph (arrows = "imported by"):
 ```
 bitzoom-algo.js              (no deps — pure functions + constants)
+bitzoom-colors.js            (no deps — color schemes)
   ↑
-bitzoom-pipeline.js          (imports from algo)
-  ↑             ↑
-bitzoom-utils.js             (imports from algo — autoTuneWeights)
+bitzoom-pipeline.js          (algo)
+bitzoom-renderer.js          (algo)
+bitzoom-gl-renderer.js       (algo)
+bitzoom-utils.js             (algo)
+bitzoom-svg.js               (algo, colors)
+bitzoom-gpu.js               (algo, pipeline)
   ↑
-bitzoom-canvas.js            (imports from algo + renderer + gl-renderer + utils)
-  ↑             ↑
-bitzoom-svg.js               (imports from algo + renderer — SVG export)
+bitzoom-canvas.js            (algo, colors, pipeline, renderer, gl-renderer, gpu, utils)
   ↑
-bitzoom-viewer.js  bitzoom-worker.js → bitzoom-proj-worker.js
-  (composes                            ↑
-   BitZoomCanvas)            (imports from algo + pipeline)
-  ↑
-bitzoom-renderer.js          bitzoom-gl-renderer.js
-  (imports from algo)          (imports from algo — WebGL2 shaders + draw)
+bitzoom-viewer.js            (algo, canvas, colors, gl-renderer, gpu, pipeline, svg, utils)
+bz-graph.js                  (canvas, colors)
+
+bitzoom-worker.js            (pipeline)
+bitzoom-proj-worker.js       (algo, pipeline)
 ```
 
 No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) live once in [bitzoom-algo.js](../docs/bitzoom-algo.js). `BitZoom` composes `BitZoomCanvas` (`this.view`) — all graph state, rendering, and interaction primitives live on the canvas component.
@@ -185,9 +186,13 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **Color-by UI**: clicking a group name label in the sidebar sets `view.colorBy` to that group (underline indicates active). Clicking again returns to auto (highest-weight group). This overrides coloring without affecting layout weights.
 
-### [bitzoom-svg.js](../docs/bitzoom-svg.js) (~220 lines)
+### [bitzoom-svg.js](../docs/bitzoom-svg.js) (~601 lines)
 
-SVG export utility. `exportSVG(bz, opts)` renders the current graph view as an SVG string. Reads the same view state (nodes, edges, zoom, pan, level, colors) as the canvas renderer. Produces a standalone `<svg>` element with circles, edges, and labels. Used by the viewer's S key shortcut.
+SVG export. Two entry points:
+- `exportSVG(bz, opts)` — renders the current view (BitZoomCanvas or headless view) as an SVG string. Produces background, grid, edges, density heatmap contours, circles, labels, and legend.
+- `createSVGView(nodes, edges, opts)` — builds a lightweight view from plain pipeline data, no DOM required. Suitable for headless/server-side SVG export and testing.
+
+Density heatmap uses kernel density estimation on a coarse grid, global normalization across all color groups (matching the canvas renderer), Moore neighborhood contour tracing, RDP simplification, and Chaikin smoothing. Imports from `bitzoom-algo.js` (levels, constants) and `bitzoom-colors.js` (color schemes).
 
 ### Workers (142 + 95 lines)
 

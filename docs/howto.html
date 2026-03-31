@@ -480,9 +480,27 @@ view.setWeights(result.weights); <span class="comment">// triggers re-blend and 
 <pre><span class="keyword">import</span> { exportSVG } <span class="keyword">from</span> <span class="string">'./bitzoom.js'</span>;
 
 <span class="keyword">const</span> svgString = <span class="fn">exportSVG</span>(view);
-<span class="comment">// Returns a complete &lt;svg&gt; string with circles, edges, and labels</span></pre>
+<span class="comment">// Returns a complete &lt;svg&gt; string with background, grid, edges,</span>
+<span class="comment">// density heatmap contours, circles, labels, and legend</span></pre>
 
 <p>The export reads the same view state (nodes, edges, zoom, pan, level, colors) as the canvas renderer, producing a vector image suitable for print or embedding in documents.</p>
+
+<h3>Headless SVG (no DOM)</h3>
+
+<p>Use <code>createSVGView</code> to build a view from pipeline data without any browser APIs &mdash; works in Deno, Node.js, or Web Workers:</p>
+
+<pre><span class="keyword">import</span> { createSVGView, exportSVG } <span class="keyword">from</span> <span class="string">'./bitzoom.js'</span>;
+
+<span class="comment">// After running the pipeline and blending (see Offline Pipeline below)</span>
+<span class="keyword">const</span> view = <span class="fn">createSVGView</span>(nodes, result.edges, {
+  width: 800, height: 600,
+  colorBy: <span class="string">'group'</span>,
+  heatmapMode: <span class="string">'density'</span>,
+  showLegend: 1,
+});
+
+<span class="keyword">const</span> svg = <span class="fn">exportSVG</span>(view);
+Deno.writeTextFileSync(<span class="string">'graph.svg'</span>, svg);</pre>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
@@ -805,7 +823,7 @@ el.setAttribute(<span class="string">'level'</span>, <span class="string">'5'</s
   <tr><td><code>bitzoom-utils.js</code></td><td>Auto-tune optimizer</td></tr>
   <tr><td><code>bitzoom-gl-renderer.js</code></td><td>WebGL2 instanced rendering</td></tr>
   <tr><td><code>bitzoom-gpu.js</code></td><td>WebGPU compute acceleration</td></tr>
-  <tr><td><code>bitzoom-svg.js</code></td><td>SVG export (<code>exportSVG</code>)</td></tr>
+  <tr><td><code>bitzoom-svg.js</code></td><td>SVG export (<code>exportSVG</code>, <code>createSVGView</code>)</td></tr>
   <tr><td><code>bitzoom-colors.js</code></td><td>Color schemes (vivid, viridis, plasma, etc.)</td></tr>
   <tr><td><code>bz-graph.js</code></td><td><code>&lt;bz-graph&gt;</code> web component</td></tr>
   <tr><td><code>dist/bitzoom.bundle.js</code></td><td>Minified single-file bundle (all of the above)</td></tr>
