@@ -1,0 +1,298 @@
+# NodeId	Label	Group	Generation	Body	Engine	Drivetrain	HP	TopSpeed	0-60	Weight	Year
+2025 Porsche Macan 4 Electric	2025 Porsche Macan 4 Electric	Macan	EV	suv	electric		408	137	5.2	5302	2025
+2025 Porsche Macan Turbo Electric	2025 Porsche Macan Turbo Electric	Macan	EV	suv	electric		639	162	3.3	5302	2025
+2025 Porsche Taycan	2025 Porsche Taycan	Taycan	J1.2	coupe	electric	Rear Wheel		155	3.7	4949	2025
+2025 Porsche Taycan Cross Turismo	2025 Porsche Taycan Cross Turismo	Taycan	J1.2	wagon	electric	Rear Wheel	435	137	4.7	5027	2025
+2025 Porsche Taycan Sport Turismo	2025 Porsche Taycan Sport Turismo	Taycan	J1.2	wagon	electric	Rear Wheel		143	4.8	4751	2025
+2025 Porsche Taycan Turbo GT	2025 Porsche Taycan Turbo GT	Taycan	J1.2	coupe	electric	Rear Wheel		180	2.3	5049	2025
+2025 Porsche 911 Carrera Cabriolet	2025 Porsche 911 Carrera Cabriolet	911	992	convertible	6-cyl	Rear Wheel	394	181	4.2	3527	2025
+2025 Porsche 911 Carrera 4 GTS	2025 Porsche 911 Carrera 4 GTS	911	992	coupe	hybrid	All Wheel	485	194	3	3627	2025
+2025 Porsche 911 GT3	2025 Porsche 911 GT3	911	992	coupe	6-cyl	Rear Wheel	510	194	3.9	3223	2025
+2025 Porsche 911 GT3 Touring Package	2025 Porsche 911 GT3 Touring Package	911	992	coupe	6-cyl	Rear Wheel	510	194	3.9	3221	2025
+2024 Porsche Cayenne	2024 Porsche Cayenne	Cayenne	E3.2	suv	6-cyl	All Wheel	353	150	6	4696	2024
+2024 Cayenne E-Hybrid Coupe	2024 Cayenne E-Hybrid Coupe	Cayenne	E3.2	suv	hybrid	All Wheel	304	158	4.9	5512	2024
+2024 Porsche Cayenne Turbo GT	2024 Porsche Cayenne Turbo GT	Cayenne	E3.2	suv	V8	All Wheel	640	186	3.3	4894	2024
+2024 Porsche 718 Spyder RS	2024 Porsche 718 Spyder RS	718	982	convertible	6-cyl	Rear Wheel	500	191	3.4	3109	2024
+2024 Porsche Cayenne S	2024 Porsche Cayenne S	Cayenne	E3.2	suv	V8	All Wheel	474	170	5	4762	2024
+2024 Porsche Cayenne E-Hybrid	2024 Porsche Cayenne E-Hybrid	Cayenne	E3.2	suv	hybrid	All Wheel	304	158	4.9	5346	2024
+2024 Porsche Cayenne S Coupe	2024 Porsche Cayenne S Coupe	Cayenne	E3.2	suv	V8	All Wheel	474	170	4.7	4828	2024
+2024 Porsche Cayenne Turbo E-Hybrid Coupe with GT Package	2024 Porsche Cayenne Turbo E-Hybrid Coupe with GT Package	Cayenne	E3.2	suv	hybrid	All Wheel	599	183	3.7	5721	2024
+2024 Porsche Cayenne Turbo E-Hybrid	2024 Porsche Cayenne Turbo E-Hybrid	Cayenne	E3.2	suv	hybrid	All Wheel	599	183	3.7	5666	2024
+2024 Porsche Panamera Turbo E-Hybrid	2024 Porsche Panamera Turbo E-Hybrid	Panamera	972.2	sedan	hybrid	All Wheel	519	196	3.2	5368	2024
+2024 Porsche Panamera 4	2024 Porsche Panamera 4	Panamera	972.2	sedan	6-cyl	Rear Wheel	353	168	5	4398	2024
+2024 Porsche Panamera	2024 Porsche Panamera	Panamera	972.2	sedan	6-cyl	Rear Wheel	353	169	5.3	4321	2024
+PORSCHE Macan T 2022-Present	PORSCHE Macan T 2022-Present	Macan	95B	suv	4-cyl	All Wheel	265	144	6.2	5534	2022
+PORSCHE 911 GT3 RS (992) 2022-Present	PORSCHE 911 GT3 RS (992) 2022-Present	911	992	coupe	6-cyl	Rear Wheel	525	184	3.2	3362	2022
+2023 Porsche 911 Carrera T	2023 Porsche 911 Carrera T	911	992	coupe	6-cyl	Rear Wheel	380	181	4.5		2023
+2022 Porsche GT3	2022 Porsche GT3	other		coupe	flat-6	Rear Wheel	510	199	3.8	3126	2022
+2022 Porsche Taycan Cross Turismo	2022 Porsche Taycan Cross Turismo	Taycan	J1	wagon	electric	All Wheel	761	155	2.9	5280	2022
+PORSCHE Macan GTS (95B) 2021-Present	PORSCHE Macan GTS (95B) 2021-Present	Macan	95B	suv	6-cyl		440		4.3		2021
+PORSCHE Macan S (95B) 2021-Present	PORSCHE Macan S (95B) 2021-Present	Macan	95B	suv	6-cyl		380	161	4.6		2021
+PORSCHE 911 Targa 4 GTS 2021-Present	PORSCHE 911 Targa 4 GTS 2021-Present	911	992	targa	flat-6	All Wheel	480	191	3.5	3715	2021
+2022 Porsche 911 Carrera 4 GTS	2022 Porsche 911 Carrera 4 GTS	911	992	coupe	flat-6	All Wheel	480	192	3.3	3516	2022
+2022 Porsche Taycan	2022 Porsche Taycan	Taycan	J1	coupe	electric	Rear Wheel	469	143	5.3	4566	2022
+PORSCHE GTS Sport Turismo 2021-Present	PORSCHE GTS Sport Turismo 2021-Present	other		wagon	electric	Rear Wheel	590	155	3.7	5152	2021
+PORSCHE GTS 2021-Present	PORSCHE GTS 2021-Present	other		coupe	electric	Rear Wheel	590	155	3.7	5077	2021
+2022 Porsche 718 Cayman GT4 RS	2022 Porsche 718 Cayman GT4 RS	718	982	coupe	6-cyl	Rear Wheel	500	196	3.4	3120	2022
+PORSCHE 911 Turbo S (992) 2020-Present	PORSCHE 911 Turbo S (992) 2020-Present	911	992	coupe	flat-6	All Wheel	650	205	2.7		2020
+PORSCHE 911 Turbo S Cabriolet (992) 2020-Present	PORSCHE 911 Turbo S Cabriolet (992) 2020-Present	911	992	convertible	flat-6	All Wheel	650	205	2.7		2020
+PORSCHE 911 Targa 4S (992) 2020-Present	PORSCHE 911 Targa 4S (992) 2020-Present	911	992	targa	6-cyl	All Wheel	450	189	4.4	3616	2020
+2021 Porsche CAYENNE GTS	2021 Porsche CAYENNE GTS	other		coupe	V8	All Wheel	460	168	8	4729	2021
+PORSCHE Cayenne GTS Coupe (PO536) 2020-Present	PORSCHE Cayenne GTS Coupe (PO536) 2020-Present	Cayenne	E3	suv	V8	All Wheel	460	168	4.5	4795	2020
+PORSCHE 911 Targa 4 (992) 2020-Present	PORSCHE 911 Targa 4 (992) 2020-Present	911	992	targa	6-cyl	All Wheel	385	180	4.4	3671	2020
+PORSCHE 911 Turbo (992) 2020-Present	PORSCHE 911 Turbo (992) 2020-Present	911	992	coupe	6-cyl	All Wheel	580	199	2.8		2020
+PORSCHE Panamera Turbo S Sport Turismo (971) 2020-Present	PORSCHE Panamera Turbo S Sport Turismo (971) 2020-Present	Panamera	971	wagon	V8	Rear Wheel	630	196	3.1	4872	2020
+PORSCHE Panamera GTS Sport Turismo (971) 2020-Present	PORSCHE Panamera GTS Sport Turismo (971) 2020-Present	Panamera	971	wagon	V8	Rear Wheel	480	181	3.9	4663	2020
+PORSCHE Panamera Turbo S (971) 2020-Present	PORSCHE Panamera Turbo S (971) 2020-Present	Panamera	971	sedan	V8	Rear Wheel	630	196	3.1		2020
+PORSCHE Panamera 4S E-Hybrid (971) 2020-Present	PORSCHE Panamera 4S E-Hybrid (971) 2020-Present	Panamera	971	sedan	hybrid	Rear Wheel	440	185	3.7	5071	2020
+PORSCHE Panamera 4S E-Hybrid Executive (971) 2020-Present	PORSCHE Panamera 4S E-Hybrid Executive (971) 2020-Present	Panamera	971	sedan	hybrid	Rear Wheel	440	185	3.8	5302	2020
+2023 Porsche Panamera 4	2023 Porsche Panamera 4	Panamera	971	sedan	6-cyl	Rear Wheel	330	167	5.3	4354	2023
+PORSCHE Panamera GTS (971) 2020-Present	PORSCHE Panamera GTS (971) 2020-Present	Panamera	971	sedan	V8	Rear Wheel	480	186	3.9	4619	2020
+2021 Porsche Panamera	2021 Porsche Panamera	Panamera	971	sedan	6-cyl	Rear Wheel	330	168	5.6	4266	2021
+2020 Porsche Cayenne Coupe	2020 Porsche Cayenne Coupe	Cayenne	E3	suv	6-cyl	All Wheel	340	151	6		2020
+2019 Porsche CCayenne Turbo Coupe	2019 Porsche CCayenne Turbo Coupe	other		coupe	V8	All Wheel	550	178	3.9		2019
+PORSCHE 911 Carrera S (992) 2019-Present	PORSCHE 911 Carrera S (992) 2019-Present	911	992	coupe	flat-6	Rear Wheel	450	191	4.2	3428	2019
+PORSCHE 911 Speedster 2019-Present	PORSCHE 911 Speedster 2019-Present	911	992	convertible	flat-6	Rear Wheel	502	192	3.9	3230	2019
+2020 Porsche Cayman GT4 (982)	2020 Porsche Cayman GT4 (982)	718	982	coupe	6-cyl	Rear Wheel	420	189	4.4	3131	2020
+2019 Porsche 718 Spyder	2019 Porsche 718 Spyder	718	982	convertible	flat-6	Rear Wheel	420	187	4.4	3131	2019
+PORSCHE 911 Carrera Coupe (992) 2019-Present	PORSCHE 911 Carrera Coupe (992) 2019-Present	911	992	coupe	6-cyl	Rear Wheel	385	182	4	3454	2019
+2020 911 Carrera Cabriolet	2020 911 Carrera Cabriolet	911	992	convertible	6-cyl	Rear Wheel	385	182	4	3454	2020
+PORSCHE Cayenne Turbo S E-Hybrid (PO536) 2019-Present	PORSCHE Cayenne Turbo S E-Hybrid (PO536) 2019-Present	Cayenne	E3	suv	hybrid	All Wheel	680	183	3.8	5490	2019
+2020 Porsche Macan Turbo	2020 Porsche Macan Turbo	Macan	95B	suv	6-cyl	All Wheel	440	168	4.5	4288	2020
+2019 Porsche Taycan Turbo	2019 Porsche Taycan Turbo	Taycan	J1	coupe	electric	All Wheel	625	162	3.2	5082	2019
+2019 Porsche Taycan 4S	2019 Porsche Taycan 4S	Taycan	J1	coupe	electric	All Wheel	571	155	4	4894	2019
+PORSCHE Macan GTS (95B) 2019-2021	PORSCHE Macan GTS (95B) 2019-2021	Macan	95B	suv	6-cyl	All Wheel	380	162	4.9	4211	2019
+2020 Porsche 718 Boxster GTS 4.0	2020 Porsche 718 Boxster GTS 4.0	718	982	coupe	flat-6	All Wheel	400	182	4.5		2020
+2020 Porsche Cayman GTS 4.0 (982C)	2020 Porsche Cayman GTS 4.0 (982C)	718	982	coupe	flat-6	Rear Wheel	400	182	4.5	3097	2020
+PORSCHE 911 GT3 RS (991.2) 2018-2019	PORSCHE 911 GT3 RS (991.2) 2018-2019	911	991	coupe	flat-6	Rear Wheel	520	194	3.2	3318	2018
+2019 Porsche Cayenne E-Hybrid	2019 Porsche Cayenne E-Hybrid	Cayenne	E3	suv	hybrid	Front Wheel	462	157	4.9	5060	2019
+PORSCHE Macan (95B) 2018-Present	PORSCHE Macan (95B) 2018-Present	Macan	95B	suv	4-cyl	All Wheel	250	141		3957	2018
+PORSCHE Panamera GTS (971) 2018-2020	PORSCHE Panamera GTS (971) 2018-2020	Panamera	971	sedan	V8	All Wheel	460	181	4	4398	2018
+PORSCHE Panamera GTS Sport Turismo (971) 2018-2020	PORSCHE Panamera GTS Sport Turismo (971) 2018-2020	Panamera	971	wagon	V8	All Wheel	460	180	4	4464	2018
+PORSCHE 911 Carrera 4S (992) 2018-Present	PORSCHE 911 Carrera 4S (992) 2018-Present	911	991	coupe	flat-6	All Wheel	450	191	3.4	3450	2018
+PORSCHE Macan S (95B) 2018-2021	PORSCHE Macan S (95B) 2018-2021	Macan	95B	suv	6-cyl	All Wheel	354	158	5.3	4112	2018
+2020 Porsche 718 Boxster T (982)	2020 Porsche 718 Boxster T (982)	718	982	coupe	4-cyl	Rear Wheel	300	171	5.1	2976	2020
+2020 Porsche 718 Cayman T (982C)	2020 Porsche 718 Cayman T (982C)	718	982	coupe	4-cyl	Rear Wheel	300	171	5.1		2020
+PORSCHE 911 Carrera 4S Cabriolet (992) 2018-Present	PORSCHE 911 Carrera 4S Cabriolet (992) 2018-Present	911	991	convertible	flat-6	All Wheel	450	189	3.7		2018
+PORSCHE Panamera Turbo S E-Hybrid (971) 2017-2020	PORSCHE Panamera Turbo S E-Hybrid (971) 2017-2020	Panamera	971	sedan	hybrid	All Wheel	550	193	3.5	5313	2017
+PORSCHE 911 GT3 (991.2) 2017-2021	PORSCHE 911 GT3 (991.2) 2017-2021	911	991	coupe	flat-6	Rear Wheel	500	199	3.9	3280	2017
+PORSCHE Panamera 4 Sport Turismo (971) 2017-2020	PORSCHE Panamera 4 Sport Turismo (971) 2017-2020	Panamera	971	wagon	6-cyl	All Wheel	330	161	5.5	4145	2017
+PORSCHE Panamera 4S Sport Turismo (971) 2017-Present	PORSCHE Panamera 4S Sport Turismo (971) 2017-Present	Panamera	971	wagon	6-cyl	All Wheel	440	178	4.4	4222	2017
+PORSCHE Panamera 4 E-Hybrid Sport Turismo (971) 2017-2020	PORSCHE Panamera 4 E-Hybrid Sport Turismo (971) 2017-2020	Panamera	971	wagon	hybrid	All Wheel	330	171	4.6	4828	2017
+2017 Porsche Panamera 4S Diesel Sport Turismo	2017 Porsche Panamera 4S Diesel Sport Turismo	Panamera	971	wagon	V8	All Wheel	422	175	4.5	4619	2017
+PORSCHE Panamera Turbo Sport Turismo (971) 2017-Present	PORSCHE Panamera Turbo Sport Turismo (971) 2017-Present	Panamera	971	wagon	V8	All Wheel	550	189	3.8	4486	2017
+PORSCHE 911 GT2 RS (991) 2017-2019	PORSCHE 911 GT2 RS (991) 2017-2019	911	991	coupe	flat-6	Rear Wheel	700	211	2.8	3241	2017
+2018 Porsche Cayenne	2018 Porsche Cayenne	Cayenne	E3	suv	6-cyl	All Wheel	340	152	6.2	4376	2018
+2018 Cayenne S	2018 Cayenne S	Cayenne	E3	suv	6-cyl	All Wheel	440	165	5.2	4453	2018
+PORSCHE Cayenne Turbo (PO536) 2017-Present	PORSCHE Cayenne Turbo (PO536) 2017-Present	Cayenne	958	suv	V8	All Wheel	550	178	4.1	4795	2017
+PORSCHE Panamera Turbo S E-Hybrid Sport Turismo 2017-Present	PORSCHE Panamera Turbo S E-Hybrid Sport Turismo 2017-Present	Panamera	971	wagon	hybrid	All Wheel	550	193	3.4	5126	2017
+2017 718 Boxster GTS (982)	2017 718 Boxster GTS (982)	718	982	coupe	4-cyl	Rear Wheel	365	180	4.6	3031	2017
+2018 Porsche Cayman GTS	2018 Porsche Cayman GTS	718	982	coupe	4-cyl	Rear Wheel	365	180	4.6	3031	2018
+PORSCHE 911 Carrera T 2017-2022	PORSCHE 911 Carrera T 2017-2022	911	991	coupe	flat-6	Rear Wheel	370	181	4.2	3186	2017
+PORSCHE 911 Turbo (991.2) 2016-2020	PORSCHE 911 Turbo (991.2) 2016-2020	911	991	coupe	flat-6	All Wheel	540	199	3	3516	2016
+PORSCHE 911 Turbo Cabriolet (991.2) 2016-2020	PORSCHE 911 Turbo Cabriolet (991.2) 2016-2020	911	991	convertible	flat-6	All Wheel	540	199	3.1	3671	2016
+PORSCHE 911 Turbo S (991.2) 2016-2020	PORSCHE 911 Turbo S (991.2) 2016-2020	911	991	coupe	flat-6	All Wheel	580	205	2.9	3527	2016
+PORSCHE 911 Turbo S Cabriolet (991.2) 2016-2020	PORSCHE 911 Turbo S Cabriolet (991.2) 2016-2020	911	991	convertible	flat-6	All Wheel	580	205	3	3682	2016
+2016 Porsche 718 Boxster (982)	2016 Porsche 718 Boxster (982)	718	982	coupe	4-cyl	Rear Wheel	300	171	5.1	2943	2016
+2016 Porsche 718 Boxster S (982)	2016 Porsche 718 Boxster S (982)	718	982	coupe	4-cyl	Rear Wheel	350	177	4.6	2987	2016
+PORSCHE 911 R 2016-Present	PORSCHE 911 R 2016-Present	911	991	coupe	flat-6	Rear Wheel	500	201	3.8	3020	2016
+PORSCHE 911 GT3 RS (991.1) 2016-2018	PORSCHE 911 GT3 RS (991.1) 2016-2018	911	991	coupe	flat-6	Rear Wheel	500	193	3.3	3131	2016
+PORSCHE 911 Targa 4 (991.2) 2016-2020	PORSCHE 911 Targa 4 (991.2) 2016-2020	911	991	targa	flat-6	All Wheel	370	178	4.5	3505	2016
+2016 Porsche 917 Cayman (982C)	2016 Porsche 917 Cayman (982C)	other		coupe	4-cyl	Rear Wheel	300	171	5.1	2943	2016
+2016 Porsche 917 Cayman S (982C)	2016 Porsche 917 Cayman S (982C)	other		coupe	4-cyl	Rear Wheel	350	177	4.6	2987	2016
+PORSCHE Panamera 4S (971) 2016-2020	PORSCHE Panamera 4S (971) 2016-2020	Panamera	970	sedan	6-cyl	All Wheel	440	180	4.4	4123	2016
+PORSCHE Panamera Turbo (971) 2016-2020	PORSCHE Panamera Turbo (971) 2016-2020	Panamera	970	sedan	V8	All Wheel	550	190	3.8	4398	2016
+PORSCHE Panamera 4S Diesel (971) 2016-2020	PORSCHE Panamera 4S Diesel (971) 2016-2020	Panamera	970	sedan	V8	All Wheel	422	177	4.5	4519	2016
+PORSCHE Panamera 4 E-Hybrid (971) 2016-2020	PORSCHE Panamera 4 E-Hybrid (971) 2016-2020	Panamera	970	sedan	hybrid	All Wheel	330	173	4.6	4784	2016
+PORSCHE Panamera (971) 2016-2020	PORSCHE Panamera (971) 2016-2020	Panamera	970	sedan	flat-6	Rear Wheel	330	164	5.7	4001	2016
+PORSCHE Panamera 4 (971) 2016-2020	PORSCHE Panamera 4 (971) 2016-2020	Panamera	970	sedan	6-cyl	All Wheel	330	163	5.5	4079	2016
+PORSCHE 911 Targa 4 GTS (991) 2015-2021	PORSCHE 911 Targa 4 GTS (991) 2015-2021	911	991	targa	flat-6	All Wheel	430	187	4.3	3428	2015
+2016 Porsche Cayman GT4 (981C)	2016 Porsche Cayman GT4 (981C)	718	982	coupe	flat-6	Rear Wheel	358	183	4.4	2899	2016
+2016 Porsche Boxster Spyder (981)	2016 Porsche Boxster Spyder (981)	718	982	convertible	flat-6	Rear Wheel	375	180	4.5	3064	2016
+PORSCHE Cayenne (958) 2015-2017	PORSCHE Cayenne (958) 2015-2017	Cayenne	958	suv	6-cyl	All Wheel	300	143	7.7	4497	2015
+PORSCHE Cayenne Turbo S (958) 2015-2017	PORSCHE Cayenne Turbo S (958) 2015-2017	Cayenne	958	suv	V8	All Wheel	570	176	4.1	4927	2015
+PORSCHE 911 Carrera Coupe (991) 2015-2019	PORSCHE 911 Carrera Coupe (991) 2015-2019	911	991	coupe	flat-6	Rear Wheel	370	182	4.4	3197	2015
+PORSCHE 911 Carrera S Coupe (991) 2015-2019	PORSCHE 911 Carrera S Coupe (991) 2015-2019	911	991	coupe	flat-6	Rear Wheel	420	190	4.1	3219	2015
+PORSCHE 911 Carrera Cabrio (991) 2015-2019	PORSCHE 911 Carrera Cabrio (991) 2015-2019	911	991	convertible	flat-6	Rear Wheel	370	180	4.6	3351	2015
+PORSCHE 911 Carrera S Cabriolet (991) 2015-2018	PORSCHE 911 Carrera S Cabriolet (991) 2015-2018	911	991	convertible	flat-6	Rear Wheel	420	189	4.3	3373	2015
+PORSCHE Macan GTS (95B) 2015-2019	PORSCHE Macan GTS (95B) 2015-2019	Macan	95B	suv	6-cyl	All Wheel	360	159	5.2	4178	2015
+PORSCHE Macan S (95B) 2014-2018	PORSCHE Macan S (95B) 2014-2018	Macan	95B	suv	6-cyl	All Wheel	340	158	5.5	4112	2014
+PORSCHE 911 Carrera Targa 4 (991) 2014-2016	PORSCHE 911 Carrera Targa 4 (991) 2014-2016	911	991	targa	flat-6	All Wheel	349	174	5	3439	2014
+PORSCHE 911 Carrera Targa 4S (991) 2014-2020	PORSCHE 911 Carrera Targa 4S (991) 2014-2020	911	991	targa	flat-6	All Wheel	400	183	4.6	3428	2014
+PORSCHE Cayenne Diesel 2014-2017	PORSCHE Cayenne Diesel 2014-2017	Cayenne	958	suv	6-cyl	All Wheel	262	137	7.3	4652	2014
+PORSCHE Cayenne S (958) 2014-2017	PORSCHE Cayenne S (958) 2014-2017	Cayenne	958	suv	6-cyl	All Wheel	420	161	5.5	4597	2014
+PORSCHE Cayenne S Diesel (958) 2014-2017	PORSCHE Cayenne S Diesel (958) 2014-2017	Cayenne	958	suv	V8	All Wheel	385	157	5.4	4883	2014
+PORSCHE Cayenne S E-Hybrid (958) 2014-Present	PORSCHE Cayenne S E-Hybrid (958) 2014-Present	Cayenne	958	suv	hybrid	All Wheel	416	151	5.9	5181	2014
+PORSCHE Cayenne Turbo 2014-Present	PORSCHE Cayenne Turbo 2014-Present	Cayenne	958	suv	V8	All Wheel	521	173	4.5	4817	2014
+PORSCHE 911 Carrera GTS 2014-2021	PORSCHE 911 Carrera GTS 2014-2021	911	991	coupe	flat-6	Rear Wheel	430	189	4	3351	2014
+PORSCHE 911 Carrera GTS Cabriolet 2014-Present	PORSCHE 911 Carrera GTS Cabriolet 2014-Present	911	991	convertible	flat-6	Rear Wheel	430	188	4.2	3505	2014
+PORSCHE 911 Carrera 4 GTS (991) 2014-2018	PORSCHE 911 Carrera 4 GTS (991) 2014-2018	911	991	coupe	flat-6	All Wheel	430	189	4.4	3406	2014
+PORSCHE 911 Carrera 4 GTS Cabriolet (991) 2014-2018	PORSCHE 911 Carrera 4 GTS Cabriolet (991) 2014-2018	911	991	convertible	flat-6	All Wheel	430	187	4.2	3605	2014
+PORSCHE Cayenne GTS (958) 2014-2018	PORSCHE Cayenne GTS (958) 2014-2018	Cayenne	958	suv	6-cyl	All Wheel	441	163	5.2	4817	2014
+PORSCHE Macan Turbo (95B) 2014-2019	PORSCHE Macan Turbo (95B) 2014-2019	Macan	95B	suv	6-cyl	All Wheel	400	165	4.8	4244	2014
+PORSCHE Macan S Diesel (95B) 2014-2018	PORSCHE Macan S Diesel (95B) 2014-2018	Macan	95B	suv	6-cyl	All Wheel	258	143	6.3	4145	2014
+PORSCHE Macan (95B) 2014-2018	PORSCHE Macan (95B) 2014-2018	Macan	95B	suv	4-cyl	All Wheel	252	142	6.7	3902	2014
+PORSCHE Panamera 4S (970) 2013-2016	PORSCHE Panamera 4S (970) 2013-2016	Panamera	970	sedan	6-cyl	All Wheel	420	178	4.8	4123	2013
+PORSCHE Panamera Turbo (970) 2013-2016	PORSCHE Panamera Turbo (970) 2013-2016	Panamera	970	sedan	V8	All Wheel	520	190	4.1	4343	2013
+PORSCHE Panamera (970) 2013-2016	PORSCHE Panamera (970) 2013-2016	Panamera	970	sedan	6-cyl	Rear Wheel	310	160	6.2	3902	2013
+PORSCHE Panamera 4 (970) 2013-2016	PORSCHE Panamera 4 (970) 2013-2016	Panamera	970	sedan	6-cyl	All Wheel	310	160	6	4012	2013
+PORSCHE Panamera S (970) 2013-2016	PORSCHE Panamera S (970) 2013-2016	Panamera	970	sedan	6-cyl	Rear Wheel	420	178	5.1	3990	2013
+PORSCHE Panamera GTS (970) 2013-2016	PORSCHE Panamera GTS (970) 2013-2016	Panamera	970	sedan	V8	All Wheel	440	178	4.4	4233	2013
+PORSCHE 911 GT3 (991) 2013-2017	PORSCHE 911 GT3 (991) 2013-2017	911	991	coupe	flat-6	Rear Wheel	476	196	3.5	3153	2013
+PORSCHE 911 Turbo (991) 2013-2016	PORSCHE 911 Turbo (991) 2013-2016	911	991	coupe	flat-6	All Wheel	520	196	3.4	3516	2013
+PORSCHE 911 Turbo S (991) 2013-2016	PORSCHE 911 Turbo S (991) 2013-2016	911	991	coupe	flat-6	All Wheel	560	198	3.1	3538	2013
+PORSCHE Panamera Diesel (970) 2013-2016	PORSCHE Panamera Diesel (970) 2013-2016	Panamera	970	sedan	6-cyl	All Wheel	300	161	6	4189	2013
+PORSCHE Panamera Turbo S (970) 2013-2016	PORSCHE Panamera Turbo S (970) 2013-2016	Panamera	970	sedan	V8	All Wheel	570	193	3.8	4398	2013
+2014 Porsche 918 Spyder	2014 Porsche 918 Spyder	918 Spyder		convertible	hybrid	All Wheel	616	214	2.6	3692	2014
+PORSCHE Panamera S E-Hybrid (970) 2013-2016	PORSCHE Panamera S E-Hybrid (970) 2013-2016	Panamera	970	sedan	hybrid	Rear Wheel	416	168	5.5	4619	2013
+PORSCHE 911 Turbo Cabriolet (991) 2013-2016	PORSCHE 911 Turbo Cabriolet (991) 2013-2016	911	991	convertible	flat-6	All Wheel	520	195	3.4	3671	2013
+PORSCHE 911 Turbo S Cabriolet (991)  2013-2016	PORSCHE 911 Turbo S Cabriolet (991)  2013-2016	911	991	convertible	flat-6	All Wheel	560	197	3.1	3693	2013
+2012 Porsche Boxster (981)	2012 Porsche Boxster (981)	718	981	coupe	flat-6	Rear Wheel	265	164	5.8	2888	2012
+2012 Porsche Boxster S (981)	2012 Porsche Boxster S (981)	718	981	coupe	flat-6	Rear Wheel	315	168	5.1	2910	2012
+PORSCHE 911 Carrera (991) 2012-2015	PORSCHE 911 Carrera (991) 2012-2015	911	991	coupe	flat-6	Rear Wheel	350	178	4.6	3086	2012
+PORSCHE 911 Carrera S (991) 2012-2015	PORSCHE 911 Carrera S (991) 2012-2015	911	991	coupe	flat-6	Rear Wheel	400	188	4.3	3120	2012
+PORSCHE 911 Carrera Cabriolet (991) 2012-2015	PORSCHE 911 Carrera Cabriolet (991) 2012-2015	911	991	convertible	flat-6	Rear Wheel	350	176	4.8	3241	2012
+PORSCHE 911 Carrera S Cabriolet (991) 2012-2015	PORSCHE 911 Carrera S Cabriolet (991) 2012-2015	911	991	convertible	flat-6	Rear Wheel	400	186	4.5	3274	2012
+PORSCHE Cayenne GTS (958) 2012-2014	PORSCHE Cayenne GTS (958) 2012-2014	Cayenne	958	suv	V8	All Wheel	420	162	5.7	4597	2012
+PORSCHE 911 Carrera 4 (991) 2012-2015	PORSCHE 911 Carrera 4 (991) 2012-2015	911	991	coupe	flat-6	All Wheel	350	177	4.9	3153	2012
+PORSCHE 911 Carrera 4S (991) 2012-2018	PORSCHE 911 Carrera 4S (991) 2012-2018	911	991	coupe	flat-6	All Wheel	400	185	4.3	3230	2012
+PORSCHE 911 Carrera 4 Cabriolet (991) 2012-Present	PORSCHE 911 Carrera 4 Cabriolet (991) 2012-Present	911	991	convertible	flat-6	All Wheel	350	174	4.9	3351	2012
+PORSCHE 911 Carrera 4S Cabriolet (991) 2012-2018	PORSCHE 911 Carrera 4S Cabriolet (991) 2012-2018	911	991	convertible	flat-6	All Wheel	400	183	4.5	3384	2012
+PORSCHE Cayenne S Diesel (958) 2012-2014	PORSCHE Cayenne S Diesel (958) 2012-2014	Cayenne	958	suv	V8	All Wheel	382	157	5.7	4839	2012
+PORSCHE Cayenne Turbo S (958) 2012-2014	PORSCHE Cayenne Turbo S (958) 2012-2014	Cayenne	958	suv	V8	All Wheel	551	176	4.5	4883	2012
+2012 Porsche Cayman (981C)	2012 Porsche Cayman (981C)	718	981	coupe	flat-6	Rear Wheel	275	165	5.7	2888	2012
+2014 Porsche Cayman S (981C)	2014 Porsche Cayman S (981C)	718	981	coupe	flat-6	Rear Wheel	325	176	5	2910	2014
+PORSCHE Panamera Turbo S (907) 2011-2013	PORSCHE Panamera Turbo S (907) 2011-2013	Panamera	970	sedan	V8	All Wheel	550	190	3.8	4398	2011
+PORSCHE Panamera S Hybrid (970) 2011-2013	PORSCHE Panamera S Hybrid (970) 2011-2013	Panamera	970	sedan	hybrid	Rear Wheel	333	168	6	4365	2011
+PORSCHE 911 GT3 RS 4.0 (991) 2011-2013	PORSCHE 911 GT3 RS 4.0 (991) 2011-2013	911	997	coupe	flat-6	Rear Wheel	500	193	3.9	6	2011
+PORSCHE Panamera GTS (970) 2011-2013	PORSCHE Panamera GTS (970) 2011-2013	Panamera	970	sedan	V8	All Wheel	430	179	4.5	4233	2011
+PORSCHE Panamera Diesel (970) 2011-2013	PORSCHE Panamera Diesel (970) 2011-2013	Panamera	970	sedan	6-cyl	Rear Wheel	250	150	6.8	4145	2011
+PORSCHE 911 Sport Classic (911) 2010-2012	PORSCHE 911 Sport Classic (911) 2010-2012	911	997	coupe	flat-6	Rear Wheel	408	187	4.6	5	2010
+PORSCHE Cayenne Turbo (958) 2010-2014	PORSCHE Cayenne Turbo (958) 2010-2014	Cayenne	955	suv	V8	All Wheel	500	172	4.7	4	2010
+PORSCHE Cayenne S Hybrid (958) 2010-2014	PORSCHE Cayenne S Hybrid (958) 2010-2014	Cayenne	955	suv	hybrid	All Wheel	333	150	6.1	7	2010
+PORSCHE Cayenne (958) 2010-2015	PORSCHE Cayenne (958) 2010-2015	Cayenne	955	suv	6-cyl	All Wheel	299	143	7.5	6	2010
+PORSCHE Cayenne Diesel 2010-2014	PORSCHE Cayenne Diesel 2010-2014	Cayenne	955	suv	6-cyl	All Wheel	245	137	7.6	4630	2010
+PORSCHE Cayenne S (958) 2010-2014	PORSCHE Cayenne S (958) 2010-2014	Cayenne	955	suv	V8	All Wheel	400	160	5.9	9	2010
+2010 Porsche Cayman R (987.2C)	2010 Porsche Cayman R (987.2C)	718	981	coupe	flat-6	Rear Wheel	330	175	5	2855	2010
+PORSCHE 911 GT2 RS (997) 2010-2012	PORSCHE 911 GT2 RS (997) 2010-2012	911	997	coupe	flat-6	Rear Wheel	620	205	3.5	7	2010
+PORSCHE 911 Turbo S (997) 2010-2011	PORSCHE 911 Turbo S (997) 2010-2011	911	997	coupe	flat-6	All Wheel	530	195	3.3	7	2010
+PORSCHE 911 Turbo S Cabriolet (997) 2010-2011	PORSCHE 911 Turbo S Cabriolet (997) 2010-2011	911	997	convertible	flat-6	All Wheel	530	195	3.4	3825	2010
+PORSCHE 911 Carrera GTS (997) 2010-2011	PORSCHE 911 Carrera GTS (997) 2010-2011	911	997	coupe	flat-6	Rear Wheel	408	1	4.6	9	2010
+PORSCHE 911 Carrera GTS Cabriolet (997) 2010-2011	PORSCHE 911 Carrera GTS Cabriolet (997) 2010-2011	911	997	convertible	flat-6	Rear Wheel	408	1	4.8	3	2010
+2009 Porsche Cayman (987.2C)	2009 Porsche Cayman (987.2C)	718	981	coupe	flat-6	Rear Wheel	265	7	5.8	2932	2009
+2009 Porsche Cayman S (987.2C)	2009 Porsche Cayman S (987.2C)	718	981	coupe	flat-6	Rear Wheel	320	1	5.2	2976	2009
+PORSCHE 911 GT3 (997) 2009-2011	PORSCHE 911 GT3 (997) 2009-2011	911	997	coupe	flat-6	Rear Wheel	435	194	4.1	3020	2009
+PORSCHE Cayenne S TransSyberia (957) 2009-2011	PORSCHE Cayenne S TransSyberia (957) 2009-2011	Cayenne	955	suv	V8	All Wheel	385	157	6.6	5192	2009
+PORSCHE Panamera S (970) 2009-2013	PORSCHE Panamera S (970) 2009-2013	Panamera	970	sedan	V8	Rear Wheel	400	177	5.6	2	2009
+PORSCHE Panamera 4S (970) 2009-2013	PORSCHE Panamera 4S (970) 2009-2013	Panamera	970	sedan	V8	All Wheel	400	175	5	6	2009
+PORSCHE Panamera Turbo (970) 2009-2013	PORSCHE Panamera Turbo (970) 2009-2013	Panamera	970	sedan	V8	Rear Wheel	500	188	4.2	1	2009
+PORSCHE 911 Turbo (997) 2009-2011	PORSCHE 911 Turbo (997) 2009-2011	911	997	coupe	flat-6	All Wheel	500	193	3.7	3461	2009
+PORSCHE 911 Turbo Cabriolet (997) 2009-2011	PORSCHE 911 Turbo Cabriolet (997) 2009-2011	911	997	convertible	6-cyl	Rear Wheel	500	193	3.7	3626	2009
+PORSCHE Panamera (907) 2009-2013	PORSCHE Panamera (907) 2009-2013	Panamera	970	sedan	6-cyl	Rear Wheel	300	162	6.8	3814	2009
+PORSCHE Panamera 4 (907) 2009-2013	PORSCHE Panamera 4 (907) 2009-2013	Panamera	970	sedan	6-cyl	All Wheel	300	160	6.1	4	2009
+2009 Porsche Boxster Spyder (987.2)	2009 Porsche Boxster Spyder (987.2)	718	981	convertible	flat-6	Rear Wheel	320	166	5.1	2	2009
+PORSCHE 911 GT3 RS (997.2) 2009-2011	PORSCHE 911 GT3 RS (997.2) 2009-2011	911	997	coupe	flat-6	Rear Wheel	450	6	4	7	2009
+PORSCHE Cayenne Turbo S (957) 2008-2009	PORSCHE Cayenne Turbo S (957) 2008-2009	Cayenne	955	suv	V8	All Wheel	550	174	4.8	9	2008
+PORSCHE 911 Carrera (997) 2008-2012	PORSCHE 911 Carrera (997) 2008-2012	911	997	coupe	flat-6	Rear Wheel	345	180	4.9	3064	2008
+PORSCHE 911 Carrera Cabriolet (997) 2008-2012	PORSCHE 911 Carrera Cabriolet (997) 2008-2012	911	997	convertible	flat-6	Rear Wheel	345	180	5.1	3252	2008
+PORSCHE 911 Carrera 4 (997) 2008-2012	PORSCHE 911 Carrera 4 (997) 2008-2012	911	997	coupe	flat-6	All Wheel	345	4	5	3186	2008
+PORSCHE 911 Carrera 4S (997) 2008-2012	PORSCHE 911 Carrera 4S (997) 2008-2012	911	997	coupe	flat-6	All Wheel	385	185	4.7	3208	2008
+PORSCHE 911 Carrera S (997) 2008-2011	PORSCHE 911 Carrera S (997) 2008-2011	911	997	coupe	flat-6	Rear Wheel	385	7	4.7	3086	2008
+PORSCHE 911 Carrera 4 Cabriolet (997) 2008-2011	PORSCHE 911 Carrera 4 Cabriolet (997) 2008-2011	911	997	convertible	flat-6	All Wheel	345	180	5.1	3373	2008
+PORSCHE 911 Carrera 4S Cabriolet (997) 2008-2012	PORSCHE 911 Carrera 4S Cabriolet (997) 2008-2012	911	997	convertible	flat-6	All Wheel	385	185	4.9	3384	2008
+PORSCHE 911 Carrera S Cabriolet (997) 2008-2011	PORSCHE 911 Carrera S Cabriolet (997) 2008-2011	911	997	convertible	flat-6	Rear Wheel	385	7	4.9	3274	2008
+PORSCHE 911 Carrera Targa 4 (997) 2008-2013	PORSCHE 911 Carrera Targa 4 (997) 2008-2013	911	997	targa	flat-6	All Wheel	345	4	5.2	3318	2008
+PORSCHE 911 Carrera Targa 4S (997) 2008-2013	PORSCHE 911 Carrera Targa 4S (997) 2008-2013	911	997	targa	flat-6	All Wheel	385	5	4.9	3340	2008
+PORSCHE Cayenne GTS (957) 2008-2010	PORSCHE Cayenne GTS (957) 2008-2010	Cayenne	955	suv	V8	All Wheel	405	156	6.5	4894	2008
+PORSCHE Cayenne Diesel (957) 2008-2010	PORSCHE Cayenne Diesel (957) 2008-2010	Cayenne	955	suv	6-cyl	All Wheel	240	6	8.3	4938	2008
+2009 Porsche Boxster (987.2)	2009 Porsche Boxster (987.2)	718	981	coupe	flat-6	Rear Wheel	256	4	5.9	5	2009
+2000 Porsche Boxster S (987.2)	2000 Porsche Boxster S (987.2)	718	981	coupe	flat-6	Rear Wheel	330	171	5.2	2987	2000
+PORSCHE 911 Turbo Cabriolet (997) 2007-2009	PORSCHE 911 Turbo Cabriolet (997) 2007-2009	911	997	convertible	flat-6	All Wheel	480	193	3.8	3726	2007
+PORSCHE 911 GT2 (997) 2007-2009	PORSCHE 911 GT2 (997) 2007-2009	911	997	coupe	flat-6	Rear Wheel	9	204	3.7	3120	2007
+PORSCHE Cayenne (957) 2007-2009	PORSCHE Cayenne (957) 2007-2009	Cayenne	955	suv	6-cyl	All Wheel	290	141	8.5	4784	2007
+PORSCHE Cayenne S (957) 2007-2009	PORSCHE Cayenne S (957) 2007-2009	Cayenne	955	suv	V8	All Wheel	385	155	6.8	4949	2007
+PORSCHE Cayenne Turbo (957) 2007-2009	PORSCHE Cayenne Turbo (957) 2007-2009	Cayenne	955	suv	V8	All Wheel	500	171	5.1	5192	2007
+PORSCHE Cayenne Turbo S (955) 2006-2007	PORSCHE Cayenne Turbo S (955) 2006-2007	Cayenne	955	suv	V8	All Wheel	521	168	5.2	5192	2006
+PORSCHE 911 Carrera Targa 4 (997) 2006-2008	PORSCHE 911 Carrera Targa 4 (997) 2006-2008	911	997	targa	flat-6	All Wheel	325	171	5.6	3285	2006
+PORSCHE 911 Carrera Targa 4S (997) 2006-2008	PORSCHE 911 Carrera Targa 4S (997) 2006-2008	911	997	targa	flat-6	All Wheel	355	174	5.3	3340	2006
+PORSCHE 911 GT3 (997) 2006-2009	PORSCHE 911 GT3 (997) 2006-2009	911	997	coupe	flat-6	Rear Wheel	415	193	4.3	3075	2006
+PORSCHE 911 GT3 RS (997) 2006-2009	PORSCHE 911 GT3 RS (997) 2006-2009	911	997	coupe	flat-6	Rear Wheel	415	193	4.2	3075	2006
+PORSCHE 911 Turbo (997) 2006-2009	PORSCHE 911 Turbo (997) 2006-2009	911	997	coupe	flat-6	All Wheel	480	193	3.7	3571	2006
+2006 Porsche Cayman (987C)	2006 Porsche Cayman (987C)	718	981	coupe	flat-6	Rear Wheel	245	157	7	2998	2006
+2005 Porsche Cayman S (987C)	2005 Porsche Cayman S (987C)	718	981	coupe	flat-6	Rear Wheel	295	166	6.1	2954	2005
+PORSCHE 911 Carrera Cabriolet (997) 2005-2008	PORSCHE 911 Carrera Cabriolet (997) 2005-2008	911	997	convertible	flat-6	Rear Wheel	325	177	5	3075	2005
+PORSCHE 911 Carrera 4 (997) 2005-2008	PORSCHE 911 Carrera 4 (997) 2005-2008	911	997	coupe	flat-6	All Wheel	325	171	5.6	3285	2005
+PORSCHE 911 Carrera 4 Cabriolet (997) 2005-2008	PORSCHE 911 Carrera 4 Cabriolet (997) 2005-2008	911	997	convertible	flat-6	All Wheel	325	171	5.8	3329	2005
+PORSCHE 911 Carrera 4S (997) 2005-2008	PORSCHE 911 Carrera 4S (997) 2005-2008	911	997	coupe	flat-6	All Wheel	355	174	5.3	3340	2005
+PORSCHE 911 Carrera 4S Cabriolet (997) 2005-2008	PORSCHE 911 Carrera 4S Cabriolet (997) 2005-2008	911	997	convertible	flat-6	All Wheel	355	174	5.4	3384	2005
+PORSCHE 911 Carrera S Cabriolet (997) 2005-2008	PORSCHE 911 Carrera S Cabriolet (997) 2005-2008	911	997	convertible	flat-6	Rear Wheel	355	182	4.8	3131	2005
+PORSCHE 911 GT3 RS (996) 2004-2006	PORSCHE 911 GT3 RS (996) 2004-2006	911	996	coupe	flat-6	Rear Wheel	381	190	4.4	2998	2004
+2005 Porsche Boxster	2005 Porsche Boxster	718	981	coupe	flat-6	Rear Wheel	245	156	7	3009	2005
+PORSCHE 911 Carrera (997) 2004-2008	PORSCHE 911 Carrera (997) 2004-2008	911	996	coupe	6-cyl	Rear Wheel	325	177	5	3075	2004
+PORSCHE 911 Turbo Cabriolet (996) 2004-2007	PORSCHE 911 Turbo Cabriolet (996) 2004-2007	911	996	convertible	flat-6	All Wheel	420	185	4.9	3748	2004
+PORSCHE 911 Turbo S (996) 2004-2005	PORSCHE 911 Turbo S (996) 2004-2005	911	996	coupe	flat-6	All Wheel	450	186	4.8	3494	2004
+PORSCHE 911 Turbo S Cabriolet (996) 2004-2006	PORSCHE 911 Turbo S Cabriolet (996) 2004-2006	911	996	convertible	flat-6	Rear Wheel	450	186	4.8	3748	2004
+PORSCHE 911 Carrera S (997) 2004-2008	PORSCHE 911 Carrera S (997) 2004-2008	911	996	coupe	flat-6	Rear Wheel	355	182	4.8	3131	2004
+2004 Porsche Boxster S	2004 Porsche Boxster S	718	981	coupe	flat-6	Rear Wheel	295	164	6.1	3075	2004
+2004 Porsche Carrera GT	2004 Porsche Carrera GT	Carrera GT		coupe	V10	Rear Wheel	612	205	3.9	3042	2004
+PORSCHE 911 GT3 (996) 2003-2006	PORSCHE 911 GT3 (996) 2003-2006	911	996	coupe	flat-6	Rear Wheel	381	190	4.5	3042	2003
+PORSCHE 911 Carrera 4S Cabriolet (996) 2003-2005	PORSCHE 911 Carrera 4S Cabriolet (996) 2003-2005	911	996	convertible	flat-6	All Wheel	320	171	5.9	3571	2003
+PORSCHE Cayenne (955) 2002-2007	PORSCHE Cayenne (955) 2002-2007	Cayenne	955	suv	V8	All Wheel	345	150	6.8	4949	2002
+PORSCHE Cayenne S (955) 2002-2007	PORSCHE Cayenne S (955) 2002-2007	Cayenne	955	suv	V8	All Wheel	340	150	7.2	4949	2002
+PORSCHE Cayenne Turbo (955) 2002-2007	PORSCHE Cayenne Turbo (955) 2002-2007	Cayenne	955	suv	V8	All Wheel	450	165	5.6	5192	2002
+2002 Porsche Boxster	2002 Porsche Boxster	718	981	coupe	flat-6	Rear Wheel	228	154	7.3	2932	2002
+2002 Porsche Boxster S	2002 Porsche Boxster S	718	981	coupe	flat-6	Rear Wheel	260	160	6.4	2998	2002
+PORSCHE 911 GT2 (996) 2001-2006	PORSCHE 911 GT2 (996) 2001-2006	911	996	coupe	flat-6	Rear Wheel	462	6	4.1	3168	2001
+PORSCHE 911 Carrera (996) 2001-2004	PORSCHE 911 Carrera (996) 2001-2004	911	996	coupe	6-cyl	Rear Wheel	320	177	5	2965	2001
+PORSCHE 911 Carrera 4 (996) 2001-2005	PORSCHE 911 Carrera 4 (996) 2001-2005	911	996	coupe	flat-6	All Wheel	320	174	5.5	3219	2001
+PORSCHE 911 Carrera 4 Cabriolet (996) 2001-2004	PORSCHE 911 Carrera 4 Cabriolet (996) 2001-2004	911	996	convertible	flat-6	All Wheel	320	174	5.7	3395	2001
+PORSCHE 911 Carrera 4S (996) 2001-2005	PORSCHE 911 Carrera 4S (996) 2001-2005	911	996	coupe	flat-6	All Wheel	320	171	5.6	3362	2001
+PORSCHE 911 Turbo (996) 2000-2006	PORSCHE 911 Turbo (996) 2000-2006	911	996	coupe	flat-6	All Wheel	420	185	4.9	3494	2000
+PORSCHE 911 GT3 (996) 1999-2001	PORSCHE 911 GT3 (996) 1999-2001	911	996	coupe	flat-6	Rear Wheel	360	188	4.8	2976	1999
+1999 Porsche Boxster S	1999 Porsche Boxster S	718	981	coupe	flat-6	Rear Wheel	252	158	6.9	2943	1999
+PORSCHE 911 Carrera 4 (996) 1998-2001	PORSCHE 911 Carrera 4 (996) 1998-2001	911	996	coupe	flat-6	All Wheel	300	171	6	3131	1998
+PORSCHE 911 Carrera Cabriolet (996) 1998-2001	PORSCHE 911 Carrera Cabriolet (996) 1998-2001	911	996	convertible	flat-6	Rear Wheel	300	171	6.2	3175	1998
+PORSCHE 911 Carrera 4 Cabriolet (996) 1998-2001	PORSCHE 911 Carrera 4 Cabriolet (996) 1998-2001	911	996	convertible	flat-6	All Wheel	300	171	6.2	3296	1998
+PORSCHE 911 Carrera (996) 1997-2001	PORSCHE 911 Carrera (996) 1997-2001	911	993	coupe	6-cyl	Rear Wheel	300	174	5.2	2910	1997
+1996 Porsche Boxster	1996 Porsche Boxster	718	981	coupe	flat-6	Rear Wheel	220	155	7.4	2888	1996
+PORSCHE 911 Carrera S (993) 1995-1997	PORSCHE 911 Carrera S (993) 1995-1997	911	993	coupe	flat-6	Rear Wheel	285	171	5.4	3086	1995
+PORSCHE 911 Carrera 4S (993) 1995-1998	PORSCHE 911 Carrera 4S (993) 1995-1998	911	993	coupe	flat-6	All Wheel	285	168	5.3	3197	1995
+PORSCHE 911 Carrera RS (993) 1995-1996	PORSCHE 911 Carrera RS (993) 1995-1996	911	993	coupe	flat-6	Rear Wheel	331	172	5	2729	1995
+PORSCHE 911 Turbo (993) 1995-1997	PORSCHE 911 Turbo (993) 1995-1997	911	993	coupe	flat-6	All Wheel	408	180	4.5	3307	1995
+PORSCHE 911 Targa (993) 1995-1997	PORSCHE 911 Targa (993) 1995-1997	911	993	targa	flat-6	Rear Wheel	285	165	6.6	3031	1995
+PORSCHE 911 GT2 (993) 1995-1997	PORSCHE 911 GT2 (993) 1995-1997	911	993	coupe	flat-6	Rear Wheel	435	183	4.4	2679	1995
+PORSCHE 911 Carrera 4 (993) 1994-1997	PORSCHE 911 Carrera 4 (993) 1994-1997	911	993	coupe	flat-6	Rear Wheel	285	171	5.3	3130	1994
+PORSCHE 911 Cabriolet (993) 1994-1997	PORSCHE 911 Cabriolet (993) 1994-1997	911	993	convertible	6-cyl	Rear Wheel	285	171	5.4	3020	1994
+PORSCHE 911 Carrera (993) 1993-1997	PORSCHE 911 Carrera (993) 1993-1997	911	964	coupe	6-cyl	Rear Wheel	286	171	5.4	3020	1993
+PORSCHE 911 Carrera RS (964) 1993-1994	PORSCHE 911 Carrera RS (964) 1993-1994	911	964	coupe	flat-6	Rear Wheel	305	172	5	2729	1993
+PORSCHE 968 Turbo S 1993-1994	PORSCHE 968 Turbo S 1993-1994	968		coupe	4-cyl	Rear Wheel	305	175	4.9	3020	1993
+PORSCHE 928 GTS 1992-1995	PORSCHE 928 GTS 1992-1995	928		coupe	V8	Rear Wheel	350	171	5.9	3571	1992
+PORSCHE 968 Club Sport 1992-1995	PORSCHE 968 Club Sport 1992-1995	968		coupe	4-cyl	Rear Wheel	240	158	6.2	2910	1992
+PORSCHE 911 Carrera RS (964) 1991-1992	PORSCHE 911 Carrera RS (964) 1991-1992	911	964	coupe	flat-6	Rear Wheel	260	162	5.4	2711	1991
+PORSCHE 968 1991-1995	PORSCHE 968 1991-1995	968		coupe	4-cyl	Rear Wheel	240	158	6.4	3020	1991
+PORSCHE 968 Cabrio 1991-1995	PORSCHE 968 Cabrio 1991-1995	968		convertible	4-cyl	Rear Wheel	240	158	6.5	3082	1991
+PORSCHE 911 Turbo (964) 1990-1995	PORSCHE 911 Turbo (964) 1990-1995	911	964	coupe	flat-6	Rear Wheel	360	174	4.8	3241	1990
+PORSCHE 928 GT 1989-1991	PORSCHE 928 GT 1989-1991	928		coupe	V8	Rear Wheel	330	170	6.1	3779	1989
+PORSCHE 911 Carrera 2 (964) 1989-1993	PORSCHE 911 Carrera 2 (964) 1989-1993	911	964	coupe	6-cyl	Rear Wheel	250	162	5.7	2976	1989
+PORSCHE 911 Targa 2 (964) 1989-1993	PORSCHE 911 Targa 2 (964) 1989-1993	911	964	targa	flat-6	Rear Wheel	250	162	5.7	2976	1989
+PORSCHE 911 Carrera 2 Cabriolet (964) 1989-1993	PORSCHE 911 Carrera 2 Cabriolet (964) 1989-1993	911	964	convertible	6-cyl	Rear Wheel	250	162	5.9	3196	1989
+PORSCHE 911 Carrera 4 (964) 1988-1993	PORSCHE 911 Carrera 4 (964) 1988-1993	911	G	coupe	flat-6	All Wheel	250	162	5.9	3196	1988
+PORSCHE 944 S2 1988-1991	PORSCHE 944 S2 1988-1991	944		coupe	4-cyl	Rear Wheel	211	149	7.1	2888	1988
+PORSCHE 911 Turbo Cabriolet "Flachtbau" (930) 1987-1989	PORSCHE 911 Turbo Cabriolet "Flachtbau" (930) 1987-1989	911	G	convertible	flat-6	Rear Wheel	330	168	5.2		1987
+PORSCHE 959 1987-1988	PORSCHE 959 1987-1988	959		coupe	flat-6	Rear Wheel	450	197	3.9	3197	1987
+PORSCHE 928 S4 1986-1991	PORSCHE 928 S4 1986-1991	928		coupe	V8	Rear Wheel	320	165		3527	1986
+PORSCHE 944 S 1986-1988	PORSCHE 944 S 1986-1988	944		coupe	4-cyl	Rear Wheel	190	142	7.9	2822	1986
+PORSCHE 944 Turbo/Turbo S (951) 1985-1990	PORSCHE 944 Turbo/Turbo S (951) 1985-1990	944		coupe	4-cyl	Rear Wheel	250	162	5.7	2976	1985
+PORSCHE 911 Carrera Cabriolet (930) 1983-1989	PORSCHE 911 Carrera Cabriolet (930) 1983-1989	911	G	convertible	flat-6	Rear Wheel	231	152	6.1	2778	1983
+PORSCHE 911 Turbo "Flachbau" (930) 1981-1989	PORSCHE 911 Turbo "Flachbau" (930) 1981-1989	911	G	coupe	flat-6	Rear Wheel	330	168	5.1	3128	1981
+PORSCHE 944 1981-1990	PORSCHE 944 1981-1990	944		coupe	4-cyl	Rear Wheel	165	137	8.2	2844	1981
+PORSCHE 928 S 1980-1986	PORSCHE 928 S 1980-1986	928		coupe	V8	Rear Wheel	300	155	6.6	3197	1980
+PORSCHE 928 1978-1982	PORSCHE 928 1978-1982	928		coupe	V8	Rear Wheel	240	143	6.8	3197	1978
+PORSCHE 911 Turbo (930) 1977-1989	PORSCHE 911 Turbo (930) 1977-1989	911	G	coupe	flat-6	Rear Wheel	300	161	5.2	2943	1977
+PORSCHE 911 Turbo (930) 1974-1977	PORSCHE 911 Turbo (930) 1974-1977	911	G	coupe	flat-6	Rear Wheel	260	155	5.5	2635	1974
+PORSCHE 911 Targa (930) 1974-1989	PORSCHE 911 Targa (930) 1974-1989	911	G	targa	flat-6	Rear Wheel	231	152	5.8	2801	1974
+PORSCHE 911 Carrera (930) 1973-1989	PORSCHE 911 Carrera (930) 1973-1989	911	classic	coupe	6-cyl	Rear Wheel	231	152	6.1	2667	1973
+PORSCHE 911 Carrera RS (901) 1972-1973	PORSCHE 911 Carrera RS (901) 1972-1973	911	classic	coupe	flat-6	Rear Wheel	210	152	5.5	2315	1972
+PORSCHE 911 Targa (901) 1967-1973	PORSCHE 911 Targa (901) 1967-1973	911	classic	targa	flat-6	Rear Wheel	160	136	7.9	2341	1967
+PORSCHE 912 (901) 1965-1969	PORSCHE 912 (901) 1965-1969	other		coupe	4-cyl	Rear Wheel	90	119	11.8	2138	1965
+PORSCHE 911 (901) 1964-1973	PORSCHE 911 (901) 1964-1973	911	classic	coupe	6-cyl	Rear Wheel	190	144	6.6	2374	1964

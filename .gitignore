@@ -4,3 +4,4 @@ stix/
 .claude/
 benchmarks/layouts/
 data/
+!docs/data/
