@@ -31,6 +31,13 @@ class BitZoom {
             showLegend: true,
             initialLevel: 0,
             onRender: () => this._scheduleHashUpdate(),
+            onAnnounce: (text) => { const el = document.getElementById('aria-announce'); if (el) el.textContent = text; },
+            onSummary: (rows) => {
+                const tb = document.querySelector('#aria-summary tbody');
+                if (!tb) return;
+                const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                tb.innerHTML = rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.group)}</td><td>${r.connections}</td></tr>`).join('');
+            },
         });
 
         // App-specific state
@@ -153,7 +160,6 @@ class BitZoom {
         v.layoutAll();
         this._updateAlgoInfo();
         this._updateOverview();
-
         // Animate if few nodes on screen and not switching to/from RAW
         const newSns = !newIsRaw ? v.getLevel(idx).supernodes : null;
         const shouldAnimate = oldSns && newSns && newSns.length < 80 && oldSns.length < 80;
@@ -1539,6 +1545,10 @@ class BitZoom {
                 v.pan.x = v.W/2 - (v.W/2 - v.pan.x) * f;
                 v.pan.y = v.H/2 - (v.H/2 - v.pan.y) * f;
                 v.render();
+            } else if (e.key === 'Escape') {
+                v.selectedId = null;
+                document.getElementById('node-panel').classList.remove('open');
+                v.render();
             } else if (e.key === 'f') {
                 v.showFps = !v.showFps;
                 v.render();
@@ -1547,6 +1557,8 @@ class BitZoom {
                 v.render();
             } else if (e.key === 'c') {
                 v.cycleColorScheme();
+            } else if (e.key === 'a') {
+                document.body.classList.toggle('a11y-debug');
             } else if (e.key === 's') {
                 const svg = exportSVG(v, { metadata: this._currentDatasetId || undefined });
                 const blob = new Blob([svg], { type: 'image/svg+xml' });

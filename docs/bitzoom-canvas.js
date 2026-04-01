@@ -24,6 +24,7 @@ import { initGL, renderGL } from './bitzoom-gl-renderer.js';
 import { layoutAll, render, worldToScreen, screenToWorld, hitTest } from './bitzoom-renderer.js';
 
 export class BitZoomCanvas {
+  static _instanceCount = 0;
   /**
    * @param {HTMLCanvasElement} canvas
    * @param {object} opts
@@ -43,6 +44,8 @@ export class BitZoomCanvas {
    * @param {number} [opts.smoothAlpha=0]
    * @param {function} [opts.onSelect] - callback(hit) when a node/supernode is clicked
    * @param {function} [opts.onHover] - callback(hit) on hover change
+   * @param {function} [opts.onAnnounce] - callback(text) for accessibility announcements
+   * @param {function} [opts.onSummary] - callback([{label, group, connections}]) for summary table data (on level change/load)
    */
   constructor(canvas, opts = {}) {
     this.canvas = canvas;
@@ -114,6 +117,8 @@ export class BitZoomCanvas {
     // Callbacks
     this._onSelect = opts.onSelect || null;
     this._onHover = opts.onHover || null;
+    this._onAnnounce = opts.onAnnounce || null;
+    this._onSummary = opts.onSummary || null;
 
     // Level cache
     this.levels = new Array(ZOOM_LEVELS.length).fill(null);
@@ -136,6 +141,9 @@ export class BitZoomCanvas {
     this._abortController = new AbortController();
     this._resizeObserver = null;
     this._onRender = opts.onRender || null;
+    this._viewAnnounceTimer = 0;
+    this._hoverAnnounceTimer = 0;
+    this._a11yState = { level: -1, zoom: -1, sel: null, hov: null, labelKey: '', colorBy: '' };
 
     if (!opts.skipEvents) this._bindEvents();
     this.resize();
@@ -164,6 +172,67 @@ export class BitZoomCanvas {
       this.selectedIds.add(id);
       this._primarySelectedId = id;
     }
+  }
+
+  /** Fire an accessibility announcement via the onAnnounce callback. */
+  announce(text) { if (this._onAnnounce) this._onAnnounce(text); }
+
+  /** Push summary table data for visible nodes via the onSummary callback. */
+  _emitSummary() {
+    if (!this._onSummary) return;
+    const isRaw = this.currentLevel === RAW_LEVEL;
+    const allNodes = isRaw ? this.nodes : (this.getLevel(this.currentLevel)?.supernodes || []);
+    const rz = this.renderZoom;
+    const W = this.W, H = this.H;
+    // Filter to visible nodes (within viewport)
+    const visible = [];
+    for (const n of allNodes) {
+      const sx = n.x * rz + this.pan.x;
+      const sy = n.y * rz + this.pan.y;
+      if (sx >= -20 && sx <= W + 20 && sy >= -20 && sy <= H + 20) visible.push(n);
+    }
+    visible.sort((a, b) => {
+      const av = isRaw ? (a.degree || 0) : (a.members?.length || 0);
+      const bv = isRaw ? (b.degree || 0) : (b.members?.length || 0);
+      return bv - av;
+    });
+    this._onSummary(visible.slice(0, 50).map(n => ({
+      label: isRaw ? this._nodeLabel(n) : this._supernodeLabel(n),
+      group: isRaw ? this._nodeColorVal(n) : (n.cachedColorVal || ''),
+      connections: isRaw ? (n.degree || 0) : (n.members?.length || 0),
+    })));
+  }
+
+  /** Describe a node/supernode for screen readers. */
+  _describeNode(hit) {
+    if (!hit) return '';
+    if (hit.type === 'node') {
+      const n = hit.item;
+      return `${this._nodeLabel(n)}, ${this._nodeColorVal(n)}, ${n.degree || 0} connections`;
+    }
+    const sn = hit.item;
+    return `${this._supernodeLabel(sn)}, ${sn.members ? sn.members.length : 0} members`;
+  }
+
+  /** Look up a node or supernode by id at the current level. */
+  _findById(id) {
+    if (this.currentLevel === RAW_LEVEL) return this.nodeIndexFull[id];
+    const level = this.getLevel(this.currentLevel);
+    if (!level) return null;
+    if (!level._snByBid) {
+      level._snByBid = new Map();
+      for (const sn of level.supernodes) level._snByBid.set(sn.bid, sn);
+    }
+    return level._snByBid.get(id);
+  }
+
+  /** Describe the current level for announcements. */
+  _describeLevel() {
+    const isRaw = this.currentLevel === RAW_LEVEL;
+    if (isRaw) return `Raw level, ${this.nodes.length} nodes`;
+    const level = this.getLevel(this.currentLevel);
+    const count = level ? level.supernodes.length : 0;
+    return `Level ${LEVEL_LABELS[this.currentLevel]}, ${count} supernodes`;
   }
 
   get _dominantProp() { return this._cachedDominant; }
@@ -382,8 +451,76 @@ export class BitZoomCanvas {
     ctx.fillText(text, 6, 6);
   }
 
-  /** Hook for post-render actions (e.g., hash state updates). */
-  _postRender() { if (this._onRender) this._onRender(); }
+  /** Hook for post-render actions (e.g., hash state updates, accessibility). */
+  _postRender() {
+    if (this._onRender) this._onRender();
+    this._a11yCheck();
+  }
+
+  /** Detect state changes and fire accessibility announcements. */
+  _a11yCheck() {
+    if (!this._onAnnounce && !this._onSummary) return;
+    const prev = this._a11yState;
+    const level = this.currentLevel;
+    const zoom = this.renderZoom;
+    const sel = this._primarySelectedId;
+    const hov = this.hoveredId;
+    let levelChanged = false;
+
+    if (level !== prev.level) {
+      // Skip the initial -1 → real transition (load announcement handles that)
+      if (prev.level !== -1) this.announce(this._describeLevel());
+      this._emitSummary();
+      prev.level = level;
+      prev.sel = sel; // suppress "selection cleared" as side effect of level change
+      prev.zoom = zoom; // suppress zoom announce on level change
+      levelChanged = true;
+    }
+    const selChanged = sel !== prev.sel;
+    if (selChanged) {
+      if (sel) {
+        const item = this._findById(sel);
+        if (item) {
+          const type = this.currentLevel === RAW_LEVEL ? 'node' : 'supernode';
+          this.announce(`Selected: ${this._describeNode({ type, item })}`);
+        }
+      } else {
+        this.announce('Selection cleared');
+      }
+      prev.sel = sel;
+    }
+    if (hov !== prev.hov) {
+      clearTimeout(this._hoverAnnounceTimer);
+      // Don't announce hover if selection just changed (selection takes priority)
+      if (hov && !selChanged) {
+        this._hoverAnnounceTimer = setTimeout(() => {
+          const item = this._findById(hov);
+          if (item) {
+            const type = this.currentLevel === RAW_LEVEL ? 'node' : 'supernode';
+            this.announce(this._describeNode({ type, item }));
+          }
+        }, 300);
+      }
+      prev.hov = hov;
+    }
+    if (!levelChanged && Math.abs(zoom - prev.zoom) > 0.01) {
+      clearTimeout(this._viewAnnounceTimer);
+      this._viewAnnounceTimer = setTimeout(() => {
+        this.announce(`Zoom ${this.renderZoom.toFixed(1)}x. ${this._describeLevel()}`);
+        this._emitSummary();
+      }, 400);
+      prev.zoom = zoom;
+    }
+    const labelKey = this._cachedLabelProps.join(',');
+    const colorBy = this._cachedDominant;
+    if (labelKey !== prev.labelKey || colorBy !== prev.colorBy) {
+      // Skip initial empty → real transition (load handles that)
+      if (prev.labelKey !== '') this.announce(`Showing ${labelKey.replace(/,/g, ', ')}, colored by ${colorBy}`);
+      this._emitSummary();
+      prev.labelKey = labelKey;
+      prev.colorBy = colorBy;
+    }
+  }
 
   /** Show progress overlay on the canvas. Set to null to clear. */
   showProgress(text) {
@@ -406,7 +543,7 @@ export class BitZoomCanvas {
     }
   }
 
-  renderNow() { render(this); }
+  renderNow() { render(this); this._a11yCheck(); }
   worldToScreen(wx, wy) { return worldToScreen(this, wx, wy); }
   screenToWorld(sx, sy) { return screenToWorld(this, sx, sy); }
   hitTest(sx, sy) { return hitTest(this, sx, sy); }
@@ -787,13 +924,25 @@ export class BitZoomCanvas {
       this.render();
     }, { passive: false, signal: this._abortController.signal });
 
-    // Keyboard
-    canvas.setAttribute('tabindex', '0'); // make focusable
+    // Accessibility
+    canvas.setAttribute('tabindex', '0');
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-roledescription', 'interactive graph');
+    canvas.setAttribute('aria-label', `Graph visualization, ${this.nodes.length} nodes`);
+    // Keyboard help — insert adjacent to canvas so it works in both light DOM and shadow DOM
+    const helpId = 'bz-keys-help-' + (++BitZoomCanvas._instanceCount);
+    const help = document.createElement('div');
+    help.id = helpId;
+    help.className = 'visually-hidden';
+    help.textContent = 'Arrow keys: change level. Plus/minus: zoom. Escape: deselect. Click: select node. F: FPS. L: legend. C: color scheme. A: accessibility debug.';
+    canvas.parentNode.insertBefore(help, canvas.nextSibling);
+    canvas.setAttribute('aria-describedby', helpId);
     canvas.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft' && this.currentLevel > 0) { e.preventDefault(); this.switchLevel(this.currentLevel - 1); }
       else if (e.key === 'ArrowRight' && this.currentLevel < LEVEL_LABELS.length - 1) { e.preventDefault(); this.switchLevel(this.currentLevel + 1); }
       else if (e.key === '+' || e.key === '=') { e.preventDefault(); this._zoomBy(1.15); }
       else if (e.key === '-' || e.key === '_') { e.preventDefault(); this._zoomBy(1/1.15); }
+      else if (e.key === 'Escape') { this.selectedId = null; this.render(); }
       else if (e.key === 'f') { this.showFps = !this.showFps; this.render(); }
       else if (e.key === 'l') { this.showLegend = (this.showLegend + 1) % 5; this.render(); }
       else if (e.key === 'c') { this.cycleColorScheme(); }
@@ -812,6 +961,10 @@ export class BitZoomCanvas {
     if (this._gl) this._destroyWebGL();
     if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
     if (this._edgeBuildRaf) { cancelAnimationFrame(this._edgeBuildRaf); this._edgeBuildRaf = null; }
+    clearTimeout(this._viewAnnounceTimer);
+    clearTimeout(this._hoverAnnounceTimer);
+    const helpEl = this.canvas.getAttribute('aria-describedby');
+    if (helpEl) { const el = (this.canvas.getRootNode() || document).getElementById?.(helpEl) || document.getElementById(helpEl); if (el) el.remove(); }
   }
 
   // ─── Internal animation helpers ────────────────────────────────────────────
@@ -964,6 +1117,8 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
     view._refreshPropCache();
     view.layoutAll();
     view.render();
+    canvas.setAttribute('aria-label', `Graph visualization, ${nodes.length} nodes, ${edges.length} edges`);
+    view.announce(`Graph loaded, ${nodes.length} nodes, ${edges.length} edges. ${view._describeLevel()}`);
   })();
 
   return view;
