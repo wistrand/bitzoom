@@ -269,6 +269,7 @@ function renderSupernodes(bz, pass) {
   const selIds = bz.selectedIds;
   const hasSel = selIds.size > 0;
   const hov = bz.hoveredId;
+  const zoomTgt = bz.zoomTargetId;
 
   if (pass === 'edges') {
     // Normal edges — batched by alpha bucket to minimize beginPath/stroke calls
@@ -376,7 +377,7 @@ function renderSupernodes(bz, pass) {
     const r = Math.max(1.5, Math.min(rMax, 1.5 + Math.sqrt(sizeVal) * 1.2));
     const col = sn.cachedColor;
     const isSelected = selIds.has(sn.bid);
-    const isHovered = hov === sn.bid;
+    const isHovered = hov === sn.bid || zoomTgt === sn.bid;
     const importance = visibleCount > 50 ? 0.3 + 0.7 * Math.sqrt(sizeVal / maxSizeVal) : 1;
 
     if (pass === 'circles') {
@@ -485,7 +486,8 @@ function renderSupernodes(bz, pass) {
         } else {
           const fs = Math.max(10, Math.min(13, cellPx * 0.18)) | 0;
           const charW = fs * 0.6;
-          const maxChars = Math.max(3, (cellPx / charW) | 0);
+          const snappedCellPx = Math.round(cellPx / 4) * 4;
+          const maxChars = Math.max(3, (snappedCellPx / charW) | 0);
           ctx.fillStyle = _t(bz).labelDim;
           ctx.font = fontStr(fs, false);
           ctx.textAlign = 'center';
@@ -524,6 +526,7 @@ function renderNodes(bz, pass) {
   const selIds = bz.selectedIds;
   const hasSel = selIds.size > 0;
   const hov = bz.hoveredId;
+  const zoomTgt = bz.zoomTargetId;
 
   if (pass === 'edges') {
     // Normal edges — drawn behind heatmap
@@ -604,7 +607,7 @@ function renderNodes(bz, pass) {
     const r = Math.max(1, Math.min(rMaxRaw, 1 + Math.sqrt(sizeVal) * 1.0));
     const col = bz._nodeColor(n);
     const isSelected = selIds.has(n.id);
-    const isHovered = hov === n.id;
+    const isHovered = hov === n.id || zoomTgt === n.id;
 
     if (pass === 'circles') {
       if (isSelected || isHovered) {

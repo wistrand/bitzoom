@@ -113,6 +113,7 @@ export class BitZoomCanvas {
     this.selectedIds = new Set();
     this._primarySelectedId = null;
     this.hoveredId = null;
+    this.zoomTargetId = null;
 
     // Callbacks
     this._onSelect = opts.onSelect || null;
@@ -1035,7 +1036,7 @@ export class BitZoomCanvas {
     const wy = (sy - this.pan.y) / rz;
     const maxWorld = maxScreenDist / rz;
     let bestD2 = maxWorld * maxWorld;
-    let bestX = 0, bestY = 0, found = false;
+    let bestX = 0, bestY = 0, bestId = null, found = false;
 
     if (this.currentLevel === RAW_LEVEL) {
       const scale = this._layoutScale;
@@ -1068,7 +1069,7 @@ export class BitZoomCanvas {
               if (n.x === undefined) continue;
               const ddx = n.x - wx, ddy = n.y - wy;
               const d2 = ddx * ddx + ddy * ddy;
-              if (d2 < bestD2) { bestD2 = d2; bestX = n.x; bestY = n.y; found = true; }
+              if (d2 < bestD2) { bestD2 = d2; bestX = n.x; bestY = n.y; bestId = n.id; found = true; }
             }
           }
         }
@@ -1078,7 +1079,7 @@ export class BitZoomCanvas {
           if (n.x === undefined) continue;
           const ddx = n.x - wx, ddy = n.y - wy;
           const d2 = ddx * ddx + ddy * ddy;
-          if (d2 < bestD2) { bestD2 = d2; bestX = n.x; bestY = n.y; found = true; }
+          if (d2 < bestD2) { bestD2 = d2; bestX = n.x; bestY = n.y; bestId = n.id; found = true; }
         }
       }
     } else {
@@ -1088,15 +1089,17 @@ export class BitZoomCanvas {
         if (n.x === undefined) continue;
         const ddx = n.x - wx, ddy = n.y - wy;
         const d2 = ddx * ddx + ddy * ddy;
-        if (d2 < bestD2) { bestD2 = d2; bestX = n.x; bestY = n.y; found = true; }
+        if (d2 < bestD2) { bestD2 = d2; bestX = n.x; bestY = n.y; bestId = n.bid || n.id; found = true; }
       }
     }
-    return found ? { x: bestX, y: bestY } : null;
+    return found ? { x: bestX, y: bestY, id: bestId } : null;
   }
 
   wheelZoom(mx, my, zoomingIn, onAutoLevel) {
     // Before zoom: find nearest node/supernode to cursor
     const nearest = zoomingIn ? this._nearestItem(mx, my, 200) : null;
+    // Track zoom target so renderer shows its full label
+    this.zoomTargetId = nearest ? nearest.id : null;
 
     // Apply zoom
     const oldRZ = this.renderZoom;
