@@ -1401,6 +1401,12 @@ class BitZoom {
             `<div style="padding:3px 0"><span style="color:var(--accent)">Drag</span> Pan view</div>` +
             `<div style="padding:3px 0"><span style="color:var(--accent)">Click</span> Select node</div>` +
             `<div style="padding:3px 0"><span style="color:var(--accent)">Ctrl+Click</span> Multi-select</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">Arrows</span> Jump to nearest node in direction</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">Shift+Arrows</span> Navigate to connected neighbor in direction</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">N / Shift+N</span> Walk connections by weight</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">Home</span> Select largest visible node</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">Enter</span> Open detail panel</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">, / .</span> Change zoom level</div>` +
             `</div>`;
             dlg.showModal();
         }, sig);
@@ -1568,9 +1574,26 @@ class BitZoom {
 
         window.addEventListener('keydown', e => {
             if (!this.dataLoaded) return;
-            if (e.key === 'ArrowLeft' && v.currentLevel > 0) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right';
+                if (e.shiftKey) v._navByDirection(dir);
+                else v._navAnyByDirection(dir);
+            } else if (e.key === 'n' || e.key === 'N') {
+                e.preventDefault(); v._navStep(e.shiftKey ? -1 : 1);
+            } else if (e.key === 'Home') {
+                e.preventDefault(); v._navSelectLargest();
+            } else if ((e.key === 'Enter' || e.key === ' ') && v.selectedId) {
+                e.preventDefault();
+                v._navNeighbors = null; v._navAnchorId = null; v._buildNavNeighbors();
+                const item = v._findById(v.selectedId);
+                if (item) {
+                    const type = v.currentLevel === RAW_LEVEL ? 'node' : 'supernode';
+                    this._showDetail({ type, item });
+                }
+            } else if (e.key === ',' && v.currentLevel > 0) {
                 e.preventDefault(); this.switchLevel(v.currentLevel - 1);
-            } else if (e.key === 'ArrowRight' && v.currentLevel < LEVEL_LABELS.length - 1) {
+            } else if (e.key === '.' && v.currentLevel < LEVEL_LABELS.length - 1) {
                 e.preventDefault(); this.switchLevel(v.currentLevel + 1);
             } else if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
@@ -1586,6 +1609,7 @@ class BitZoom {
                 v.render();
             } else if (e.key === 'Escape') {
                 v.selectedId = null;
+                v._navNeighbors = null; v._navAnchorId = null;
                 document.getElementById('node-panel').classList.remove('open');
                 v.render();
             } else if (e.key === 'f') {

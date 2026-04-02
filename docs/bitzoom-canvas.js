@@ -146,6 +146,11 @@ export class BitZoomCanvas {
     this._hoverAnnounceTimer = 0;
     this._a11yState = { level: -1, zoom: -1, sel: null, hov: null, labelKey: '', colorBy: '' };
 
+    // Keyboard node navigation
+    this._navNeighbors = null; // sorted neighbor list for current selection
+    this._navIndex = -1;       // current position in neighbor list
+    this._navAnchorId = null;  // selection id that built the current list
+
     if (!opts.skipEvents) this._bindEvents();
     this.resize();
   }
@@ -577,6 +582,7 @@ export class BitZoomCanvas {
     this.currentLevel = idx;
     this.zoom = oldRZ / Math.pow(2, idx - this.baseLevel);
     this.selectedId = null;
+    this._navNeighbors = null; this._navAnchorId = null;
     this.layoutAll();
     this.render();
   }
@@ -974,15 +980,24 @@ export class BitZoomCanvas {
     const help = document.createElement('div');
     help.id = helpId;
     help.className = 'visually-hidden';
-    help.textContent = 'Arrow keys: change level. Plus/minus: zoom. Escape: deselect. Click: select node. F: FPS. L: legend. C: color scheme. A: accessibility debug.';
+    help.textContent = 'Arrows: jump to nearest node in direction. Shift+Arrows: navigate connected neighbors. N/Shift+N: walk connections by weight. Comma/period: change level. Plus/minus: zoom. Escape: deselect. Home: select largest node. F: FPS. L: legend. C: color scheme. A: accessibility debug.';
     canvas.parentNode.insertBefore(help, canvas.nextSibling);
     canvas.setAttribute('aria-describedby', helpId);
     canvas.addEventListener('keydown', e => {
-      if (e.key === 'ArrowLeft' && this.currentLevel > 0) { e.preventDefault(); this.switchLevel(this.currentLevel - 1); }
-      else if (e.key === 'ArrowRight' && this.currentLevel < LEVEL_LABELS.length - 1) { e.preventDefault(); this.switchLevel(this.currentLevel + 1); }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right';
+        if (e.shiftKey) this._navByDirection(dir);
+        else this._navAnyByDirection(dir);
+      }
+      else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); this._navStep(e.shiftKey ? -1 : 1); }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._navNeighbors = null; this._navAnchorId = null; this._buildNavNeighbors(); }
+      else if (e.key === 'Home') { e.preventDefault(); this._navSelectLargest(); }
+      else if (e.key === ',' && this.currentLevel > 0) { e.preventDefault(); this.switchLevel(this.currentLevel - 1); }
+      else if (e.key === '.' && this.currentLevel < LEVEL_LABELS.length - 1) { e.preventDefault(); this.switchLevel(this.currentLevel + 1); }
       else if (e.key === '+' || e.key === '=') { e.preventDefault(); this._zoomBy(1.15); }
       else if (e.key === '-' || e.key === '_') { e.preventDefault(); this._zoomBy(1/1.15); }
-      else if (e.key === 'Escape') { this.selectedId = null; this.render(); }
+      else if (e.key === 'Escape') { this.selectedId = null; this._navNeighbors = null; this._navAnchorId = null; this.render(); }
       else if (e.key === 'f') { this.showFps = !this.showFps; this.render(); }
       else if (e.key === 'l') { this.showLegend = (this.showLegend + 1) % 5; this.render(); }
       else if (e.key === 'c') { this.cycleColorScheme(); }
@@ -1093,6 +1108,202 @@ export class BitZoomCanvas {
       }
     }
     return found ? { x: bestX, y: bestY, id: bestId } : null;
+  }
+
+  // ─── Keyboard node navigation ───────────────────────────────────────────────
+
+  /** Build sorted neighbor list for the currently selected node. */
+  _buildNavNeighbors() {
+    const id = this._primarySelectedId;
+    if (!id) { this._navNeighbors = null; this._navIndex = -1; this._navAnchorId = null; return; }
+    if (id === this._navAnchorId && this._navNeighbors) return; // already built
+
+    const isRaw = this.currentLevel === RAW_LEVEL;
+    const anchor = this._findById(id);
+    if (!anchor) { this._navNeighbors = null; return; }
+    const ax = anchor.x, ay = anchor.y;
+
+    // Collect neighbors with weights
+    const neighbors = []; // {id, weight, item}
+    if (isRaw) {
+      const adj = this.adjList[id];
+      if (adj) {
+        for (const nid of adj) {
+          const item = this.nodeIndexFull[nid];
+          if (item && item.x !== undefined) neighbors.push({ id: nid, weight: 1, item });
+        }
+      }
+    } else {
+      const level = this.getLevel(this.currentLevel);
+      if (level && level.snEdges) {
+        if (!level._snByBid) {
+          level._snByBid = new Map();
+          for (const sn of level.supernodes) level._snByBid.set(sn.bid, sn);
+        }
+        for (const e of level.snEdges) {
+          let nid = null;
+          if (e.a === id) nid = e.b;
+          else if (e.b === id) nid = e.a;
+          if (nid !== null) {
+            const item = level._snByBid.get(nid);
+            if (item && item.x !== undefined) neighbors.push({ id: nid, weight: e.weight, item });
+          }
+        }
+      }
+    }
+
+    // Compute angle from anchor to each neighbor (0° = up/12 o'clock, clockwise)
+    const rz = this.renderZoom;
+    for (const n of neighbors) {
+      const dx = n.item.x * rz + this.pan.x - (ax * rz + this.pan.x);
+      const dy = n.item.y * rz + this.pan.y - (ay * rz + this.pan.y);
+      // atan2 gives angle from positive x-axis; convert to clockwise from 12 o'clock
+      n.angle = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+    }
+
+    // Sort: weight descending, then angle ascending (clockwise from 12)
+    neighbors.sort((a, b) => b.weight - a.weight || a.angle - b.angle);
+
+    this._navNeighbors = neighbors;
+    this._navIndex = -1;
+    this._navAnchorId = id;
+  }
+
+  /** Navigate to a node: select, ensure visible within 10% margin, animate if needed. */
+  _navTo(item, id) {
+    this.selectedId = id;
+    const sx = item.x * this.renderZoom + this.pan.x;
+    const sy = item.y * this.renderZoom + this.pan.y;
+    const margin = 0.1;
+    const left = this.W * margin, right = this.W * (1 - margin);
+    const top = this.H * margin, bottom = this.H * (1 - margin);
+    let dx = 0, dy = 0;
+    if (sx < left) dx = left - sx;
+    else if (sx > right) dx = right - sx;
+    if (sy < top) dy = top - sy;
+    else if (sy > bottom) dy = bottom - sy;
+    if (dx === 0 && dy === 0) { this.render(); return; }
+    const startPanX = this.pan.x, startPanY = this.pan.y;
+    const targetPanX = startPanX + dx, targetPanY = startPanY + dy;
+    const startTime = performance.now();
+    const animate = (now) => {
+      const t = Math.min(1, (now - startTime) / 200);
+      const e = 1 - Math.pow(1 - t, 3);
+      this.pan.x = startPanX + (targetPanX - startPanX) * e;
+      this.pan.y = startPanY + (targetPanY - startPanY) * e;
+      this.renderNow();
+      if (t < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }
+
+  /** Select the highest-degree visible node as nav entry point. */
+  _navSelectLargest() {
+    const isRaw = this.currentLevel === RAW_LEVEL;
+    let best = null, bestScore = -1;
+    if (isRaw) {
+      for (const n of this.nodes) {
+        if (n.x === undefined) continue;
+        const sx = n.x * this.renderZoom + this.pan.x;
+        const sy = n.y * this.renderZoom + this.pan.y;
+        if (sx < 0 || sx > this.W || sy < 0 || sy > this.H) continue;
+        if (n.degree > bestScore) { bestScore = n.degree; best = n; }
+      }
+      if (best) this._navTo(best, best.id);
+    } else {
+      const level = this.getLevel(this.currentLevel);
+      if (!level) return;
+      for (const sn of level.supernodes) {
+        if (sn.x === undefined) continue;
+        const sx = sn.x * this.renderZoom + this.pan.x;
+        const sy = sn.y * this.renderZoom + this.pan.y;
+        if (sx < 0 || sx > this.W || sy < 0 || sy > this.H) continue;
+        const score = sn.members ? sn.members.length : 0;
+        if (score > bestScore) { bestScore = score; best = sn; }
+      }
+      if (best) this._navTo(best, best.bid);
+    }
+  }
+
+  /** Navigate by arrow direction: pick best neighbor in a ±90° cone. */
+  _navByDirection(dir) {
+    if (!this._primarySelectedId) { this._navSelectLargest(); return; }
+    this._buildNavNeighbors();
+    if (!this._navNeighbors || this._navNeighbors.length === 0) {
+      this.announce('No connections');
+      return;
+    }
+    // Target angles: up=0, right=90, down=180, left=270
+    const targetAngle = dir === 'up' ? 0 : dir === 'right' ? 90 : dir === 'down' ? 180 : 270;
+    let best = null, bestScore = Infinity;
+    for (const n of this._navNeighbors) {
+      let diff = Math.abs(n.angle - targetAngle);
+      if (diff > 180) diff = 360 - diff;
+      if (diff <= 90 && diff < bestScore) { bestScore = diff; best = n; }
+    }
+    if (best) {
+      this._navIndex = this._navNeighbors.indexOf(best);
+      this._navTo(best.item, best.id);
+    }
+  }
+
+  /** Shift+Arrow: jump to nearest node/supernode in direction (any, not just connected). */
+  _navAnyByDirection(dir) {
+    const anchor = this._primarySelectedId ? this._findById(this._primarySelectedId) : null;
+    const rz = this.renderZoom;
+    let ax, ay;
+    if (anchor && anchor.x !== undefined) {
+      ax = anchor.x * rz + this.pan.x;
+      ay = anchor.y * rz + this.pan.y;
+    } else {
+      ax = this.W / 2;
+      ay = this.H / 2;
+    }
+    const targetAngle = dir === 'up' ? 0 : dir === 'right' ? 90 : dir === 'down' ? 180 : 270;
+    const isRaw = this.currentLevel === RAW_LEVEL;
+    let best = null, bestId = null, bestScore = Infinity;
+
+    const score = (item) => {
+      const sx = item.x * rz + this.pan.x;
+      const sy = item.y * rz + this.pan.y;
+      const dx = sx - ax, dy = sy - ay;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 1) return; // skip self
+      const angle = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+      let diff = Math.abs(angle - targetAngle);
+      if (diff > 180) diff = 360 - diff;
+      if (diff > 90) return; // outside cone
+      // Prefer closer nodes, penalize angular offset
+      const s = dist + diff * 2;
+      if (s < bestScore) { bestScore = s; best = item; bestId = item.bid || item.id; }
+    };
+
+    if (isRaw) {
+      for (const n of this.nodes) { if (n.x !== undefined) score(n); }
+    } else {
+      const level = this.getLevel(this.currentLevel);
+      if (level) for (const sn of level.supernodes) { if (sn.x !== undefined) score(sn); }
+    }
+    if (best) {
+      this._navTo(best, bestId);
+    }
+  }
+
+  /** Navigate sequentially: N (step=1) or Shift+N (step=-1).
+   *  Walks the anchor node's neighbor list — does not rebuild when selection moves. */
+  _navStep(step) {
+    if (!this._primarySelectedId) { this._navSelectLargest(); return; }
+    // Only build if no list exists yet (anchor unchanged)
+    if (!this._navNeighbors) {
+      this._buildNavNeighbors();
+    }
+    if (!this._navNeighbors || this._navNeighbors.length === 0) {
+      this.announce('No connections');
+      return;
+    }
+    this._navIndex = (this._navIndex + step + this._navNeighbors.length) % this._navNeighbors.length;
+    const n = this._navNeighbors[this._navIndex];
+    this._navTo(n.item, n.id);
   }
 
   wheelZoom(mx, my, zoomingIn, onAutoLevel) {
