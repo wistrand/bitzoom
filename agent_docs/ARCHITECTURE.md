@@ -156,11 +156,11 @@ on Canvas 2D overlay. See [`ARCHITECTURE-webgl.md`](ARCHITECTURE-webgl.md) for f
   `_instanceVBO` with `DYNAMIC_DRAW`.
 - **Exports**: `initGL(gl)`, `renderGL(gl, bz)`, `destroyGL(gl)`, `isWebGL2Available()`
 
-### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (1011 lines)
+### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (1690 lines)
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
-**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Constructor accepts `skipEvents` (for composition), `onRender` callback, `showLegend`, `showResetBtn`, `webgl`, `autoGPU`, and `colorBy` options.
+**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Always owns its event handlers (`_bindEvents`). Constructor accepts `onRender`, `showLegend`, `showResetBtn`, `webgl`, `autoGPU`, `colorBy`, `clickDelay` (ms, for single/double-click disambiguation), `keyboardTarget` (default canvas element), and extension callbacks (`onSelect`, `onHover`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`).
 
 **`colorBy`**: getter/setter overrides which property group controls node colors. Default `null` = auto (highest-weight group). Setting to a valid group name pins coloring to that group; setting to `null` returns to auto. In the viewer, clicking a group name label toggles colorBy (underlined = active). `<bz-graph>` supports the `color-by` attribute.
 
@@ -172,15 +172,15 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **`createBitZoomView(canvas, edgesText, nodesText, opts)`**: convenience factory — parses SNAP data, hydrates nodes, returns a canvas view synchronously. Initial blend kicks off async (GPU probe → blend → render). Accepts `webgl: true` to enable WebGL2 and `autoGPU: true` (default) to auto-enable WebGPU when N×G > 2000.
 
-**Public API**: `setWeights()`, `setAlpha()`, `setOptions()`, `destroy()`. Callbacks: `onSelect`, `onHover`.
+**Public API**: `setWeights()`, `setAlpha()`, `setOptions()`, `destroy()`. Callbacks: `onSelect`, `onHover`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`.
 
-### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (1750 lines)
+### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (1746 lines)
 
 `BitZoom` class — composes `BitZoomCanvas` as `this.view`. Adds application UI and orchestration.
 
-**Composition**: all graph/view state accessed via `this.view.*`. BitZoom owns app-only state (dataLoaded, presets, workers, hash timers, mouse state).
+**Composition**: all graph/view state accessed via `this.view.*`. BitZoom owns app-only state (dataLoaded, presets, workers, hash timers). All canvas-element events (mouse, touch, wheel, keyboard, resize) are handled by `BitZoomCanvas`; the viewer extends via callbacks passed at construction. Viewer-only keys (a, s, S) are handled in `_handleViewerKeys` via the `onKeydown` callback.
 
-**Navigation**: `switchLevel` (delegates to view + UI updates, animates supernodes when both old and new levels have <80 nodes), `_checkAutoLevel` (delegates to view, adds stepper/info updates), `zoomToNode` (animated 350ms with reselection after level change), `_animateZoom` (shift+dblclick zoom-out). `wheelZoom` sets `zoomTargetId` to the nearest node's id when zooming in (null on zoom-out) so the renderer highlights the attraction target.
+**Navigation**: `switchLevel` (called via `onSwitchLevel` callback from canvas keyboard `,`/`.` — adds UI updates, animates supernodes when both old and new levels have <80 nodes), `zoomToNode` (called via `onZoomToHit` on dblclick — animated 350ms with reselection after level change). Level-change UI updates (`_updateStepperUI`, `_deferUIUpdate`) fire via the `onLevelChange` callback. `wheelZoom` prefers `hitTest` for zoom target (respects visual label placement), falls back to `_nearestItem` by distance. On level change during zoom, the dominant member of the old supernode is tracked to the new level.
 
 **Multi-select**: Ctrl+click toggles `view.selectedIds`. Edges highlight for all selected nodes.
 

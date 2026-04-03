@@ -298,7 +298,8 @@ eve	Eve	management	director	12</pre>
   <tr><td><code>labelProps</code></td><td>array</td><td>[]</td><td>Property names to show as node labels</td></tr>
   <tr><td><code>showLegend</code></td><td>boolean</td><td>false</td><td>Draw color legend in bottom-right corner</td></tr>
   <tr><td><code>showResetBtn</code></td><td>boolean</td><td>false</td><td>Draw reset button in top-right corner</td></tr>
-  <tr><td><code>skipEvents</code></td><td>boolean</td><td>false</td><td>Disable built-in mouse/touch/keyboard events</td></tr>
+  <tr><td><code>clickDelay</code></td><td>number</td><td>0</td><td>Milliseconds to delay single-click for double-click disambiguation</td></tr>
+  <tr><td><code>keyboardTarget</code></td><td>EventTarget</td><td>canvas</td><td>Element to bind keyboard listener to (e.g. <code>window</code>)</td></tr>
   <tr><td><code>webgl</code></td><td>boolean</td><td>false</td><td>Use WebGL2 instanced rendering for geometry (<a href="#webgl">details</a>)</td></tr>
   <tr><td><code>useGPU</code></td><td>boolean</td><td>false</td><td>Force WebGPU compute for projection and blend (<a href="webgpu.html">details</a>)</td></tr>
   <tr><td><code>autoGPU</code></td><td>boolean</td><td>true</td><td>Automatically enable WebGPU when dataset is large enough to benefit (N&times;G &gt; 2000). Set to <code>false</code> to disable.</td></tr>
@@ -345,16 +346,27 @@ console.log(view.colorSchemeName);   <span class="comment">// "thermal"</span></
 <pre><span class="keyword">const</span> view = <span class="fn">createBitZoomView</span>(canvas, edges, nodes, {
   <span class="fn">onSelect</span>(hit) {
     <span class="comment">// hit = { type: 'node'|'supernode', item: nodeObj|supernodeObj }</span>
-    <span class="keyword">if</span> (hit) console.log(<span class="string">'Selected:'</span>, hit.item.id || hit.item.bid);
-    <span class="keyword">else</span> console.log(<span class="string">'Deselected'</span>);
+    console.log(<span class="string">'Selected:'</span>, hit.item.id || hit.item.bid);
+  },
+  <span class="fn">onDeselect</span>() {
+    <span class="comment">// Called when selection is cleared (click on empty space, Escape)</span>
+    console.log(<span class="string">'Deselected'</span>);
   },
   <span class="fn">onHover</span>(hit) {
     <span class="comment">// Called on every hover change (null when leaving a node)</span>
     sidebar.textContent = hit ? (hit.item.label || hit.item.cachedLabel) : <span class="string">''</span>;
   },
+  <span class="fn">onLevelChange</span>(newIdx, prevIdx) {
+    <span class="comment">// Called after any zoom-level change (auto or manual)</span>
+    levelIndicator.textContent = <span class="string">'L'</span> + newIdx;
+  },
   <span class="fn">onRender</span>() {
     <span class="comment">// Called after each frame render. Useful for syncing external UI.</span>
-    levelIndicator.textContent = <span class="string">'L'</span> + view.currentLevel;
+  },
+  <span class="fn">onKeydown</span>(e) {
+    <span class="comment">// Called before default key handling. Return true to suppress.</span>
+    <span class="keyword">if</span> (e.key === <span class="string">'x'</span>) { myCustomAction(); <span class="keyword">return true</span>; }
+    <span class="keyword">return false</span>;
   },
 });</pre>
 

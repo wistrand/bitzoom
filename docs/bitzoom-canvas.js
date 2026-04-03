@@ -120,6 +120,14 @@ export class BitZoomCanvas {
     this._onHover = opts.onHover || null;
     this._onAnnounce = opts.onAnnounce || null;
     this._onSummary = opts.onSummary || null;
+    this._onDeselect = opts.onDeselect || null;
+    this._onLevelChange = opts.onLevelChange || null;
+    this._onZoomToHit = opts.onZoomToHit || null;
+    this._onSwitchLevel = opts.onSwitchLevel || null;
+    this._onKeydown = opts.onKeydown || null;
+    this._clickDelay = opts.clickDelay || 0;
+    this._clickTimer = null;
+    this._keyboardTarget = opts.keyboardTarget || null;
 
     // Level cache
     this.levels = new Array(ZOOM_LEVELS.length).fill(null);
@@ -154,7 +162,7 @@ export class BitZoomCanvas {
     this._lastMouseX = -1;     // last known mouse position on canvas
     this._lastMouseY = -1;
 
-    if (!opts.skipEvents) this._bindEvents();
+    this._bindEvents();
     this.resize();
   }
 
@@ -584,6 +592,7 @@ export class BitZoomCanvas {
   }
 
   switchLevel(idx) {
+    const prevIdx = this.currentLevel;
     const oldRZ = this.renderZoom;
     this.currentLevel = idx;
     this.zoom = oldRZ / Math.pow(2, idx - this.baseLevel);
@@ -591,24 +600,27 @@ export class BitZoomCanvas {
     this._navNeighbors = null; this._navAnchorId = null;
     this.layoutAll();
     this.render();
+    if (idx !== prevIdx && this._onLevelChange) this._onLevelChange(idx, prevIdx);
   }
 
   _checkAutoLevel() {
-    const idx = this.currentLevel;
+    const prevIdx = this.currentLevel;
     const maxIdx = LEVEL_LABELS.length - 1;
-    if (idx < maxIdx && this.zoom >= 2) {
+    if (prevIdx < maxIdx && this.zoom >= 2) {
       this._snapshotForCrossfade();
       this.zoom /= 2;
-      this.currentLevel = idx + 1;
+      this.currentLevel = prevIdx + 1;
       this.layoutAll();
+      if (this._onLevelChange) this._onLevelChange(this.currentLevel, prevIdx);
       return;
     }
-    if (idx > 0 && this.zoom < 0.5) {
+    if (prevIdx > 0 && this.zoom < 0.5) {
       this._snapshotForCrossfade();
       this.zoom *= 2;
-      this.currentLevel = idx - 1;
+      this.currentLevel = prevIdx - 1;
       this.layoutAll();
       if (this.renderZoom <= 1) this.pan = {x: 0, y: 0};
+      if (this._onLevelChange) this._onLevelChange(this.currentLevel, prevIdx);
       return;
     }
     if (this.currentLevel === 0 && this.renderZoom <= 1) {
@@ -842,15 +854,16 @@ export class BitZoomCanvas {
 
     // Mouse
     canvas.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
       this.mouseDown = true; this.mouseMoved = false;
       this.mouseStart = { x: e.clientX, y: e.clientY };
     }, sig);
 
     canvas.addEventListener('mousemove', e => {
+      const r = canvas.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      this._lastMouseX = mx; this._lastMouseY = my;
       if (!this.mouseDown) {
-        const r = canvas.getBoundingClientRect();
-        const mx = e.clientX - r.left, my = e.clientY - r.top;
-        this._lastMouseX = mx; this._lastMouseY = my;
         const rb = this._resetBtnRect();
         if (rb && mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
           canvas.style.cursor = 'pointer';
@@ -875,31 +888,43 @@ export class BitZoomCanvas {
 
     canvas.addEventListener('mouseup', e => {
       this.mouseDown = false;
+      if (e.button !== 0) return;
       if (!this.mouseMoved) {
+        // Click delay: if timer pending, this is the second click — cancel it (dblclick will handle)
+        if (this._clickDelay > 0 && this._clickTimer) {
+          clearTimeout(this._clickTimer); this._clickTimer = null;
+          return;
+        }
         const r = canvas.getBoundingClientRect();
         const mx = e.clientX - r.left, my = e.clientY - r.top;
-        // Check reset button first
-        const rb = this._resetBtnRect();
-        if (rb && mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
-          this.resetView();
-          return;
-        }
-        // FPS toggle: click in top-left 40×20 area
-        if (mx < 40 && my < 20) {
-          this.showFps = !this.showFps;
+        const doClick = () => {
+          this._clickTimer = null;
+          // Check reset button first
+          const rb = this._resetBtnRect();
+          if (rb && mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
+            this.resetView();
+            return;
+          }
+          // FPS toggle: click in top-left 40×20 area
+          if (mx < 40 && my < 20) {
+            this.showFps = !this.showFps;
+            this.render();
+            return;
+          }
+          const hit = this.hitTest(mx, my);
+          const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+          if (hit) {
+            const id = hit.type === 'node' ? hit.item.id : hit.item.bid;
+            if (isMulti) this.toggleSelection(id); else this.selectedId = id;
+            if (this._onSelect) this._onSelect(hit);
+          } else if (!isMulti) {
+            this.selectedId = null;
+            if (this._onDeselect) this._onDeselect();
+          }
           this.render();
-          return;
-        }
-        const hit = this.hitTest(mx, my);
-        const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
-        if (hit) {
-          const id = hit.type === 'node' ? hit.item.id : hit.item.bid;
-          if (isMulti) this.toggleSelection(id); else this.selectedId = id;
-          if (this._onSelect) this._onSelect(hit);
-        } else if (!isMulti) {
-          this.selectedId = null;
-        }
-        this.render();
+        };
+        if (this._clickDelay > 0) this._clickTimer = setTimeout(doClick, this._clickDelay);
+        else doClick();
       }
     }, sig);
 
@@ -907,13 +932,15 @@ export class BitZoomCanvas {
 
     canvas.addEventListener('dblclick', e => {
       e.preventDefault();
+      if (this._clickTimer) { clearTimeout(this._clickTimer); this._clickTimer = null; }
       const r = canvas.getBoundingClientRect();
       const mx = e.clientX - r.left, my = e.clientY - r.top;
       if (e.shiftKey) {
         this._animateZoom(1/2, mx, my);
       } else {
         const hit = this.hitTest(mx, my);
-        if (hit) this._zoomToHit(hit);
+        if (hit && this._onZoomToHit) this._onZoomToHit(hit);
+        else if (hit) this._zoomToHit(hit);
         else this._animateZoom(2, mx, my);
       }
     }, sig);
@@ -958,8 +985,13 @@ export class BitZoomCanvas {
       if (e.touches.length === 0) {
         if (!this.touchMoved && this.t1) {
           const hit = this.hitTest(this.t1.x, this.t1.y);
-          if (hit) { this.selectedId = hit.type === 'node' ? hit.item.id : hit.item.bid; if (this._onSelect) this._onSelect(hit); }
-          else this.selectedId = null;
+          if (hit) {
+            this.selectedId = hit.type === 'node' ? hit.item.id : hit.item.bid;
+            if (this._onSelect) this._onSelect(hit);
+          } else {
+            this.selectedId = null;
+            if (this._onDeselect) this._onDeselect();
+          }
           this.render();
         }
         this.t1 = null; this.t2 = null;
@@ -990,7 +1022,9 @@ export class BitZoomCanvas {
     help.textContent = 'Arrows: jump to nearest node in direction. Shift+Arrows: navigate connected neighbors. N/Shift+N: walk connections by weight. Comma/period: change level. Plus/minus: zoom. Escape: deselect. Home: select largest node. F: FPS. L: legend. C: color scheme. A: accessibility debug.';
     canvas.parentNode.insertBefore(help, canvas.nextSibling);
     canvas.setAttribute('aria-describedby', helpId);
-    canvas.addEventListener('keydown', e => {
+    const kbTarget = this._keyboardTarget || canvas;
+    kbTarget.addEventListener('keydown', e => {
+      if (this._onKeydown && this._onKeydown(e)) return;
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right';
@@ -1000,8 +1034,20 @@ export class BitZoomCanvas {
       else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); this._navStep(e.shiftKey ? -1 : 1); }
       else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._navNeighbors = null; this._navAnchorId = null; this._buildNavNeighbors(); }
       else if (e.key === 'Home') { e.preventDefault(); this._navSelectLargest(); }
-      else if (e.key === ',' && this.currentLevel > 0) { e.preventDefault(); this.switchLevel(this.currentLevel - 1); }
-      else if (e.key === '.' && this.currentLevel < LEVEL_LABELS.length - 1) { e.preventDefault(); this.switchLevel(this.currentLevel + 1); }
+      else if (e.key === ',') {
+        if (this.currentLevel > 0) {
+          e.preventDefault();
+          if (this._onSwitchLevel) this._onSwitchLevel(this.currentLevel - 1);
+          else this.switchLevel(this.currentLevel - 1);
+        }
+      }
+      else if (e.key === '.') {
+        if (this.currentLevel < LEVEL_LABELS.length - 1) {
+          e.preventDefault();
+          if (this._onSwitchLevel) this._onSwitchLevel(this.currentLevel + 1);
+          else this.switchLevel(this.currentLevel + 1);
+        }
+      }
       else if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         const mx = this._lastMouseX >= 0 ? this._lastMouseX : this.W / 2;
@@ -1016,7 +1062,12 @@ export class BitZoomCanvas {
         this.wheelZoom(mx, my, false);
         this.render();
       }
-      else if (e.key === 'Escape') { this.selectedId = null; this._navNeighbors = null; this._navAnchorId = null; this.render(); }
+      else if (e.key === 'Escape') {
+        this.selectedId = null;
+        this._navNeighbors = null; this._navAnchorId = null;
+        if (this._onDeselect) this._onDeselect();
+        this.render();
+      }
       else if (e.key === 'f') { this.showFps = !this.showFps; this.render(); }
       else if (e.key === 'l') { this.showLegend = (this.showLegend + 1) % 5; this.render(); }
       else if (e.key === 'c') { this.cycleColorScheme(); }
@@ -1038,26 +1089,12 @@ export class BitZoomCanvas {
     clearTimeout(this._viewAnnounceTimer);
     clearTimeout(this._hoverAnnounceTimer);
     clearTimeout(this._crossfadeTimer);
+    clearTimeout(this._clickTimer);
     if (this._crossfadeOverlay?.parentElement) this._crossfadeOverlay.parentElement.removeChild(this._crossfadeOverlay);
     const helpEl = this.canvas.getAttribute('aria-describedby');
     if (helpEl) { const el = (this.canvas.getRootNode() || document).getElementById?.(helpEl) || document.getElementById(helpEl); if (el) el.remove(); }
   }
 
-  /**
-   * Zoom around a screen point with node attraction.
-   * Call from wheel handlers. Returns true if attraction was applied.
-   * @param {number} mx - screen x of zoom center
-   * @param {number} my - screen y of zoom center
-   * @param {boolean} zoomingIn
-   */
-  /**
-   * Zoom around a screen point with node attraction.
-   * Used by both wheel and keyboard zoom handlers.
-   * @param {number} mx - screen x of zoom center
-   * @param {number} my - screen y of zoom center
-   * @param {boolean} zoomingIn
-   * @param {function} [onAutoLevel] - called after zoom applied, before pan; use for UI updates on level change
-   */
   /**
    * Find the nearest node/supernode to a screen point. Uses spatial culling
    * at RAW_LEVEL for large datasets (same 3×3 cell approach as hitTest).
@@ -1338,19 +1375,55 @@ export class BitZoomCanvas {
     this._navStepping = false;
   }
 
-  wheelZoom(mx, my, zoomingIn, onAutoLevel) {
-    // Before zoom: find nearest node/supernode to cursor
-    const nearest = zoomingIn ? this._nearestItem(mx, my, 200) : null;
+  wheelZoom(mx, my, zoomingIn) {
+    // Before zoom: prefer exact hit (cursor over circle/label), fall back to nearest
+    let nearest = null, targetItem = null;
+    if (zoomingIn) {
+      const hit = this.hitTest(mx, my);
+      if (hit) {
+        const id = hit.type === 'node' ? hit.item.id : hit.item.bid;
+        nearest = { x: hit.item.x, y: hit.item.y, id };
+        targetItem = hit.item;
+      } else {
+        nearest = this._nearestItem(mx, my, 200);
+        targetItem = nearest ? this._findById(nearest.id) : null;
+      }
+    }
     // Track zoom target so renderer shows its full label
     this.zoomTargetId = nearest ? nearest.id : null;
 
     // Apply zoom
     const oldRZ = this.renderZoom;
+    const prevLevel = this.currentLevel;
     this.zoom = Math.max(0.25, Math.min(10000, this.zoom * (zoomingIn ? 1.03 : 1/1.03)));
 
-    // Auto-level check (caller can hook for UI updates)
-    if (onAutoLevel) onAutoLevel();
-    else this._checkAutoLevel();
+    this._checkAutoLevel();
+
+    // After level change, track the dominant (highest-degree) member from the old supernode
+    if (nearest && this.currentLevel !== prevLevel && targetItem && targetItem.members) {
+      let bestNode = targetItem.members[0], bestDeg = -1;
+      for (const m of targetItem.members) {
+        if (m.degree > bestDeg) { bestDeg = m.degree; bestNode = m; }
+      }
+      if (bestNode && bestNode.x !== undefined) {
+        if (this.currentLevel === RAW_LEVEL) {
+          nearest = { x: bestNode.x, y: bestNode.y, id: bestNode.id };
+        } else {
+          const level = this.getLevel(this.currentLevel);
+          if (level) {
+            const zl = ZOOM_LEVELS[this.currentLevel];
+            const bid = cellIdAtLevel(bestNode.gx, bestNode.gy, zl);
+            if (!level._snByBid) {
+              level._snByBid = new Map();
+              for (const sn of level.supernodes) level._snByBid.set(sn.bid, sn);
+            }
+            const sn = level._snByBid.get(bid);
+            if (sn && sn.x !== undefined) nearest = { x: sn.x, y: sn.y, id: sn.bid };
+          }
+        }
+        this.zoomTargetId = nearest.id;
+      }
+    }
 
     // Pan to keep cursor point fixed
     const newRZ = this.renderZoom;
