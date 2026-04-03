@@ -150,6 +150,9 @@ export class BitZoomCanvas {
     this._navNeighbors = null; // sorted neighbor list for current selection
     this._navIndex = -1;       // current position in neighbor list
     this._navAnchorId = null;  // selection id that built the current list
+    this._navStepping = false;  // true during _navStep to preserve neighbor list
+    this._lastMouseX = -1;     // last known mouse position on canvas
+    this._lastMouseY = -1;
 
     if (!opts.skipEvents) this._bindEvents();
     this.resize();
@@ -163,6 +166,9 @@ export class BitZoomCanvas {
 
   get selectedId() { return this._primarySelectedId; }
   set selectedId(id) {
+    if (id !== this._primarySelectedId && !this._navStepping) {
+      this._navNeighbors = null; this._navAnchorId = null; this._navIndex = -1;
+    }
     this._primarySelectedId = id;
     if (id === null) this.selectedIds.clear();
     else if (!this.selectedIds.has(id)) { this.selectedIds.clear(); this.selectedIds.add(id); }
@@ -844,6 +850,7 @@ export class BitZoomCanvas {
       if (!this.mouseDown) {
         const r = canvas.getBoundingClientRect();
         const mx = e.clientX - r.left, my = e.clientY - r.top;
+        this._lastMouseX = mx; this._lastMouseY = my;
         const rb = this._resetBtnRect();
         if (rb && mx >= rb.x && mx <= rb.x + rb.w && my >= rb.y && my <= rb.y + rb.h) {
           canvas.style.cursor = 'pointer';
@@ -995,8 +1002,20 @@ export class BitZoomCanvas {
       else if (e.key === 'Home') { e.preventDefault(); this._navSelectLargest(); }
       else if (e.key === ',' && this.currentLevel > 0) { e.preventDefault(); this.switchLevel(this.currentLevel - 1); }
       else if (e.key === '.' && this.currentLevel < LEVEL_LABELS.length - 1) { e.preventDefault(); this.switchLevel(this.currentLevel + 1); }
-      else if (e.key === '+' || e.key === '=') { e.preventDefault(); this._zoomBy(1.15); }
-      else if (e.key === '-' || e.key === '_') { e.preventDefault(); this._zoomBy(1/1.15); }
+      else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        const mx = this._lastMouseX >= 0 ? this._lastMouseX : this.W / 2;
+        const my = this._lastMouseY >= 0 ? this._lastMouseY : this.H / 2;
+        this.wheelZoom(mx, my, true);
+        this.render();
+      }
+      else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        const mx = this._lastMouseX >= 0 ? this._lastMouseX : this.W / 2;
+        const my = this._lastMouseY >= 0 ? this._lastMouseY : this.H / 2;
+        this.wheelZoom(mx, my, false);
+        this.render();
+      }
       else if (e.key === 'Escape') { this.selectedId = null; this._navNeighbors = null; this._navAnchorId = null; this.render(); }
       else if (e.key === 'f') { this.showFps = !this.showFps; this.render(); }
       else if (e.key === 'l') { this.showLegend = (this.showLegend + 1) % 5; this.render(); }
@@ -1197,6 +1216,15 @@ export class BitZoomCanvas {
     requestAnimationFrame(animate);
   }
 
+  /** Select the node nearest to the mouse cursor, or fall back to highest-degree. */
+  _navSelectNearMouse() {
+    if (this._lastMouseX >= 0 && this._lastMouseY >= 0) {
+      const hit = this._nearestItem(this._lastMouseX, this._lastMouseY, Infinity);
+      if (hit) { this._navTo(hit, hit.id); return; }
+    }
+    this._navSelectLargest();
+  }
+
   /** Select the highest-degree visible node as nav entry point. */
   _navSelectLargest() {
     const isRaw = this.currentLevel === RAW_LEVEL;
@@ -1227,7 +1255,7 @@ export class BitZoomCanvas {
 
   /** Navigate by arrow direction: pick best neighbor in a ±90° cone. */
   _navByDirection(dir) {
-    if (!this._primarySelectedId) { this._navSelectLargest(); return; }
+    if (!this._primarySelectedId) { this._navSelectNearMouse(); return; }
     this._buildNavNeighbors();
     if (!this._navNeighbors || this._navNeighbors.length === 0) {
       this.announce('No connections');
@@ -1249,7 +1277,8 @@ export class BitZoomCanvas {
 
   /** Shift+Arrow: jump to nearest node/supernode in direction (any, not just connected). */
   _navAnyByDirection(dir) {
-    const anchor = this._primarySelectedId ? this._findById(this._primarySelectedId) : null;
+    if (!this._primarySelectedId) { this._navSelectNearMouse(); return; }
+    const anchor = this._findById(this._primarySelectedId);
     const rz = this.renderZoom;
     let ax, ay;
     if (anchor && anchor.x !== undefined) {
@@ -1290,10 +1319,11 @@ export class BitZoomCanvas {
   }
 
   /** Navigate sequentially: N (step=1) or Shift+N (step=-1).
-   *  Walks the anchor node's neighbor list — does not rebuild when selection moves. */
+   *  Freezes the neighbor list on first N press; cycles through it on subsequent presses.
+   *  List is invalidated when selection changes via any other means (click, arrow, etc.). */
   _navStep(step) {
-    if (!this._primarySelectedId) { this._navSelectLargest(); return; }
-    // Only build if no list exists yet (anchor unchanged)
+    if (!this._primarySelectedId) { this._navSelectNearMouse(); return; }
+    // Only build on first N press; subsequent presses cycle the frozen list
     if (!this._navNeighbors) {
       this._buildNavNeighbors();
     }
@@ -1303,7 +1333,9 @@ export class BitZoomCanvas {
     }
     this._navIndex = (this._navIndex + step + this._navNeighbors.length) % this._navNeighbors.length;
     const n = this._navNeighbors[this._navIndex];
+    this._navStepping = true;
     this._navTo(n.item, n.id);
+    this._navStepping = false;
   }
 
   wheelZoom(mx, my, zoomingIn, onAutoLevel) {
@@ -1336,16 +1368,6 @@ export class BitZoomCanvas {
   }
 
   // ─── Internal animation helpers ────────────────────────────────────────────
-
-  _zoomBy(factor) {
-    const oldRZ = this.renderZoom;
-    this.zoom = Math.max(0.25, Math.min(10000, this.zoom * factor));
-    this._checkAutoLevel();
-    const f = this.renderZoom / oldRZ;
-    this.pan.x = this.W/2 - (this.W/2 - this.pan.x) * f;
-    this.pan.y = this.H/2 - (this.H/2 - this.pan.y) * f;
-    this.render();
-  }
 
   _animateZoom(factor, anchorX, anchorY) {
     const startPan = { x: this.pan.x, y: this.pan.y };

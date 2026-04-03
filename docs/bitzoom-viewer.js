@@ -1430,6 +1430,8 @@ class BitZoom {
             const r = canvas.getBoundingClientRect();
             this._lastMouseX = e.clientX - r.left;
             this._lastMouseY = e.clientY - r.top;
+            v._lastMouseX = this._lastMouseX;
+            v._lastMouseY = this._lastMouseY;
             if (!this.mouseDown) {
                 const p = { x: this._lastMouseX, y: this._lastMouseY };
                 const hit = v.hitTest(p.x, p.y);
@@ -1655,7 +1657,12 @@ class BitZoom {
             }, 120);
         }, sig);
 
-        window.addEventListener('resize', () => { if (this.dataLoaded) v.resize(); }, sig);
+        if (typeof ResizeObserver !== 'undefined') {
+            this._resizeObserver = new ResizeObserver(() => { if (this.dataLoaded) v.resize(); });
+            this._resizeObserver.observe(canvas);
+        } else {
+            window.addEventListener('resize', () => { if (this.dataLoaded) v.resize(); }, sig);
+        }
 
         // Load button + file inputs + drop zone
         document.getElementById('loadNewBtn').addEventListener('click', () => this.showLoaderScreen(), sig);
