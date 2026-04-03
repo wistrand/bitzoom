@@ -597,7 +597,6 @@ export class BitZoomCanvas {
     this.currentLevel = idx;
     this.zoom = oldRZ / Math.pow(2, idx - this.baseLevel);
     this.selectedId = null;
-    this._navNeighbors = null; this._navAnchorId = null;
     this.layoutAll();
     this.render();
     if (idx !== prevIdx && this._onLevelChange) this._onLevelChange(idx, prevIdx);
@@ -897,6 +896,7 @@ export class BitZoomCanvas {
         }
         const r = canvas.getBoundingClientRect();
         const mx = e.clientX - r.left, my = e.clientY - r.top;
+        const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
         const doClick = () => {
           this._clickTimer = null;
           // Check reset button first
@@ -912,7 +912,6 @@ export class BitZoomCanvas {
             return;
           }
           const hit = this.hitTest(mx, my);
-          const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
           if (hit) {
             const id = hit.type === 'node' ? hit.item.id : hit.item.bid;
             if (isMulti) this.toggleSelection(id); else this.selectedId = id;
@@ -1064,7 +1063,6 @@ export class BitZoomCanvas {
       }
       else if (e.key === 'Escape') {
         this.selectedId = null;
-        this._navNeighbors = null; this._navAnchorId = null;
         if (this._onDeselect) this._onDeselect();
         this.render();
       }

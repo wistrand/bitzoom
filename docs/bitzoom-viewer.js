@@ -2,7 +2,7 @@
 
 import {
     MINHASH_K, GRID_SIZE, GRID_BITS, ZOOM_LEVELS, RAW_LEVEL, LEVEL_LABELS,
-    buildGaussianProjection, unifiedBlend, cellIdAtLevel,
+    buildGaussianProjection, cellIdAtLevel,
 } from './bitzoom-algo.js';
 import { generateGroupColors } from './bitzoom-colors.js';
 import { autoTuneWeights } from './bitzoom-utils.js';
@@ -12,7 +12,7 @@ import { isWebGL2Available } from './bitzoom-gl-renderer.js';
 import { exportSVG } from './bitzoom-svg.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
-import { computeNodeSig, runPipelineGPU, runPipeline, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
+import { computeNodeSig, runPipelineGPU, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
 
 // HTML-escape user-derived strings to prevent XSS from crafted SNAP files.
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
