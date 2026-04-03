@@ -36,8 +36,8 @@ docs/                    Web app (ES modules, no build step)
   bitzoom-pipeline.js      Parsers, graph building, tokenization, projection (369 lines)
   bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1108 lines)
   bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1235 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (1072 lines)
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1806 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering (1690 lines)
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading (1746 lines)
   bitzoom-utils.js         Auto-tune optimizer (277 lines)
   bitzoom-svg.js           SVG export — exportSVG(bz, opts), createSVGView() for headless (601 lines)
   bitzoom-colors.js        Color schemes (vivid, viridis, plasma, etc.)
@@ -87,7 +87,7 @@ scripts/
 
 - **ES modules** — `import`/`export` everywhere. Module workers. `<script type="module">` in each HTML page.
 - **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in [bitzoom-algo.js](docs/bitzoom-algo.js), imported by pipeline and workers.
-- **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `skipEvents`/`onRender`/`autoTune`/`autoGPU`/`webgl`/`colorBy` options for embedding.
+- **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `onRender`/`autoTune`/`autoGPU`/`webgl`/`colorBy` options for embedding. Canvas always owns its event handlers; the viewer extends behavior via callbacks (`onSelect`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`) and options (`clickDelay`, `keyboardTarget`).
 - **colorBy** — `BitZoomCanvas.colorBy` property overrides which property group controls node colors (default: auto = highest-weight group). In the viewer, click a group name label to set colorBy (underline indicates active); click again to return to auto. `<bz-graph>` supports `color-by` attribute.
 - **SVG export** — `exportSVG(bz, opts)` in [bitzoom-svg.js](docs/bitzoom-svg.js) renders the current graph view as an SVG string. `createSVGView(nodes, edges, opts)` builds a headless view from plain pipeline data (no DOM needed). In the viewer, press **S** to download an SVG file.
 - **WebGL2 rendering** — optional GPU-accelerated layer for grid, edges, heatmap, and circles via 7 shader programs in [bitzoom-gl-renderer.js](docs/bitzoom-gl-renderer.js). Text stays on Canvas 2D overlay. Dual canvas architecture: wrapper div with GL canvas behind, original canvas transparent on top. Toggle via `webgl: true` option or GL button in viewer toolbar. Falls back silently if WebGL2 unavailable (`isWebGL2Available()` probe).
@@ -97,7 +97,7 @@ scripts/
 - **Two-zoom system** — logical zoom triggers level changes; `renderZoom = max(1, zoom * 2^levelOffset)` keeps visual scale continuous. Level crossfade overlay positioned at canvas `offsetTop`/`offsetLeft` (not `top:0;left:0`) to align in any layout.
 - **Multi-select** — Ctrl+click toggles; `selectedIds` Set; edges highlight for all selected.
 - **Adaptive rendering** — edge sampling scales with visible nodes; labels/counts hide at high density, appear on zoom-in; node opacity scales with importance. Label truncation length quantized to 4px `cellPx` steps to prevent jitter during smooth zoom.
-- **Zoom target highlight** — during scroll-wheel zoom-in, the nearest node (`zoomTargetId`) gets the same highlight treatment as hovered nodes (full label, glow, full opacity). Cleared on zoom-out.
+- **Zoom target highlight** — during scroll-wheel zoom-in, the zoom target (`zoomTargetId`) gets the same highlight treatment as hovered nodes (full label, glow, full opacity). Target selection prefers `hitTest` (cursor over circle/label) with `_nearestItem` fallback. On level change, tracks the dominant member of the old supernode to the new level. Cleared on zoom-out.
 - **5-layer render order** — edges → heatmap → highlighted edges → circles → labels. WebGL2 renders geometry layers (grid through circles); Canvas 2D overlay handles text (labels, legend, reset button).
 - **GPU tri-state** — viewer GPU button cycles Auto → GPU → CPU. Auto (default) uses adaptive thresholds: GPU projection when N×G > 2000, GPU blend when N > 50K. GPU forces all operations to GPU; CPU forces all to CPU.
 - **Async initial blend** — `createBitZoomView()` returns synchronously; initial blend kicks off async (GPU probe → blend → render). Callers get a ready view immediately; first render completes in background.

@@ -26,10 +26,11 @@ class BitZoom {
 
         // The canvas view handles all graph state, rendering, interaction primitives
         this.view = new BitZoomCanvas(canvas, {
-            skipEvents: true,
             heatmapMode: 'density',
             showLegend: true,
             initialLevel: 0,
+            clickDelay: 250,
+            keyboardTarget: window,
             onRender: () => this._scheduleHashUpdate(),
             onAnnounce: (text) => { const el = document.getElementById('aria-announce'); if (el) el.textContent = text; },
             onSummary: (rows) => {
@@ -38,6 +39,17 @@ class BitZoom {
                 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 tb.innerHTML = rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.group)}</td><td>${r.connections}</td></tr>`).join('');
             },
+            onSelect: (hit) => this._showDetail(hit),
+            onDeselect: () => {
+                document.getElementById('node-panel').classList.remove('open');
+            },
+            onLevelChange: () => {
+                this._updateStepperUI();
+                this._deferUIUpdate();
+            },
+            onZoomToHit: (hit) => this.zoomToNode(hit),
+            onSwitchLevel: (idx) => this.switchLevel(idx),
+            onKeydown: (e) => this._handleViewerKeys(e),
         });
 
         // App-specific state
@@ -53,14 +65,6 @@ class BitZoom {
         this._hashUpdateTimer = null;
         this._currentDatasetId = null;
         this._uiUpdatePending = false;
-
-        // Own event state
-        this.mouseDown = false;
-        this.mouseMoved = false;
-        this.mouseStart = null;
-        this.t1 = null;
-        this.t2 = null;
-        this.touchMoved = false;
         this._abortController = new AbortController();
 
         this._bindEvents();
@@ -237,44 +241,46 @@ class BitZoom {
         requestAnimationFrame(animate);
     }
 
-    _checkAutoLevel() {
-        const v = this.view;
-        const prev = v.currentLevel;
-        v._checkAutoLevel();
-        if (v.currentLevel !== prev) {
-            this._updateStepperUI();
-            this._deferUIUpdate();
-        }
-    }
-
-    _animateZoom(factor, anchorX, anchorY) {
-        const v = this.view;
-        const startPan = { x: v.pan.x, y: v.pan.y };
-        const startZoom = v.zoom;
-        const targetZoom = Math.max(0.25, startZoom * factor);
-        const startRZ = v.renderZoom;
-        const targetRZ = Math.max(1, targetZoom * Math.pow(2, v.currentLevel - v.baseLevel));
-        const f = targetRZ / startRZ;
-        const targetPan = {
-            x: anchorX - (anchorX - startPan.x) * f,
-            y: anchorY - (anchorY - startPan.y) * f,
-        };
-        const startTime = performance.now();
-        const animate = (now) => {
-            const t = Math.min(1, (now - startTime) / 300);
-            const e = 1 - Math.pow(1 - t, 3);
-            v.zoom = startZoom + (targetZoom - startZoom) * e;
-            v.pan.x = startPan.x + (targetPan.x - startPan.x) * e;
-            v.pan.y = startPan.y + (targetPan.y - startPan.y) * e;
-            v.renderNow();
-            if (t < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                this._checkAutoLevel();
-                v.renderNow();
+    _handleViewerKeys(e) {
+        if (!this.dataLoaded) return true;
+        if ((e.key === 'Enter' || e.key === ' ') && this.view.selectedId) {
+            const item = this.view._findById(this.view.selectedId);
+            if (item) {
+                const type = this.view.currentLevel === RAW_LEVEL ? 'node' : 'supernode';
+                this._showDetail({ type, item });
             }
-        };
-        requestAnimationFrame(animate);
+            return false; // let canvas handle nav neighbor rebuild
+        }
+        if (e.key === 'Escape') {
+            document.getElementById('node-panel').classList.remove('open');
+            return false; // let canvas handle deselect
+        }
+        if (e.key === 'a') {
+            document.body.classList.toggle('a11y-debug');
+            return true;
+        }
+        if (e.key === 's') {
+            e.preventDefault();
+            const svg = exportSVG(this.view, { metadata: this._currentDatasetId || undefined });
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bitzoom-${this._currentDatasetId || 'export'}.svg`;
+            a.click();
+            URL.revokeObjectURL(url);
+            return true;
+        }
+        if (e.key === 'S') {
+            e.preventDefault();
+            const svg = exportSVG(this.view, { metadata: this._currentDatasetId || undefined });
+            navigator.clipboard.writeText(svg).then(() => {
+                this.view.showProgress('SVG copied to clipboard');
+                setTimeout(() => { this.view._progressText = null; this.view.render(); }, 1500);
+            });
+            return true;
+        }
+        return false;
     }
 
     zoomToNode(hit) {
@@ -311,7 +317,7 @@ class BitZoom {
                 requestAnimationFrame(animate);
             } else {
                 const prevLevel = v.currentLevel;
-                this._checkAutoLevel();
+                v._checkAutoLevel();
                 if (v.currentLevel !== prevLevel && this._zoomTargetMembers) {
                     this._reselectAfterLevelChange();
                 }
@@ -1420,146 +1426,7 @@ class BitZoom {
             v.render();
         }, sig);
 
-        // Mouse
-        canvas.addEventListener('mousedown', e => {
-            if (e.button !== 0) return; // left-click only
-            this.mouseDown = true; this.mouseMoved = false;
-            this.mouseStart = { x: e.clientX, y: e.clientY };
-        }, sig);
-        canvas.addEventListener('mousemove', e => {
-            const r = canvas.getBoundingClientRect();
-            this._lastMouseX = e.clientX - r.left;
-            this._lastMouseY = e.clientY - r.top;
-            v._lastMouseX = this._lastMouseX;
-            v._lastMouseY = this._lastMouseY;
-            if (!this.mouseDown) {
-                const p = { x: this._lastMouseX, y: this._lastMouseY };
-                const hit = v.hitTest(p.x, p.y);
-                const hid = hit ? (hit.type === 'node' ? hit.item.id : hit.item.bid) : null;
-                if (hid !== v.hoveredId) { v.hoveredId = hid; canvas.style.cursor = hid ? 'pointer' : 'grab'; v.render(); }
-                return;
-            }
-            v.pan.x += e.clientX - this.mouseStart.x;
-            v.pan.y += e.clientY - this.mouseStart.y;
-            this.mouseStart = { x: e.clientX, y: e.clientY };
-            if (Math.abs(v.pan.x) > 4 || Math.abs(v.pan.y) > 4) this.mouseMoved = true;
-            v.render();
-        }, sig);
-        let clickTimer = null;
-        canvas.addEventListener('mouseup', e => {
-            this.mouseDown = false;
-            if (e.button !== 0) return; // ignore right-click and middle-click
-            if (!this.mouseMoved) {
-                if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; }
-                const r = canvas.getBoundingClientRect();
-                const p = { x: e.clientX - r.left, y: e.clientY - r.top };
-                // FPS toggle: click in top-left 40×20 area
-                if (p.x < 40 && p.y < 20) {
-                    v.showFps = !v.showFps;
-                    v.render();
-                    return;
-                }
-                const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
-                clickTimer = setTimeout(() => {
-                    clickTimer = null;
-                    const hit = v.hitTest(p.x, p.y);
-                    if (hit) {
-                        const id = hit.type === 'node' ? hit.item.id : hit.item.bid;
-                        if (isMulti) { v.toggleSelection(id); } else { v.selectedId = id; }
-                        this._showDetail(hit);
-                    } else if (!isMulti) {
-                        v.selectedId = null;
-                        document.getElementById('node-panel').classList.remove('open');
-                    }
-                    v.render();
-                }, 250);
-            }
-        }, sig);
-        canvas.addEventListener('mouseleave', () => { this.mouseDown = false; }, sig);
-        canvas.addEventListener('dblclick', e => {
-            e.preventDefault();
-            if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-            const r = canvas.getBoundingClientRect();
-            const mx = e.clientX - r.left, my = e.clientY - r.top;
-            if (e.shiftKey) {
-                this._animateZoom(1 / 2, mx, my);
-            } else {
-                const hit = v.hitTest(mx, my);
-                if (hit) {
-                    this.zoomToNode(hit);
-                } else {
-                    this._animateZoom(2, mx, my);
-                }
-            }
-        }, sig);
-
-        // Touch
-        const touchPos = (t) => {
-            const r = canvas.getBoundingClientRect();
-            return { id: t.identifier, x: t.clientX - r.left, y: t.clientY - r.top };
-        };
-        const touchDist = (a, b) => Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
-
-        canvas.addEventListener('touchstart', e => {
-            e.preventDefault();
-            this.touchMoved = false;
-            if (e.touches.length === 1) { this.t1 = touchPos(e.touches[0]); this.t2 = null; }
-            else if (e.touches.length === 2) { this.t1 = touchPos(e.touches[0]); this.t2 = touchPos(e.touches[1]); }
-        }, { passive: false, signal: this._abortController.signal });
-
-        canvas.addEventListener('touchmove', e => {
-            e.preventDefault();
-            this.touchMoved = true;
-            if (e.touches.length === 1 && !this.t2) {
-                const cur = touchPos(e.touches[0]);
-                if (this.t1) { v.pan.x += cur.x - this.t1.x; v.pan.y += cur.y - this.t1.y; }
-                this.t1 = cur;
-                v.render();
-            } else if (e.touches.length === 2) {
-                const a = touchPos(e.touches[0]), b = touchPos(e.touches[1]);
-                if (this.t1 && this.t2) {
-                    const factor = touchDist(a, b) / (touchDist(this.t1, this.t2) || 1);
-                    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-                    const oldRZ = v.renderZoom;
-                    v.zoom = Math.max(0.25, Math.min(10000, v.zoom * factor));
-                    this._checkAutoLevel();
-                    const rf = v.renderZoom / oldRZ;
-                    v.pan.x = mx - (mx - v.pan.x) * rf;
-                    v.pan.y = my - (my - v.pan.y) * rf;
-                    const pmx = (this.t1.x + this.t2.x) / 2, pmy = (this.t1.y + this.t2.y) / 2;
-                    v.pan.x += mx - pmx;
-                    v.pan.y += my - pmy;
-                    v.render();
-                }
-                this.t1 = a; this.t2 = b;
-            }
-        }, { passive: false, signal: this._abortController.signal });
-
-        canvas.addEventListener('touchend', e => {
-            e.preventDefault();
-            if (e.touches.length === 0) {
-                if (!this.touchMoved && this.t1) {
-                    const hit = v.hitTest(this.t1.x, this.t1.y);
-                    if (hit) { v.selectedId = hit.type==='node'?hit.item.id:hit.item.bid; this._showDetail(hit); }
-                    else { v.selectedId = null; document.getElementById('node-panel').classList.remove('open'); }
-                    v.render();
-                }
-                this.t1 = null; this.t2 = null;
-            } else if (e.touches.length === 1) {
-                this.t1 = touchPos(e.touches[0]); this.t2 = null; this.touchMoved = true;
-            }
-        }, { passive: false, signal: this._abortController.signal });
-        canvas.addEventListener('touchcancel', () => { this.t1 = null; this.t2 = null; }, sig);
-
-        // Wheel zoom with node attraction
-        canvas.addEventListener('wheel', e => {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            v.wheelZoom(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0, () => this._checkAutoLevel());
-            v.render();
-        }, { passive: false, signal: this._abortController.signal });
-
-        // Level stepper + keyboard
+        // Level stepper
         document.getElementById('zoomPrev').addEventListener('click', () => {
             if (v.currentLevel > 0) this.switchLevel(v.currentLevel - 1);
         }, sig);
@@ -1572,74 +1439,6 @@ class BitZoom {
             v.baseLevel = v.currentLevel;
             v.zoomForLevel(v.currentLevel);
             v.render();
-        }, sig);
-
-        window.addEventListener('keydown', e => {
-            if (!this.dataLoaded) return;
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowLeft' ? 'left' : 'right';
-                if (e.shiftKey) v._navByDirection(dir);
-                else v._navAnyByDirection(dir);
-            } else if (e.key === 'n' || e.key === 'N') {
-                e.preventDefault(); v._navStep(e.shiftKey ? -1 : 1);
-            } else if (e.key === 'Home') {
-                e.preventDefault(); v._navSelectLargest();
-            } else if ((e.key === 'Enter' || e.key === ' ') && v.selectedId) {
-                e.preventDefault();
-                v._navNeighbors = null; v._navAnchorId = null; v._buildNavNeighbors();
-                const item = v._findById(v.selectedId);
-                if (item) {
-                    const type = v.currentLevel === RAW_LEVEL ? 'node' : 'supernode';
-                    this._showDetail({ type, item });
-                }
-            } else if (e.key === ',' && v.currentLevel > 0) {
-                e.preventDefault(); this.switchLevel(v.currentLevel - 1);
-            } else if (e.key === '.' && v.currentLevel < LEVEL_LABELS.length - 1) {
-                e.preventDefault(); this.switchLevel(v.currentLevel + 1);
-            } else if (e.key === '+' || e.key === '=') {
-                e.preventDefault();
-                const mx = this._lastMouseX ?? v.W / 2;
-                const my = this._lastMouseY ?? v.H / 2;
-                v.wheelZoom(mx, my, true, () => this._checkAutoLevel());
-                v.render();
-            } else if (e.key === '-' || e.key === '_') {
-                e.preventDefault();
-                const mx = this._lastMouseX ?? v.W / 2;
-                const my = this._lastMouseY ?? v.H / 2;
-                v.wheelZoom(mx, my, false, () => this._checkAutoLevel());
-                v.render();
-            } else if (e.key === 'Escape') {
-                v.selectedId = null;
-                v._navNeighbors = null; v._navAnchorId = null;
-                document.getElementById('node-panel').classList.remove('open');
-                v.render();
-            } else if (e.key === 'f') {
-                v.showFps = !v.showFps;
-                v.render();
-            } else if (e.key === 'l') {
-                v.showLegend = (v.showLegend + 1) % 5;
-                v.render();
-            } else if (e.key === 'c') {
-                v.cycleColorScheme();
-            } else if (e.key === 'a') {
-                document.body.classList.toggle('a11y-debug');
-            } else if (e.key === 's') {
-                const svg = exportSVG(v, { metadata: this._currentDatasetId || undefined });
-                const blob = new Blob([svg], { type: 'image/svg+xml' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `bitzoom-${this._currentDatasetId || 'export'}.svg`;
-                a.click();
-                URL.revokeObjectURL(url);
-            } else if (e.key === 'S') {
-                const svg = exportSVG(v, { metadata: this._currentDatasetId || undefined });
-                navigator.clipboard.writeText(svg).then(() => {
-                    v.showProgress('SVG copied to clipboard');
-                    setTimeout(() => { v._progressText = null; v.render(); }, 1500);
-                });
-            }
         }, sig);
 
         // Topology alpha slider
@@ -1656,13 +1455,6 @@ class BitZoom {
                 this.smoothDebounceTimer = null;
             }, 120);
         }, sig);
-
-        if (typeof ResizeObserver !== 'undefined') {
-            this._resizeObserver = new ResizeObserver(() => { if (this.dataLoaded) v.resize(); });
-            this._resizeObserver.observe(canvas);
-        } else {
-            window.addEventListener('resize', () => { if (this.dataLoaded) v.resize(); }, sig);
-        }
 
         // Load button + file inputs + drop zone
         document.getElementById('loadNewBtn').addEventListener('click', () => this.showLoaderScreen(), sig);
