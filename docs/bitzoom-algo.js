@@ -284,6 +284,24 @@ export function gaussianQuantize(nodes, stats) {
 // At α=0: pure property. At α=1: pure topology (for nodes with neighbors).
 // Each pass blends (1-α)*property + α*neighbor_mean using current positions.
 // Partial convergence after k passes preserves intermediate topology structure.
+// Module-level Float64Array buffers, grown on demand and reused across
+// unifiedBlend calls. Auto-tune runs the blend 25-100+ times per session; at
+// N=367K each call allocates 4×N×8 bytes = ~12MB, which shreds GC. Reusing
+// buffers cuts allocation pressure to near zero for repeat calls at the same
+// node count. The blend is sequential (not reentrant) so sharing is safe.
+let _blendBuffers = null;
+function getBlendBuffers(N) {
+  if (!_blendBuffers || _blendBuffers.propPx.length < N) {
+    _blendBuffers = {
+      propPx: new Float64Array(N),
+      propPy: new Float64Array(N),
+      newPx: new Float64Array(N),
+      newPy: new Float64Array(N),
+    };
+  }
+  return _blendBuffers;
+}
+
 export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats) {
   const w = propWeights;
   // Adaptive weight floor: max(10% of max weight, absolute minimum of 0.10).
@@ -303,10 +321,10 @@ export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjLis
     propTotal += effW[g];
   }
 
-  // Precompute per-node property anchors (cached across passes)
+  // Precompute per-node property anchors (cached across passes). Buffers are
+  // reused across blend calls — see getBlendBuffers.
   const N = nodes.length;
-  const propPx = new Float64Array(N);
-  const propPy = new Float64Array(N);
+  const { propPx, propPy, newPx, newPy } = getBlendBuffers(N);
   for (let i = 0; i < N; i++) {
     const nd = nodes[i];
     let px = 0, py = 0;
@@ -326,9 +344,6 @@ export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjLis
   const alpha = Math.max(0, Math.min(1, smoothAlpha)); // clamp to [0,1]
 
   for (let pass = 0; pass < passes; pass++) {
-    const newPx = new Float64Array(N);
-    const newPy = new Float64Array(N);
-
     for (let i = 0; i < N; i++) {
       const nd = nodes[i];
       const neighbors = adjList[nd.id];

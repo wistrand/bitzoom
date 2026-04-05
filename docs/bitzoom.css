@@ -546,6 +546,10 @@
     border-color: var(--accent);
     background: rgba(124,106,247,0.06);
   }
+  #canvas.drag-hover, .gl-wrapper.drag-hover, .drag-hover > #canvas {
+    outline: 3px dashed var(--accent);
+    outline-offset: -6px;
+  }
   .drop-title {
     font-family: 'Syne', sans-serif;
     font-size: 22px;

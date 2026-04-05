@@ -73,16 +73,15 @@
     </div>
     <div class="drop-hint" style="margin-top:16px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px">Or load from URL</div>
     <div class="file-input-row" style="flex-direction:column;gap:6px;align-items:stretch;max-width:480px;margin:0 auto">
-      <input type="url" id="edgesUrl" placeholder=".edges URL (https://...)" aria-label="Edges file URL" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%">
-      <input type="url" id="nodesUrl" placeholder=".nodes URL (optional)" aria-label="Nodes file URL (optional)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%">
+      <input type="url" id="edgesUrl" placeholder="https://... (CSV, JSON, SNAP, STIX)" aria-label="Data URL" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%">
     </div>
     <div class="drop-hint" style="margin-top:16px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px">Or load from file</div>
     <div class="file-input-row">
-      <label>.edges or STIX .json
-        <input type="file" id="edgesFile" accept=".edges,.txt,.tsv,.gz,.json,.json.gz" aria-label="Choose edges or STIX file">
+      <label>Data file
+        <input type="file" id="edgesFile" accept=".csv,.tsv,.edges,.json,.json.gz,.csv.gz,.tsv.gz,.graphml,.gexf,.xml,.gz,.txt" aria-label="Choose data file (CSV, D3/JGF JSON, GraphML, GEXF, Cytoscape, SNAP .edges, STIX)">
       </label>
-      <label>.nodes (optional)
-        <input type="file" id="nodesFile" accept=".nodes,.labels,.txt,.tsv,.gz" aria-label="Choose nodes file (optional)">
+      <label>.nodes (optional, SNAP only)
+        <input type="file" id="nodesFile" accept=".nodes,.labels,.txt,.tsv,.gz" aria-label="Choose SNAP nodes file (optional)">
       </label>
     </div>
     <button class="load-btn" id="loadBtn" disabled aria-label="Load graph from file or URL">Load Graph</button>

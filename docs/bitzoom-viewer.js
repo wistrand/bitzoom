@@ -6,16 +6,61 @@ import {
 } from './bitzoom-algo.js';
 import { generateGroupColors } from './bitzoom-colors.js';
 import { autoTuneWeights } from './bitzoom-utils.js';
-import { convertStixToSnap } from './stix2snap.js';
 import { initGPU, computeProjectionsGPU } from './bitzoom-gpu.js';
 import { isWebGL2Available } from './bitzoom-gl-renderer.js';
 import { exportSVG } from './bitzoom-svg.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
-import { computeNodeSig, runPipelineGPU, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
+import { computeNodeSig, runPipelineGPU, runPipelineFromObjects, runPipelineFromObjectsGPU, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
+import { parseAny, detectFormat, isObjectFormat, FILE_ACCEPT_ATTR } from './bitzoom-parsers.js';
 
 // HTML-escape user-derived strings to prevent XSS from crafted SNAP files.
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/** Pick a sensible initial zoom level by inspecting how the already-quantized
+ *  nodes actually distribute across cells at each level. The ideal initial view
+ *  has a MIX of supernodes (multi-member cells) and singletons, with the total
+ *  count of distinct visible items in a readable range (not too few, not too
+ *  many). Walks from coarsest (L1) to finest, returning the first level that
+ *  satisfies: distinct cells in [MIN, MAX] AND some multi-member cells exist.
+ *  Falls through to RAW for small datasets where no aggregated level qualifies.
+ *  Dataset presets can override via settings.initialLevel. */
+function pickInitialLevel(nodes, zoomLevels, rawLevel) {
+    if (!nodes || nodes.length === 0) return rawLevel;
+    const TARGET_MIN = 25;  // ~25 visible items is the floor for "something to look at"
+    const TARGET_MAX = 400; // beyond ~400, the view gets crowded / labels overlap
+    const MAX_IDX = zoomLevels.length - 1; // highest aggregated level (RAW is rawLevel)
+
+    for (let idx = 0; idx <= MAX_IDX; idx++) {
+        const bits = zoomLevels[idx];
+        if (bits === undefined) continue;
+        const shift = 16 - bits;
+        const gridK = 1 << bits;
+        const counts = new Map();
+        let anyMulti = false;
+        for (const n of nodes) {
+            if (n.gx === undefined) continue;
+            const key = (n.gx >> shift) * gridK + (n.gy >> shift);
+            const c = (counts.get(key) || 0) + 1;
+            counts.set(key, c);
+            if (c > 1) anyMulti = true;
+        }
+        const distinct = counts.size;
+        // A good level has enough detail to be interesting (>= MIN), isn't too
+        // crowded (<= MAX), and actually has some aggregation happening (multi-
+        // member cells — otherwise raw is better).
+        if (distinct >= TARGET_MIN && distinct <= TARGET_MAX && anyMulti) {
+            return idx;
+        }
+        // We've gone too fine — back off to the previous level (which was under MAX).
+        if (distinct > TARGET_MAX) {
+            return Math.max(0, idx - 1);
+        }
+    }
+    // No aggregated level satisfied the band — dataset is small enough to show
+    // every node individually.
+    return rawLevel;
+}
 
 // Dataset definitions. Optional `settings` configures initial weights and label checkboxes.
 let DATASETS = [];
@@ -23,6 +68,11 @@ let DATASETS = [];
 class BitZoom {
     constructor() {
         const canvas = document.getElementById('canvas');
+
+        // Sync the file input accept attribute from the parsers' capability list
+        // so adding a new supported format doesn't require an HTML edit.
+        const edgesFile = document.getElementById('edgesFile');
+        if (edgesFile) edgesFile.accept = FILE_ACCEPT_ATTR;
 
         // The canvas view handles all graph state, rendering, interaction primitives
         this.view = new BitZoomCanvas(canvas, {
@@ -58,6 +108,13 @@ class BitZoom {
         this.activeWorker = null;
         this.pendingEdgesText = null;
         this.pendingNodesText = null;
+        this.pendingParsed = null;       // {nodes, edges, extraPropNames, format} from parseAny
+        this._lastParsed = null;         // for rebuild after object-pipeline loads
+        this._autoTuneOnLoad = true;     // auto-tune on fresh datasets without preset settings
+        this._tuneAbort = null;          // shared AbortController for auto-tune (manual + on-load)
+        this._canvasDropTimer = null;    // debounce for two-file SNAP drops onto the canvas
+        this._lastEdgesText = null;      // last SNAP edges text loaded (for rebuild on GPU/CPU switch)
+        this._lastNodesText = null;      // last SNAP nodes text loaded
         this.rebuildTimer = null;
         this.smoothDebounceTimer = null;
         this._zoomTargetMembers = null;
@@ -879,6 +936,61 @@ class BitZoom {
         if (progressBar) progressBar.value = 100;
     }
 
+    /** Load graph from already-parsed objects (CSV / D3 JSON / JGF / etc.).
+     *  Uses runPipelineFromObjects instead of text-based worker. No re-parse.
+     *  Stores `_lastParsed` so rebuild paths work. */
+    async loadFromParsed(parsed) {
+        const v = this.view;
+        const status = document.getElementById('loadStatus');
+        const progressBar = document.getElementById('loadProgress');
+        status.classList.remove('error');
+        const t0 = performance.now();
+        const yield_ = () => new Promise(r => requestAnimationFrame(r));
+
+        this._lastParsed = parsed;
+        this._lastEdgesText = null;
+        this._lastNodesText = null;
+
+        status.textContent = 'Building graph...';
+        if (progressBar) progressBar.value = 30;
+        await yield_();
+
+        const useGPUPath = this._gpuMode === 'gpu' || (this._gpuMode === 'auto' && !this._gpuUnavailable);
+        let graph;
+        try {
+            if (useGPUPath) {
+                status.textContent = 'Computing projections (GPU)...';
+                if (progressBar) progressBar.value = 60;
+                await yield_();
+                graph = await runPipelineFromObjectsGPU(parsed.nodes, parsed.edges, parsed.extraPropNames, computeProjectionsGPU);
+            } else {
+                status.textContent = 'Computing projections...';
+                if (progressBar) progressBar.value = 60;
+                await yield_();
+                graph = runPipelineFromObjects(parsed.nodes, parsed.edges, parsed.extraPropNames);
+            }
+        } catch (err) {
+            status.textContent = '';
+            this._showError('Pipeline Error', err.message);
+            throw err;
+        }
+
+        console.log(`[${useGPUPath ? 'GPU' : 'CPU'}] Object pipeline (${parsed.format}): ${graph.nodeArray.length} nodes, ${graph.edges.length} edges in ${Math.round(performance.now() - t0)}ms`);
+
+        status.textContent = 'Applying...';
+        if (progressBar) progressBar.value = 85;
+        await yield_();
+
+        this._applyWorkerResult({
+            nodeMeta: graph.nodeArray,
+            projBuf: graph.projBuf,
+            edges: graph.edges,
+            groupNames: graph.groupNames,
+            hasEdgeTypes: graph.hasEdgeTypes,
+        });
+        if (progressBar) progressBar.value = 100;
+    }
+
     _applyWorkerResult(result) {
         const v = this.view;
         const { nodeMeta, projBuf, edges: workerEdges, groupNames, hasEdgeTypes: het } = result;
@@ -974,7 +1086,30 @@ class BitZoom {
         // Blend is deferred to _finalizeLoad which calls v._blend() (GPU or CPU)
 
         this.dataLoaded = true;
+        // Dataset-specific state — always reset on fresh load so nothing leaks
+        // from the previous dataset. User-preference state (theme, color scheme,
+        // WebGL toggle, GPU mode, showFps, showLegend) is preserved.
         v.selectedId = null;
+        v.selectedIds.clear();
+        v.hoveredId = null;
+        v.zoomTargetId = null;
+        v.pan = { x: 0, y: 0 };
+        v.zoom = 1;
+        v.colorBy = null; // previous colorBy may name a property group that doesn't exist here
+        v.levels = new Array(ZOOM_LEVELS.length).fill(null); // invalidate any cached level
+        v._navNeighbors = null;
+        v._navAnchorId = null;
+        v._navIndex = -1;
+        v._lastMouseX = -1;
+        v._lastMouseY = -1;
+
+        // Dataset-identity state: cleared here so drop/panel loads don't leak
+        // the previous dataset's id into the URL hash. loadDataset re-sets these
+        // to the new dataset's values after this call returns.
+        this._currentDatasetId = null;
+        this._currentEdgesUrl = null;
+        this._currentNodesUrl = null;
+
         document.getElementById('node-panel').classList.remove('open');
         document.getElementById('loader-screen').classList.add('hidden');
         document.getElementById('sidebar').style.display = '';
@@ -986,7 +1121,10 @@ class BitZoom {
         document.getElementById('loadNewBtn').style.display = '';
         history.replaceState(null, '', location.pathname);
 
-        v.currentLevel = 3; // L4
+        // Initial level is picked in _finalizeLoad AFTER blending/quantization
+        // populates node.gx/gy (required for cell-distribution analysis). Start
+        // at a safe default here; _finalizeLoad will overwrite.
+        v.currentLevel = 3;
         v.baseLevel = 3;
         v._initLevel = 3;
         this._pendingSettings = null;
@@ -1005,11 +1143,24 @@ class BitZoom {
             } else {
                 await v._blend();
             }
+            // Pick a data-aware initial level now that gx/gy are populated by
+            // the blend + quantization. Skip when the dataset preset explicitly
+            // sets initialLevel (user knows best) or when the URL hash carries
+            // a level to restore.
+            const hasPresetLevel = dataset?.settings?.initialLevel != null;
+            const hasHashLevel = this._initialHashParams?.l != null;
+            if (!hasPresetLevel && !hasHashLevel) {
+                const lvl = pickInitialLevel(v.nodes, ZOOM_LEVELS, RAW_LEVEL);
+                v.currentLevel = lvl;
+                v.baseLevel = lvl;
+                v._initLevel = lvl;
+            }
             v.resize();
             v.zoomForLevel(v.currentLevel);
             // Restore hash state: use saved initial params on first load, live hash after
             const params = this._initialHashParams || this._restoreFromHash();
             this._initialHashParams = null; // consumed
+            const hasHashStrengths = params && params.d === dataset?.id && params.w;
             if (params && params.d === dataset?.id) {
                 this._applyHashState(params);
                 v.render();
@@ -1020,12 +1171,51 @@ class BitZoom {
             this._updateAlgoInfo();
             this._updateColorByUI();
             this._scheduleHashUpdate();
+
+            // Auto-tune on fresh loads: no preset settings, no URL-hash strengths.
+            // Gives the first frame meaningful defaults instead of a flat blend.
+            if (this._autoTuneOnLoad !== false && !dataset?.settings && !hasHashStrengths && v.nodes && v.nodes.length > 0) {
+                await this._autoTuneFresh();
+            }
         });
+    }
+
+    /** Run autoTuneWeights on the freshly loaded dataset. Best-effort: logs
+     *  errors but never throws. Skipped by _finalizeLoad when the dataset has
+     *  preset settings or the URL hash carries explicit strengths. */
+    async _autoTuneFresh() {
+        const v = this.view;
+        try {
+            const autoBtn = document.getElementById('autoTuneBtn');
+            // Share the abort controller with the manual Auto button so clicking
+            // Stop during an auto-on-load tune aborts and applies best-so-far.
+            this._tuneAbort = new AbortController();
+            if (autoBtn) { autoBtn.style.background = 'var(--accent)'; autoBtn.style.color = '#fff'; autoBtn.textContent = 'Stop'; }
+            const t0 = performance.now();
+            const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
+                weights: true, alpha: true, quant: false,
+                signal: this._tuneAbort.signal,
+                onProgress: (info) => {
+                    const pct = Math.round(100 * info.step / Math.max(1, info.total));
+                    v.showProgress(`Auto-tuning: ${pct}% — click Stop to apply`);
+                },
+            });
+            // Apply via the shared helper so button state + UI sync + rebuild are identical
+            await this._applyTuneResult(result);
+            console.log(`[auto-tune] fresh load: ${result.blends} blends in ${Math.round(performance.now() - t0)}ms, score=${result.score.toFixed(3)}`);
+        } catch (err) {
+            console.warn('[auto-tune] failed:', err.message);
+            v._progressText = null;
+            this._tuneAbort = null;
+            const autoBtn = document.getElementById('autoTuneBtn');
+            if (autoBtn) { autoBtn.textContent = 'Auto'; autoBtn.style.background = ''; autoBtn.style.color = ''; }
+            v.render();
+        }
     }
 
     /** Apply GPU projection to already-loaded data. No re-parse, no re-load. */
     async _applyGPUToCurrentData() {
-        if (!this._lastEdgesText) return;
+        if (!this._lastEdgesText && !this._lastParsed) return;
         const v = this.view;
         const N = v.nodes.length;
         const G = v.groupNames.length;
@@ -1035,7 +1225,9 @@ class BitZoom {
         const t0 = performance.now();
         try {
             const projFn = useGPUProj ? computeProjectionsGPU : computeProjections;
-            const result = await runPipelineGPU(this._lastEdgesText, this._lastNodesText, projFn);
+            const result = this._lastParsed
+                ? await runPipelineFromObjectsGPU(this._lastParsed.nodes, this._lastParsed.edges, this._lastParsed.extraPropNames, projFn)
+                : await runPipelineGPU(this._lastEdgesText, this._lastNodesText, projFn);
             const G = result.groupNames.length;
             for (let i = 0; i < v.nodes.length; i++) {
                 for (let g = 0; g < G; g++) {
@@ -1059,9 +1251,14 @@ class BitZoom {
 
     /** Full reload with CPU pipeline and dataset settings. */
     async _reloadCPU() {
-        console.log('[CPU] Reloading with CPU worker pipeline...');
-        if (!this._lastEdgesText) return;
-        await this.loadGraph(this._lastEdgesText, this._lastNodesText);
+        console.log('[CPU] Reloading with CPU pipeline...');
+        if (this._lastParsed) {
+            await this.loadFromParsed(this._lastParsed);
+        } else if (this._lastEdgesText) {
+            await this.loadGraph(this._lastEdgesText, this._lastNodesText);
+        } else {
+            return;
+        }
         const ds = this._currentDatasetId ? DATASETS.find(d => d.id === this._currentDatasetId) : null;
         this._finalizeLoad(ds);
     }
@@ -1077,22 +1274,31 @@ class BitZoom {
 
         try {
             let edgesText, nodesText = null;
-            if (dataset.stix) {
-                status.textContent = `Fetching ${dataset.name} (STIX)...`;
-                const jsonText = await this._fetchText(dataset.stix);
-                status.textContent = `Converting ${dataset.name}...`;
-                const result = convertStixToSnap(jsonText);
-                edgesText = result.edgesText;
-                nodesText = result.nodesText;
+            let parsedFromUrl = null;
+            // Support legacy dataset.stix alias (STIX URL field) + new dataset.edges URL.
+            // Both paths funnel through format detection after fetch.
+            const primaryUrl = dataset.stix || dataset.edges;
+            status.textContent = `Fetching ${dataset.name}...`;
+            const firstText = await this._fetchText(primaryUrl);
+            const fmt = detectFormat(firstText, primaryUrl);
+            if (isObjectFormat(fmt)) {
+                try {
+                    parsedFromUrl = parseAny(firstText, primaryUrl);
+                } catch (err) {
+                    throw new Error(`Parse error: ${err.message}`);
+                }
             } else {
-                edgesText = await this._fetchText(dataset.edges);
+                // SNAP text pipeline path (edges + optional nodes)
+                edgesText = firstText;
                 if (dataset.nodes) {
                     nodesText = await this._fetchText(dataset.nodes).catch(() => null);
                 }
             }
             const useGPUPath = this._gpuMode === 'gpu' || (this._gpuMode === 'auto' && !this._gpuUnavailable);
             console.log(`[Load] Dataset: ${dataset.name}, gpuMode: ${this._gpuMode}, gpuPath: ${useGPUPath}`);
-            if (useGPUPath) {
+            if (parsedFromUrl) {
+                await this.loadFromParsed(parsedFromUrl);
+            } else if (useGPUPath) {
                 await this.loadGraphGPU(edgesText, nodesText, dataset);
             } else {
                 await this.loadGraph(edgesText, nodesText);
@@ -1132,12 +1338,11 @@ class BitZoom {
         this.dataLoaded = false;
         this.pendingEdgesText = null;
         this.pendingNodesText = null;
+        this.pendingParsed = null;
         document.getElementById('edgesFile').value = '';
         document.getElementById('nodesFile').value = '';
         document.getElementById('edgesUrl').value = '';
-        document.getElementById('nodesUrl').value = '';
         this._pendingUrlEdges = null;
-        this._pendingUrlNodes = null;
         document.getElementById('loadBtn').disabled = true;
         document.getElementById('loadStatus').textContent = '';
         document.getElementById('loadStatus').classList.remove('error');
@@ -1244,15 +1449,15 @@ class BitZoom {
             v.render();
         }, sig);
 
-        // Auto-tune button (click to start, click again to stop)
+        // Auto-tune button (click to start, click again to stop).
+        // The abort controller lives on `this` so _autoTuneFresh (auto-run on load)
+        // and the manual click path share it — Stop works for both.
         const autoBtn = document.getElementById('autoTuneBtn');
-        let tuneAbort = null;
-        const applyTuneResult = async (result) => {
+        this._applyTuneResult = async (result) => {
             for (const g of v.groupNames) v.propWeights[g] = result.weights[g] ?? 0;
             v.smoothAlpha = result.alpha;
             v.quantMode = result.quantMode;
             v._quantStats = {};
-            // Apply tuned label props
             if (result.labelProps) {
                 v.labelProps.clear();
                 for (const p of result.labelProps) {
@@ -1270,28 +1475,41 @@ class BitZoom {
             autoBtn.textContent = 'Auto';
             autoBtn.style.background = '';
             autoBtn.style.color = '';
-            tuneAbort = null;
+            this._tuneAbort = null;
         };
         autoBtn.addEventListener('click', async () => {
-            // If running, abort and apply best so far
-            if (tuneAbort) { tuneAbort.abort(); return; }
+            // If a tune is running (manual or auto-on-load), abort and apply best so far.
+            if (this._tuneAbort) { this._tuneAbort.abort(); return; }
 
-            tuneAbort = new AbortController();
+            this._tuneAbort = new AbortController();
             autoBtn.style.background = 'var(--accent)';
             autoBtn.style.color = '#fff';
             autoBtn.textContent = 'Stop';
-            const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
-                weights: true, alpha: true, quant: false,
-                signal: tuneAbort.signal,
-                onProgress: (info) => {
-                    const pct = Math.round(100 * info.step / Math.max(1, info.total));
-                    const phase = info.phase === 'presets' ? 'scanning presets'
-                        : info.phase === 'done' ? 'done' : 'refining';
-                    v.showProgress(`Auto-tuning: ${phase} (${pct}%) — click Stop to apply`);
-                },
-            });
-            await applyTuneResult(result);
-            console.log(`Auto-tune: ${result.blends} blends, ${result.quants} quants in ${result.timeMs}ms, score=${result.score.toFixed(3)}`);
+            try {
+                const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
+                    weights: true, alpha: true, quant: false,
+                    signal: this._tuneAbort.signal,
+                    onProgress: (info) => {
+                        const pct = Math.round(100 * info.step / Math.max(1, info.total));
+                        const phase = info.phase === 'presets' ? 'scanning presets'
+                            : info.phase === 'done' ? 'done' : 'refining';
+                        v.showProgress(`Auto-tuning: ${phase} (${pct}%) — click Stop to apply`);
+                    },
+                });
+                await this._applyTuneResult(result);
+                console.log(`Auto-tune: ${result.blends} blends, ${result.quants} quants in ${result.timeMs}ms, score=${result.score.toFixed(3)}`);
+            } catch (err) {
+                // Restore button state + clear tune state on any failure (including
+                // unexpected errors — not just aborts). Without this, a thrown error
+                // would leave _tuneAbort set and the button stuck in "Stop" state.
+                console.warn('[auto-tune] failed:', err?.message || err);
+                v._progressText = null;
+                v.render();
+                this._tuneAbort = null;
+                autoBtn.textContent = 'Auto';
+                autoBtn.style.background = '';
+                autoBtn.style.color = '';
+            }
         }, sig);
 
         // GPU tri-state: auto (adaptive thresholds) → gpu (always) → cpu (never) → auto
@@ -1472,60 +1690,97 @@ class BitZoom {
         }, sig);
         document.getElementById('edgesFile').addEventListener('change', e => {
             const f = e.target.files[0];
-            if (!f) return;
-            const n = f.name.toLowerCase();
-            if (n.endsWith('.json') || n.endsWith('.json.gz')) this._handleStixFile(f);
-            else this._handleFileSelect(f, 'edges');
+            if (f) this._handleFileSelect(f);
         }, sig);
         document.getElementById('nodesFile').addEventListener('change', e => {
             if (e.target.files[0]) this._handleFileSelect(e.target.files[0], 'labels');
         }, sig);
 
-        // URL inputs
+        // URL input (single field, any format)
         const edgesUrlInput = document.getElementById('edgesUrl');
-        const nodesUrlInput = document.getElementById('nodesUrl');
         const updateUrlState = () => {
             const url = edgesUrlInput.value.trim();
             if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
                 document.getElementById('loadBtn').disabled = false;
                 this._pendingUrlEdges = url;
-                this._pendingUrlNodes = nodesUrlInput.value.trim() || null;
             } else {
                 this._pendingUrlEdges = null;
-                this._pendingUrlNodes = null;
                 // Re-check file state
-                if (!this.pendingEdgesText) document.getElementById('loadBtn').disabled = true;
+                if (!this.pendingEdgesText && !this.pendingNodesText && !this.pendingParsed) {
+                    document.getElementById('loadBtn').disabled = true;
+                }
             }
         };
         edgesUrlInput.addEventListener('input', updateUrlState, sig);
-        nodesUrlInput.addEventListener('input', updateUrlState, sig);
 
         const dropZone = document.getElementById('dropZone');
         dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); }, sig);
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'), sig);
-        dropZone.addEventListener('drop', e => {
+        dropZone.addEventListener('drop', async e => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            for (const f of e.dataTransfer.files) {
-                const n = f.name.toLowerCase();
-                if (n.endsWith('.json') || n.endsWith('.json.gz')) this._handleStixFile(f);
-                else if (n.endsWith('.edges') || n.endsWith('.edges.gz')) this._handleFileSelect(f, 'edges');
-                else if (n.endsWith('.nodes') || n.endsWith('.nodes.gz') || n.endsWith('.labels') || n.endsWith('.labels.gz')) this._handleFileSelect(f, 'labels');
+            await this._stageDroppedFiles(e.dataTransfer.files);
+        }, sig);
+
+        // Canvas is also a drop target — dropping a file onto the viewer mid-session
+        // stages and immediately loads, bypassing the loader panel.
+        const canvasEl = document.getElementById('canvas');
+        const canvasDragTarget = canvasEl.parentElement || canvasEl;
+        canvasDragTarget.addEventListener('dragover', e => {
+            if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+                e.preventDefault();
+                canvasDragTarget.classList.add('drag-hover');
+            }
+        }, sig);
+        canvasDragTarget.addEventListener('dragleave', () => canvasDragTarget.classList.remove('drag-hover'), sig);
+        canvasDragTarget.addEventListener('drop', async e => {
+            if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+            e.preventDefault();
+            canvasDragTarget.classList.remove('drag-hover');
+
+            // Classify the incoming drop to decide whether to replace or merge.
+            // SNAP .edges and .nodes can arrive as a pair across two quick drops
+            // — debounce briefly so a companion file can join before the load fires.
+            const files = [...e.dataTransfer.files];
+            const names = files.map(f => f.name.toLowerCase());
+            const hasSnapOnly = files.length > 0 && names.every(n =>
+                n.endsWith('.edges') || n.endsWith('.edges.gz') ||
+                n.endsWith('.nodes') || n.endsWith('.nodes.gz') ||
+                n.endsWith('.labels') || n.endsWith('.labels.gz'));
+
+            if (hasSnapOnly) {
+                // First SNAP drop of a potential pair — preserve any prior pending SNAP state
+                // so a previous drop can complete. Cancel any pending canvas-drop timer,
+                // stage, and re-arm the timer. If the second file arrives in time, the timer
+                // fires with both files staged.
+                if (this._canvasDropTimer) clearTimeout(this._canvasDropTimer);
+                await this._stageDroppedFiles(files);
+                this._canvasDropTimer = setTimeout(async () => {
+                    this._canvasDropTimer = null;
+                    await this._executeCanvasLoad();
+                }, 600);
+            } else {
+                // Non-SNAP drop (CSV / D3 / JGF / STIX / mixed) — replaces any prior state
+                if (this._canvasDropTimer) { clearTimeout(this._canvasDropTimer); this._canvasDropTimer = null; }
+                this.pendingEdgesText = null;
+                this.pendingNodesText = null;
+                this.pendingParsed = null;
+                await this._stageDroppedFiles(files);
+                await this._executeCanvasLoad();
             }
         }, sig);
 
         document.getElementById('loadBtn').addEventListener('click', async () => {
-            // URL-based loading takes priority if edges URL is set
+            // URL-based loading takes priority if URL is set
             if (this._pendingUrlEdges) {
-                const edgesUrl = this._pendingUrlEdges;
-                // If no explicit nodes URL, infer from edges URL
-                let nodesUrl = this._pendingUrlNodes;
-                if (!nodesUrl) {
-                    nodesUrl = edgesUrl.replace(/\.edges(\.gz)?$/, (_, gz) => '.nodes' + (gz || ''));
-                    if (nodesUrl === edgesUrl) nodesUrl = null; // no .edges suffix to replace
-                }
-                const name = edgesUrl.split('/').pop()?.replace(/\.edges(\.gz)?$/, '') || 'Remote';
-                this.loadDataset({ id: '__url__', name, edges: edgesUrl, nodes: nodesUrl, desc: 'URL' });
+                const url = this._pendingUrlEdges;
+                // For SNAP .edges URLs, infer the companion .nodes URL by convention.
+                // For any other format (CSV, D3 JSON, JGF), loadDataset will detect
+                // the format from fetched content and route through the object pipeline.
+                let nodesUrl = url.replace(/\.edges(\.gz)?$/, (_, gz) => '.nodes' + (gz || ''));
+                if (nodesUrl === url) nodesUrl = null; // URL didn't match .edges pattern
+                const name = url.split('/').pop()?.replace(/\.(edges|csv|tsv|json)(\.gz)?$/, '') || 'Remote';
+                this.loadDataset({ id: '__url__', name, edges: url, nodes: nodesUrl, desc: 'URL' });
                 return;
             }
             const progressBar = document.getElementById('loadProgress');
@@ -1533,9 +1788,14 @@ class BitZoom {
             progressBar.value = 0;
             document.getElementById('loadBtn').disabled = true;
             try {
-                const gpuPath = this._gpuMode === 'gpu' || (this._gpuMode === 'auto' && !this._gpuUnavailable);
-                if (gpuPath) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
-                else await this.loadGraph(this.pendingEdgesText, this.pendingNodesText);
+                if (this.pendingParsed) {
+                    // Object pipeline: CSV / D3 JSON / JGF / nodes-only SNAP
+                    await this.loadFromParsed(this.pendingParsed);
+                } else {
+                    const gpuPath = this._gpuMode === 'gpu' || (this._gpuMode === 'auto' && !this._gpuUnavailable);
+                    if (gpuPath) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
+                    else await this.loadGraph(this.pendingEdgesText, this.pendingNodesText);
+                }
                 const nameEl = document.getElementById('datasetName');
                 if (nameEl) nameEl.textContent = this._pendingFileName || 'Custom';
                 this._finalizeLoad(null);
@@ -1572,8 +1832,46 @@ class BitZoom {
         return resp.text();
     }
 
-    async _handleFileSelect(file, type) {
-        let text;
+    /** Execute whatever is currently staged in pendingParsed / pendingEdgesText /
+     *  pendingNodesText as a canvas-drop load. Shared by the immediate-load path
+     *  (non-SNAP drops) and the debounced path (SNAP pair drops). */
+    async _executeCanvasLoad() {
+        if (!this.pendingParsed && !this.pendingEdgesText && !this.pendingNodesText) return;
+        try {
+            if (this.pendingParsed) {
+                await this.loadFromParsed(this.pendingParsed);
+            } else {
+                const gpuPath = this._gpuMode === 'gpu' || (this._gpuMode === 'auto' && !this._gpuUnavailable);
+                if (gpuPath) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
+                else await this.loadGraph(this.pendingEdgesText, this.pendingNodesText);
+            }
+            const nameEl = document.getElementById('datasetName');
+            if (nameEl) nameEl.textContent = this._pendingFileName || 'Custom';
+            this._finalizeLoad(null);
+        } catch (err) {
+            this._showError('Load Error', err.message || 'Failed to load dropped file');
+        }
+    }
+
+    /** Route an iterable of dropped/selected files into the pending slots.
+     *  SNAP .edges/.nodes files need explicit role routing because they share
+     *  the same internal pipeline but play different roles. Everything else is
+     *  dispatched by content via _handleFileSelect → detectFormat. */
+    async _stageDroppedFiles(files) {
+        for (const f of files) {
+            const n = f.name.toLowerCase();
+            if (n.endsWith('.edges') || n.endsWith('.edges.gz')) {
+                await this._handleFileSelect(f, 'edges');
+            } else if (n.endsWith('.nodes') || n.endsWith('.nodes.gz') || n.endsWith('.labels') || n.endsWith('.labels.gz')) {
+                await this._handleFileSelect(f, 'labels');
+            } else {
+                await this._handleFileSelect(f);
+            }
+        }
+    }
+
+    /** Read file contents as text, transparently decompressing .gz files. */
+    async _readFileText(file) {
         if (file.name.endsWith('.gz')) {
             const buf = await file.arrayBuffer();
             const ds = new DecompressionStream('gzip');
@@ -1590,65 +1888,76 @@ class BitZoom {
             const merged = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
             let off = 0;
             for (const c of chunks) { merged.set(c, off); off += c.length; }
-            text = new TextDecoder().decode(merged);
-        } else {
-            text = await file.text();
+            return new TextDecoder().decode(merged);
         }
-        if (type === 'edges') {
-            this.pendingEdgesText = text;
-            this._pendingFileName = file.name.replace(/\.(edges|gz|txt|tsv)$/g, '');
-        } else {
-            this.pendingNodesText = text;
-        }
-        this._updateLoadStatus();
+        return await file.text();
     }
 
-    async _handleStixFile(file) {
-        const status = document.getElementById('loadStatus');
-        status.textContent = 'Loading STIX 2.1 JSON...';
-        status.classList.remove('error');
+    /** Handle a dropped/selected file. Detects format from content + filename.
+     *  SNAP files stage into pendingEdgesText/pendingNodesText for the text worker pipeline.
+     *  CSV / D3 / JGF files parse via parseAny and stage into pendingParsed for the object pipeline.
+     *  @param {File} file
+     *  @param {'edges'|'labels'} [hintType] - legacy routing hint for ambiguous SNAP content
+     */
+    async _handleFileSelect(file, hintType) {
+        let text;
         try {
-            let jsonText;
-            if (file.name.endsWith('.gz')) {
-                const buf = await file.arrayBuffer();
-                const ds = new DecompressionStream('gzip');
-                const reader = ds.readable.getReader();
-                const writer = ds.writable.getWriter();
-                writer.write(new Uint8Array(buf));
-                writer.close();
-                const chunks = [];
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                }
-                const merged = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
-                let off = 0;
-                for (const c of chunks) { merged.set(c, off); off += c.length; }
-                jsonText = new TextDecoder().decode(merged);
-            } else {
-                jsonText = await file.text();
-            }
-            status.textContent = 'Converting STIX 2.1 JSON...';
-            const result = convertStixToSnap(jsonText);
-            this.pendingEdgesText = result.edgesText;
-            this.pendingNodesText = result.nodesText;
-            status.textContent = `STIX: ${result.stats.nodes} nodes, ${result.stats.edges} edges — ready to load`;
-            document.getElementById('loadBtn').disabled = false;
+            text = await this._readFileText(file);
         } catch (err) {
-            status.textContent = '';
-            this._showError('STIX Parse Error', err.message);
+            this._showError('Read Error', err.message);
+            return;
         }
+
+        const format = detectFormat(text, file.name);
+        const baseName = file.name
+            .replace(/\.(csv|tsv|json|edges|nodes|labels|txt|graphml|gexf|xml|gz)$/gi, '')
+            .replace(/\.(csv|tsv|json|edges|nodes|labels|txt|graphml|gexf|xml)$/gi, '');
+
+        if (format === 'snap-edges') {
+            this.pendingEdgesText = text;
+            this.pendingParsed = null;
+            this._pendingFileName = baseName;
+        } else if (format === 'snap-nodes') {
+            this.pendingNodesText = text;
+            this.pendingParsed = null;
+        } else if (format === 'snap') {
+            // Ambiguous SNAP content — use hint or default to edges
+            if (hintType === 'labels') this.pendingNodesText = text;
+            else { this.pendingEdgesText = text; this._pendingFileName = baseName; }
+            this.pendingParsed = null;
+        } else if (isObjectFormat(format)) {
+            // CSV / D3 / JGF / GraphML / GEXF / Cytoscape / bare JSON / nodes-only SNAP
+            try {
+                const parsed = parseAny(text, file.name);
+                this.pendingParsed = parsed;
+                this.pendingEdgesText = null;
+                this.pendingNodesText = null;
+                this._pendingFileName = baseName;
+            } catch (err) {
+                this._showError('Parse Error', err.message);
+                return;
+            }
+        } else {
+            this._showError('Unknown Format', `Could not detect a supported format for ${file.name}`);
+            return;
+        }
+        this._updateLoadStatus();
     }
 
     _updateLoadStatus() {
         const status = document.getElementById('loadStatus');
         const parts = [];
+        if (this.pendingParsed) {
+            const n = this.pendingParsed.nodes.size;
+            const e = this.pendingParsed.edges ? this.pendingParsed.edges.length : 0;
+            parts.push(`${this.pendingParsed.format}: ${n} nodes${e ? `, ${e} edges` : ''} ready`);
+        }
         if (this.pendingEdgesText) parts.push('edges file ready');
         if (this.pendingNodesText) parts.push('nodes file ready');
         status.textContent = parts.length > 0 ? parts.join(' · ') : '';
         status.classList.remove('error');
-        document.getElementById('loadBtn').disabled = !this.pendingEdgesText;
+        // Allow load when any source is ready
+        document.getElementById('loadBtn').disabled = !this.pendingEdgesText && !this.pendingNodesText && !this.pendingParsed;
     }
 
     _buildDatasetButtons() {

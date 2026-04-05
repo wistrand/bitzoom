@@ -1,5 +1,6 @@
-// stix2snap.js — Convert STIX 2.1 bundle JSON to SNAP text format (browser-compatible).
-// No DOM, no file I/O. Takes JSON string, returns { edgesText, nodesText, stats }.
+// stix2snap.js — Parse STIX 2.1 bundle JSON into the unified object pipeline shape.
+// Browser-compatible, no DOM. Exports parseSTIX(data) returning
+// { nodes: Map, edges: Array, extraPropNames: string[], stats }.
 
 const clean = (s) => s.replace(/[\t\n\r]/g, ' ').trim();
 
@@ -91,20 +92,22 @@ const ARRAY_REF_FIELDS = {
 };
 
 /**
- * Convert STIX 2.1 bundle JSON text to SNAP format.
- * @param {string} jsonText — raw JSON string
- * @returns {{ edgesText: string, nodesText: string, stats: { nodes: number, edges: number, types: Record<string, number> } }}
+ * Parse a STIX 2.1 bundle into the unified object pipeline shape.
+ * @param {object|string} input — already-parsed bundle object, or raw JSON string
+ * @returns {{ nodes: Map, edges: Array<{src,dst,type}>, extraPropNames: string[], stats: object }}
  * @throws {Error} if input is not a valid STIX 2.1 bundle
  */
-export function convertStixToSnap(jsonText) {
-  const bundle = JSON.parse(jsonText);
+export function parseSTIX(input) {
+  const bundle = typeof input === 'string' ? JSON.parse(input) : input;
 
   // Accept both { type: 'bundle', objects: [...] } and raw arrays of objects
   let objects;
-  if (bundle.type === 'bundle' && Array.isArray(bundle.objects)) {
+  if (bundle && bundle.type === 'bundle' && Array.isArray(bundle.objects)) {
     objects = bundle.objects;
   } else if (Array.isArray(bundle)) {
     objects = bundle;
+  } else if (bundle && Array.isArray(bundle.objects)) {
+    objects = bundle.objects;
   } else {
     throw new Error('Input is not a STIX 2.1 bundle (expected { type: "bundle", objects: [...] })');
   }
@@ -207,21 +210,34 @@ export function convertStixToSnap(jsonText) {
     if (!edgeSet.has(key)) { edgeSet.add(key); dedupEdges.push(e); }
   }
 
-  // Build SNAP text
-  const edgeLines = ['# STIX 2.1 bundle', `# Nodes: ${nodeMap.size} Edges: ${dedupEdges.length}`, '# FromId\tToId\tRelationshipType'];
-  for (const e of dedupEdges) edgeLines.push(`${e.src}\t${e.dst}\t${e.type}`);
-
-  const nodeLines = ['# NodeId\tLabel\tGroup\tSubType\tKillChain\tAliases\tLevel\tPlatforms'];
+  // Build object-pipeline output
+  const nodes = new Map();
+  const extraPropSet = new Set();
   for (const [id, obj] of nodeMap) {
-    nodeLines.push(`${id}\t${truncate(clean(nodeLabel(obj)), 80)}\t${obj.type}\t${clean(subType(obj))}\t${clean(killChain(obj))}\t${clean(aliases(obj))}\t${clean(sophisticationLevel(obj))}\t${clean(platforms(obj))}`);
+    const extraProps = {};
+    const addExtra = (name, value) => {
+      const v = clean(value || '');
+      if (v) { extraProps[name] = v; extraPropSet.add(name); }
+    };
+    addExtra('subtype', subType(obj));
+    addExtra('killchain', killChain(obj));
+    addExtra('aliases', aliases(obj));
+    addExtra('level', sophisticationLevel(obj));
+    addExtra('platforms', platforms(obj));
+    nodes.set(id, {
+      label: truncate(clean(nodeLabel(obj)), 80),
+      group: obj.type,
+      extraProps,
+    });
   }
 
   const types = {};
   for (const obj of nodeMap.values()) types[obj.type] = (types[obj.type] || 0) + 1;
 
   return {
-    edgesText: edgeLines.join('\n') + '\n',
-    nodesText: nodeLines.join('\n') + '\n',
+    nodes,
+    edges: dedupEdges,
+    extraPropNames: [...extraPropSet],
     stats: { nodes: nodeMap.size, edges: dedupEdges.length, types },
   };
 }

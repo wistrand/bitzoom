@@ -1,5 +1,13 @@
 # BitZoom Architecture
 
+This is the top-level architecture overview. Subsystems have their own docs:
+
+- [ARCHITECTURE-data-import.md](ARCHITECTURE-data-import.md) — format parsers, `parseAny` dispatcher, object pipeline
+- [ARCHITECTURE-auto-tune.md](ARCHITECTURE-auto-tune.md) — auto-tune algorithm, metric, phases, performance
+- [ARCHITECTURE-webgl.md](ARCHITECTURE-webgl.md) — WebGL2 instanced renderer, dual-canvas layout, shaders
+- [ARCHITECTURE-webgpu.md](ARCHITECTURE-webgpu.md) — WebGPU compute for projection and blend
+- [ARCHITECTURE-svg.md](ARCHITECTURE-svg.md) — SVG export
+
 ## Overview
 
 BitZoom is a deterministic layout and hierarchical aggregation viewer for large property graphs. Nodes are positioned by property similarity using MinHash + Gaussian projection, with stable zoom levels derived from stored uint16 grid coordinates via bit shifts.
@@ -15,20 +23,22 @@ docs/                    Web application (ES modules, served by Deno)
   example.html             Minimal example — two embedded graphs (SNAP + inline)
   bitzoom.css              Styles — dark theme, responsive, loader, detail panel overlay
   bitzoom-algo.js          Pure algorithm functions and constants (no DOM)
-  bitzoom-pipeline.js      Shared parsers, graph building, tokenization, projection
+  bitzoom-pipeline.js      SNAP parsers, buildGraph, runPipeline(GPU), runPipelineFromObjects(GPU)
+  bitzoom-parsers.js       Format adapters — CSV, D3 JSON, JGF, GraphML, GEXF, Cytoscape, STIX dispatcher
   bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing (no state mutation)
   bitzoom-gl-renderer.js   WebGL2 instanced renderer — 7 shader programs (~1202 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, event hub
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, drop zones
   bitzoom-utils.js         Auto-tune optimizer (async, yield-based, AbortSignal + timeout)
+  stix2snap.js             STIX 2.1 → object pipeline (parseSTIX, browser-compatible)
   bitzoom-svg.js           SVG export — exportSVG(bz, opts) + createSVGView() headless factory
   bitzoom-worker.js        Web Worker coordinator — uses pipeline, fans out projection
   bitzoom-proj-worker.js   Web Worker — imports from algo+pipeline, computes projections
   webgl-test.html          Side-by-side Canvas 2D vs WebGL2 visual comparison
 
-tests/pipeline_test.ts     68 Deno tests: algo unit, pipeline, numeric, undefined, E2E, SVG export
+tests/pipeline_test.ts     172 Deno tests: algo, pipeline, numeric, undefined, E2E, SVG, parsers, format dispatch, auto-tune
 
-docs/data/                 9 SNAP-format graph datasets (.edges + .nodes, Amazon .gz compressed)
+docs/data/                 SNAP graph datasets + D3/JGF/GEXF/Cytoscape/CSV samples (.gz compressed for large)
 benchmarks/                Layout comparison vs ForceAtlas2, UMAP, t-SNE (Docker runner)
 agent_docs/                Architecture and spec documentation
 scripts/
@@ -47,6 +57,7 @@ Dependency graph (arrows = "imported by"):
 ```
 bitzoom-algo.js              (no deps — pure functions + constants)
 bitzoom-colors.js            (no deps — color schemes)
+stix2snap.js                 (no deps — STIX 2.1 bundle → object pipeline shape)
   ↑
 bitzoom-pipeline.js          (algo)
 bitzoom-renderer.js          (algo)
@@ -54,10 +65,11 @@ bitzoom-gl-renderer.js       (algo)
 bitzoom-utils.js             (algo)
 bitzoom-svg.js               (algo, colors)
 bitzoom-gpu.js               (algo, pipeline)
+bitzoom-parsers.js           (pipeline, stix2snap)
   ↑
 bitzoom-canvas.js            (algo, colors, pipeline, renderer, gl-renderer, gpu, utils)
   ↑
-bitzoom-viewer.js            (algo, canvas, colors, gl-renderer, gpu, pipeline, svg, utils)
+bitzoom-viewer.js            (algo, canvas, colors, gl-renderer, gpu, pipeline, parsers, svg, utils)
 bz-graph.js                  (canvas, colors)
 
 bitzoom-worker.js            (pipeline)
@@ -80,7 +92,7 @@ No code duplication. GC-optimized MinHash variants (`computeMinHashInto`, `_sig`
 
 ## Module Responsibilities
 
-### [bitzoom-algo.js](../docs/bitzoom-algo.js) (502 lines)
+### [bitzoom-algo.js](../docs/bitzoom-algo.js) (510 lines)
 
 Pure functions, no DOM. Single source of truth for MinHash/projection.
 
@@ -93,15 +105,25 @@ Pure functions, no DOM. Single source of truth for MinHash/projection.
 - **Level building**: `buildLevelNodes` (phase 1: bucket nodes into supernodes, O(n)) + `buildLevelEdges` (phase 2: aggregate edges, O(|E|), numeric key packing for levels 1-13, string keys for level 14) + `buildLevel` (combined wrapper). Caches `cachedColor`/`cachedLabel` on supernodes.
 - **Helpers**: `maxCountKey` (O(k) max), `generateGroupColors` (golden-angle HSL → hex), `getNodePropValue`, `getSupernodeDominantValue`
 
-### [bitzoom-pipeline.js](../docs/bitzoom-pipeline.js) (369 lines)
+### [bitzoom-pipeline.js](../docs/bitzoom-pipeline.js) (455 lines)
 
-Shared parsing, graph building, tokenization. Imports from algo. No DOM.
+SNAP parsing, graph building, tokenization, pipeline entry points. Imports from algo. No DOM.
 
-- **Parsers**: `parseEdgesFile` (streaming line-by-line, flat arrays), `parseNodesFile` (header detection, extra columns, preserves empty tabs)
-- **Graph building**: `buildGraph` — nodes, edges, adjacency, neighbor groups, numeric column auto-detection (`numericBins`)
+- **SNAP Parsers**: `parseEdgesFile` (streaming line-by-line, flat arrays, accepts null/empty for nodes-only graphs), `parseNodesFile` (header detection, extra columns, preserves empty tabs)
+- **Graph building**: `buildGraph` — nodes, edges, adjacency, neighbor groups, numeric column auto-detection (`numericBins`). Unions node ids from `parsed.nodeIds` AND `nodesMap.keys()` so nodes-only inputs and orphaned metadata rows are preserved.
 - **Tokenization**: `degreeBucket`, `tokenizeLabel` (inline word scanner), `tokenizeNumeric` (3-level for numeric, categorical fallback, 0 tokens for empty/undefined)
 - **Signature**: `computeNodeSig(node)` — on-demand signature computation (signatures not stored on nodes)
-- **Full pipeline**: `computeProjections` (GC-optimized), `runPipeline(edgesText, nodesText)` (parse → build → project)
+- **Text pipeline**: `computeProjections` (GC-optimized), `runPipeline(edgesText, nodesText)`, `runPipelineGPU(edgesText, nodesText, computeProjectionsGPU)` — accept null `edgesText` for nodes-only graphs
+- **Object pipeline (new)**: `runPipelineFromObjects(nodesMap, edges, extraPropNames)`, `runPipelineFromObjectsGPU(...)` — bypass text parsing for CSV/D3/JGF/GraphML/GEXF/Cytoscape/STIX loads. Shares `buildGraph` + `computeProjections` with the text pipeline.
+
+### [bitzoom-parsers.js](../docs/bitzoom-parsers.js) (965 lines)
+
+Format adapters and content-based dispatcher. Imports `parseNodesFile` from pipeline and `parseSTIX` from `stix2snap.js`. All parsers return the unified shape `{nodes: Map, edges: Array|null, extraPropNames: string[]}` consumable by `runPipelineFromObjects`. See [ARCHITECTURE-data-import.md](ARCHITECTURE-data-import.md) for full details.
+
+- **CSV**: `parseCSV` (state-machine, quoted fields, CRLF, BOM, delimiter auto-detect), `csvRowsToNodes` (header sniffing with role precedence + uniqueness check), `parseCSVToNodes`
+- **JSON variants**: `parseD3` (D3 force JSON with numeric-index links), `parseJGF` (array or dict-form nodes), `parseCytoscape` (grouped + flat forms)
+- **XML formats**: `parseXML` (hand-rolled SAX subset, no deps), `parseGraphML` (key registry), `parseGEXF` (attribute registry)
+- **Dispatch**: `detectFormat(text, filenameHint?)` content sniffer, `parseAny(text, filenameHint?)` unified entry. Exports `OBJECT_FORMATS`, `TEXT_FORMATS`, `FILE_EXTENSIONS`, `FILE_ACCEPT_ATTR`, and classification helpers `isObjectFormat`/`isTextFormat`/`isSpecialFormat` so the viewer has no hardcoded format lists.
 
 ### [bitzoom-renderer.js](../docs/bitzoom-renderer.js) (944 lines)
 
@@ -156,7 +178,7 @@ on Canvas 2D overlay. See [`ARCHITECTURE-webgl.md`](ARCHITECTURE-webgl.md) for f
   `_instanceVBO` with `DYNAMIC_DRAW`.
 - **Exports**: `initGL(gl)`, `renderGL(gl, bz)`, `destroyGL(gl)`, `isWebGL2Available()`
 
-### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (1690 lines)
+### [bitzoom-canvas.js](../docs/bitzoom-canvas.js) (1688 lines)
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
@@ -174,7 +196,7 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **Public API**: `setWeights()`, `setAlpha()`, `setOptions()`, `destroy()`. Callbacks: `onSelect`, `onHover`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`.
 
-### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (1746 lines)
+### [bitzoom-viewer.js](../docs/bitzoom-viewer.js) (2055 lines)
 
 `BitZoom` class — composes `BitZoomCanvas` as `this.view`. Adds application UI and orchestration.
 
@@ -208,13 +230,22 @@ Density heatmap uses kernel density estimation on a coarse grid, global normaliz
 
 ## Key Data Flow
 
-```
-SNAP files (.edges, .nodes)
-  → bitzoom-worker.js: parse (streaming), build graph, detect numeric columns
-    → bitzoom-proj-worker.js (×3): tokenize → MinHash → project → Float64Array
-  → main thread: unpack → hydrate → unifiedBlend → quantize → render
+Two entry paths into the shared `buildGraph` → `computeProjections` → blend → quantize chain:
 
-Weight/alpha change:
+```
+SNAP text pipeline (worker-backed for large inputs):
+  SNAP files (.edges, .nodes)
+    → bitzoom-worker.js: parse (streaming), build graph, detect numeric columns
+      → bitzoom-proj-worker.js (×3): tokenize → MinHash → project → Float64Array
+    → main thread: unpack → hydrate → unifiedBlend → quantize → render
+
+Object pipeline (main-thread for CSV/D3/JGF/GraphML/GEXF/Cytoscape/STIX):
+  text → detectFormat → parseAny → {nodes: Map, edges: Array|null, extraPropNames}
+    → runPipelineFromObjects(GPU)?: buildGraph → computeProjections → unifiedBlend → quantize
+    → _applyWorkerResult → render
+    → _finalizeLoad → pickInitialLevel (data-aware) → auto-tune (if no preset settings)
+
+Weight/alpha change (either pipeline):
   → _refreshPropCache → invalidate levels → unifiedBlend → layoutAll → render
 
 Zoom/pan:
