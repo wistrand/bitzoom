@@ -10,7 +10,7 @@ Deno.test('GPU blend init', async () => {
   assert(await initGPU(), 'GPU should be available');
 });
 
-async function compareBlend(name: string, edgesPath: string, nodesPath: string | null, alpha: number, weights?: Record<string, number>) {
+async function compareBlend(name: string, edgesPath: string, nodesPath: string | null, alpha: number, strengths?: Record<string, number>) {
   const edgesText = Deno.readTextFileSync(edgesPath);
   const nodesText = nodesPath ? Deno.readTextFileSync(nodesPath) : null;
   const result = runPipeline(edgesText, nodesText);
@@ -37,9 +37,9 @@ async function compareBlend(name: string, edgesPath: string, nodesPath: string |
   const nodeIndexFull: Record<string, any> = {};
   for (const n of nodes) nodeIndexFull[n.id] = n;
 
-  const propWeights: Record<string, number> = weights || {};
-  if (!weights) {
-    for (const g of result.groupNames) propWeights[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+  const propStrengths: Record<string, number> = strengths || {};
+  if (!strengths) {
+    for (const g of result.groupNames) propStrengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
   }
 
   // CPU blend: replicate the blend logic WITHOUT quantization to get comparable positions.
@@ -52,11 +52,11 @@ async function compareBlend(name: string, edgesPath: string, nodesPath: string |
 
   // Compute property anchors (same as unifiedBlend)
   let maxW = 0;
-  for (const g of result.groupNames) { const raw = propWeights[g] || 0; if (raw > maxW) maxW = raw; }
+  for (const g of result.groupNames) { const raw = propStrengths[g] || 0; if (raw > maxW) maxW = raw; }
   const floorVal = Math.max(maxW * 0.10, 0.10);
   let propTotal = 0;
   const effW: Record<string, number> = {};
-  for (const g of result.groupNames) { effW[g] = Math.max(propWeights[g] || 0, floorVal); propTotal += effW[g]; }
+  for (const g of result.groupNames) { effW[g] = Math.max(propStrengths[g] || 0, floorVal); propTotal += effW[g]; }
 
   const cpuPropPx = new Float64Array(N);
   const cpuPropPy = new Float64Array(N);
@@ -97,7 +97,7 @@ async function compareBlend(name: string, edgesPath: string, nodesPath: string |
   }
 
   // GPU blend
-  const gpuResult = await gpuBlend(nodes, result.groupNames, propWeights, alpha, adjList, nodeIndexFull, 5);
+  const gpuResult = await gpuBlend(nodes, result.groupNames, propStrengths, alpha, adjList, nodeIndexFull, 5);
 
   // Compare pre-quantization positions
   let maxDelta = 0;

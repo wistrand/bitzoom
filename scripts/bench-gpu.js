@@ -124,8 +124,8 @@ for (const ds of DATASETS) {
       adjList[e.dst].push(e.src);
     }
   }
-  const weights = {};
-  for (const g of groupNames) weights[g] = g === 'group' ? 5 : g === 'label' ? 1 : 2;
+  const strengths = {};
+  for (const g of groupNames) strengths[g] = g === 'group' ? 5 : g === 'label' ? 1 : 2;
 
   // CPU blend
   const cpuBlendTimes = [];
@@ -133,7 +133,7 @@ for (const ds of DATASETS) {
     const nodes = makeNodes();
     const ni = Object.fromEntries(nodes.map(n => [n.id, n]));
     const t0 = performance.now();
-    unifiedBlend(nodes, groupNames, weights, 0.5, adjList, ni, 5, 'gaussian');
+    unifiedBlend(nodes, groupNames, strengths, 0.5, adjList, ni, 5, 'gaussian');
     const elapsed = performance.now() - t0;
     if (i >= warmup) cpuBlendTimes.push(elapsed);
   }
@@ -144,7 +144,7 @@ for (const ds of DATASETS) {
     const nodes = makeNodes();
     const ni = Object.fromEntries(nodes.map(n => [n.id, n]));
     const t0 = performance.now();
-    await gpuBlend(nodes, groupNames, weights, 0.5, adjList, ni, 5);
+    await gpuBlend(nodes, groupNames, strengths, 0.5, adjList, ni, 5);
     const elapsed = performance.now() - t0;
     if (i >= warmup) gpuBlendTimes.push(elapsed);
   }

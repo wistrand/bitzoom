@@ -211,32 +211,32 @@ async function loadPair(name, edgesFile, nodesFile, canvasL, canvasR, opts = {})
 await loadPair('Karate',
   'data/karate.edges', 'data/karate.nodes',
   'karate-2d', 'karate-gl',
-  { initialLevel: 2, weights: { group: 8 }, labelProps: ['group'] });
+  { initialLevel: 2, strengths: { group: 8 }, labelProps: ['group'] });
 
 await loadPair('Epstein',
   'data/epstein.edges', 'data/epstein.nodes',
   'epstein-2d', 'epstein-gl',
-  { initialLevel: 3, weights: { group: 5, edgetype: 8 }, labelProps: ['label'] });
+  { initialLevel: 3, strengths: { group: 5, edgetype: 8 }, labelProps: ['label'] });
 
 await loadPair('Epstein curves',
   'data/epstein.edges', 'data/epstein.nodes',
   'epstein-curves-2d', 'epstein-curves-gl',
-  { initialLevel: 3, weights: { group: 5, edgetype: 8 }, labelProps: ['label'], edgeMode: 'curves' });
+  { initialLevel: 3, strengths: { group: 5, edgetype: 8 }, labelProps: ['label'], edgeMode: 'curves' });
 
 await loadPair('BZ Source',
   'data/bitzoom-source.edges', 'data/bitzoom-source.nodes',
   'bzsource-2d', 'bzsource-gl',
-  { weights: { kind: 8, group: 3 }, labelProps: ['kind'] });
+  { strengths: { kind: 8, group: 3 }, labelProps: ['kind'] });
 
 await loadPair('MITRE',
   'data/mitre-attack.edges', 'data/mitre-attack.nodes',
   'mitre-2d', 'mitre-gl',
-  { weights: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'] });
+  { strengths: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'] });
 
 await loadPair('Email-EU',
   'data/email-eu.edges', null,
   'email-2d', 'email-gl',
-  { weights: {}, smoothAlpha: 1.0, quantMode: 'rank' });
+  { strengths: {}, smoothAlpha: 1.0, quantMode: 'rank' });
 
 status.textContent = `Done. ${results.join(' · ')}`;
 </script>

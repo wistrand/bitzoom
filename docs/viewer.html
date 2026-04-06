@@ -4,17 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BitZoom — Viewer</title>
-<meta name="description" content="Interactive graph viewer with property-similarity layout, hierarchical zoom, and real-time weight tuning.">
+<meta name="description" content="Interactive graph viewer with property-similarity layout, hierarchical zoom, and real-time strength tuning.">
 <meta property="og:title" content="BitZoom Viewer">
-<meta property="og:description" content="Interactive graph viewer with property-similarity layout, hierarchical zoom, and real-time weight tuning.">
+<meta property="og:description" content="Interactive graph viewer with property-similarity layout, hierarchical zoom, and real-time strength tuning.">
 <meta property="og:image" content="images/bitzoom-2.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="BitZoom Viewer">
-<meta name="twitter:description" content="Interactive graph viewer with property-similarity layout, hierarchical zoom, and real-time weight tuning.">
+<meta name="twitter:description" content="Interactive graph viewer with property-similarity layout, hierarchical zoom, and real-time strength tuning.">
 <meta name="twitter:image" content="images/bitzoom-2.png">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
-<link rel="stylesheet" href="bitzoom.css">
+<style>html:not(.css-ready) body{visibility:hidden}</style>
+<link rel="stylesheet" href="bitzoom.css" onload="document.documentElement.classList.add('css-ready')">
 </head>
 <body>
 <a href="#canvas" class="skip-link visually-hidden-focusable">Skip to graph</a>
@@ -49,9 +50,10 @@
     <button class="reset-btn" id="quantModeBtn" title="Quantization mode: Gaussian (density-preserving) or Rank (uniform)" aria-label="Toggle quantization mode">Q:G</button>
     <button class="reset-btn" id="edgeModeBtn" title="Edge display: curves / straight lines / hidden" aria-label="Cycle edge display mode">E:C</button>
     <button class="reset-btn" id="heatmapBtn" title="Heatmap: off / density / splat" aria-label="Cycle heatmap mode">H:D</button>
-    <button class="reset-btn" id="autoTuneBtn" title="Auto-tune weights, alpha, and quantization to maximize visual structure" aria-label="Auto-tune parameters">Auto</button>
+    <button class="reset-btn" id="autoTuneBtn" title="Auto-tune strengths, alpha, and quantization to maximize visual structure" aria-label="Auto-tune parameters">Auto</button>
     <button class="reset-btn" id="gpuBtn" title="WebGPU compute: Auto (adaptive) / GPU always / CPU only" style="width:42px;text-align:center" aria-label="Cycle GPU compute mode">Auto</button>
     <button class="reset-btn" id="glBtn" title="WebGL2 rendering: offloads circle and edge drawing to GPU" aria-label="Toggle WebGL rendering">GL</button>
+    <button class="reset-btn" id="compassBtn" title="Radial strength & bearing compass (R)" aria-label="Toggle compass panel">&#9678;</button>
     <button class="reset-btn" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">&#9788;</button>
     <button class="reset-btn" id="helpBtn" title="Show keyboard shortcuts and control reference" aria-label="Help">?</button>
   </div>
@@ -73,16 +75,15 @@
     </div>
     <div class="drop-hint" style="margin-top:16px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px">Or load from URL</div>
     <div class="file-input-row" style="flex-direction:column;gap:6px;align-items:stretch;max-width:480px;margin:0 auto">
-      <input type="url" id="edgesUrl" placeholder=".edges URL (https://...)" aria-label="Edges file URL" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%">
-      <input type="url" id="nodesUrl" placeholder=".nodes URL (optional)" aria-label="Nodes file URL (optional)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%">
+      <input type="url" id="edgesUrl" placeholder="https://... (CSV, JSON, SNAP, STIX)" aria-label="Data URL" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;width:100%">
     </div>
     <div class="drop-hint" style="margin-top:16px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px">Or load from file</div>
     <div class="file-input-row">
-      <label>.edges or STIX .json
-        <input type="file" id="edgesFile" accept=".edges,.txt,.tsv,.gz,.json,.json.gz" aria-label="Choose edges or STIX file">
+      <label>Data file
+        <input type="file" id="edgesFile" accept=".csv,.tsv,.edges,.json,.json.gz,.csv.gz,.tsv.gz,.graphml,.gexf,.xml,.gz,.txt" aria-label="Choose data file (CSV, D3/JGF JSON, GraphML, GEXF, Cytoscape, SNAP .edges, STIX)">
       </label>
-      <label>.nodes (optional)
-        <input type="file" id="nodesFile" accept=".nodes,.labels,.txt,.tsv,.gz" aria-label="Choose nodes file (optional)">
+      <label>.nodes (optional, SNAP only)
+        <input type="file" id="nodesFile" accept=".nodes,.labels,.txt,.tsv,.gz" aria-label="Choose SNAP nodes file (optional)">
       </label>
     </div>
     <button class="load-btn" id="loadBtn" disabled aria-label="Load graph from file or URL">Load Graph</button>
@@ -103,8 +104,8 @@
   </div>
   <div>
     <div class="panel-title" role="heading" aria-level="2">Cluster by</div>
-    <div class="preset-row" id="presetRow" role="group" aria-label="Weight presets"></div>
-    <div id="weightSliders" role="group" aria-label="Property weight sliders"></div>
+    <div class="preset-row" id="presetRow" role="group" aria-label="Strength presets"></div>
+    <div id="strengthSliders" role="group" aria-label="Property strength sliders"></div>
   </div>
     <div class="algo-info" id="algo-info">
       Click a node or supernode to inspect it. Zoom levels L0–L3 show increasingly fine MinHash bucket partitions.
@@ -120,6 +121,16 @@
   <div id="node-detail"></div>
 </aside>
 
+<div id="compassPanel" class="compass-panel" role="dialog" aria-label="Strength and bearing compass" style="display:none">
+  <div class="compass-titlebar" id="compassTitlebar">
+    <span>Compass</span>
+    <span style="flex:1"></span>
+    <button class="compass-close" id="compassHelp" aria-label="Show compass help" title="Help">?</button>
+    <button class="compass-close" id="compassClose" aria-label="Close compass">&times;</button>
+  </div>
+  <bz-compass id="compassWidget"></bz-compass>
+</div>
+
 <dialog id="errorDialog" aria-labelledby="errorDialogTitle" style="max-width:460px;margin:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:'JetBrains Mono',monospace;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
   <h3 style="margin:0 0 12px;color:var(--accent2);font-size:14px" id="errorDialogTitle">Error</h3>
   <p style="margin:0 0 16px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word" id="errorDialogMsg"></p>
@@ -128,6 +139,7 @@
 
 <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" aria-expanded="false">≡</button>
+<script type="module" src="bz-compass.js"></script>
 <script type="module" src="bitzoom-viewer.js"></script>
 </body>
 </html>

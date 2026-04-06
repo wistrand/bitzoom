@@ -12,6 +12,8 @@ export function parseEdgesFile(text) {
   const edgeTypeMap = new Map();
   let hasThirdCol = false;
 
+  if (!text) return { edgeFrom, edgeTo, edgeCount: 0, edgeTypeMap: null, nodeIds };
+
   let pos = 0;
   const len = text.length;
   while (pos < len) {
@@ -101,7 +103,12 @@ export function parseNodesFile(text) {
 export function buildGraph(parsed, nodesMap, extraPropNames) {
   const nodeArray = [];
   const nodeIndex = {};
-  for (const id of parsed.nodeIds) {
+  // Union of ids from edges and from nodes metadata — either source may be empty.
+  // Edge-only graphs take ids from parsed.nodeIds. Nodes-only graphs take them from nodesMap.
+  // Mixed inputs get both (nodes with metadata but no edges are no longer silently dropped).
+  const allIds = new Set(parsed.nodeIds);
+  if (nodesMap) for (const id of nodesMap.keys()) allIds.add(id);
+  for (const id of allIds) {
     const info = nodesMap ? nodesMap.get(id) : null;
     const group = info ? info.group : 'unknown';
     const label = info ? info.label : id;
@@ -333,6 +340,10 @@ export function computeNodeSig(node) {
 
 // ─── Full pipeline: parse → build → project ──────────────────────────────────
 
+/**
+ * @param {string|null} edgesText - SNAP .edges text, or null/empty for nodes-only graphs
+ * @param {string|null} nodesText - SNAP .nodes text (required when edgesText is empty)
+ */
 export function runPipeline(edgesText, nodesText) {
   const parsed = parseEdgesFile(edgesText);
   const nodesResult = nodesText ? parseNodesFile(nodesText) : null;
@@ -349,8 +360,8 @@ export function runPipeline(edgesText, nodesText) {
 
 /**
  * GPU-accelerated pipeline. Parses on CPU, projects on GPU.
- * @param {string} edgesText
- * @param {string|null} nodesText
+ * @param {string|null} edgesText - SNAP .edges text, or null/empty for nodes-only graphs
+ * @param {string|null} nodesText - SNAP .nodes text (required when edgesText is empty)
  * @param {function} computeProjectionsGPU - async GPU projection function from bitzoom-gpu.js
  * @returns {Promise<object>} same shape as runPipeline
  */
@@ -366,4 +377,79 @@ export async function runPipelineGPU(edgesText, nodesText, computeProjectionsGPU
   );
 
   return { ...graph, projBuf, extraPropNames };
+}
+
+// ─── Object-based pipeline (D3 JSON, JGF, etc.) ──────────────────────────────
+
+/**
+ * Build a parsed-edges structure from an array of edge objects.
+ * Matches the shape returned by parseEdgesFile so buildGraph can consume either.
+ * @param {Array<{src: string, dst: string, type?: string}>|null} edges
+ */
+function edgesToParsed(edges) {
+  const edgeFrom = [];
+  const edgeTo = [];
+  const nodeIds = new Set();
+  const edgeTypeMap = new Map();
+  let hasEdgeTypes = false;
+
+  if (edges) {
+    for (const e of edges) {
+      const src = String(e.src);
+      const dst = String(e.dst);
+      edgeFrom.push(src);
+      edgeTo.push(dst);
+      nodeIds.add(src);
+      nodeIds.add(dst);
+      if (e.type) {
+        hasEdgeTypes = true;
+        if (!edgeTypeMap.has(src)) edgeTypeMap.set(src, new Set());
+        if (!edgeTypeMap.has(dst)) edgeTypeMap.set(dst, new Set());
+        edgeTypeMap.get(src).add(e.type);
+        edgeTypeMap.get(dst).add(e.type);
+      }
+    }
+  }
+
+  return {
+    edgeFrom,
+    edgeTo,
+    edgeCount: edgeFrom.length,
+    edgeTypeMap: hasEdgeTypes ? edgeTypeMap : null,
+    nodeIds,
+  };
+}
+
+/**
+ * Run the full pipeline from already-parsed JavaScript objects instead of SNAP text.
+ * Used by D3 JSON, JGF, and any other format that parses to a native object shape.
+ *
+ * @param {Map<string, {label: string, group: string, extraProps: object}>} nodesMap
+ *        Node metadata keyed by id — same shape as parseNodesFile output.
+ * @param {Array<{src: string, dst: string, type?: string}>|null} edges
+ *        Edge list with stringified endpoints. null/empty for edgeless graphs.
+ * @param {string[]} [extraPropNames=[]]
+ *        Ordered list of extra property group names (same as parseNodesFile output).
+ * @returns {object} same shape as runPipeline
+ */
+export function runPipelineFromObjects(nodesMap, edges, extraPropNames = []) {
+  const parsed = edgesToParsed(edges);
+  const graph = buildGraph(parsed, nodesMap, extraPropNames);
+  const { projBuf } = computeProjections(
+    graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames, graph.numericBins
+  );
+  return { ...graph, projBuf, extraPropNames };
+}
+
+/**
+ * GPU variant of runPipelineFromObjects.
+ * @param {function} computeProjectionsGPU - async GPU projection function from bitzoom-gpu.js
+ */
+export async function runPipelineFromObjectsGPU(nodesMap, edges, extraPropNames, computeProjectionsGPU) {
+  const parsed = edgesToParsed(edges);
+  const graph = buildGraph(parsed, nodesMap, extraPropNames || []);
+  const { projBuf } = await computeProjectionsGPU(
+    graph.nodeArray, graph.adjGroups, graph.groupNames, graph.hasEdgeTypes, extraPropNames || [], graph.numericBins
+  );
+  return { ...graph, projBuf, extraPropNames: extraPropNames || [] };
 }

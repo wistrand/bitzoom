@@ -65,31 +65,31 @@ console.log(`  Generate ${(edges.length / 1e6).toFixed(1)}M edges: ${fmt(perform
 
 // ─── Blend (α=0) ──────────────────────────────────────────────────────────
 
-const weights = {};
-for (const g of GROUP_NAMES) weights[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+const strengths = {};
+for (const g of GROUP_NAMES) strengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
 
 console.log('\n=== Blend + Quantize ===');
 
 const quantStats = {};
 const t2 = performance.now();
-unifiedBlend(nodes, GROUP_NAMES, weights, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
+unifiedBlend(nodes, GROUP_NAMES, strengths, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
 console.log(`  Blend (α=0, gaussian): ${fmt(performance.now() - t2)}`);
 
 // Re-blend with rank for comparison
 const t2b = performance.now();
-unifiedBlend(nodes, GROUP_NAMES, weights, 0, adjList, nodeIndex, 5, 'rank');
+unifiedBlend(nodes, GROUP_NAMES, strengths, 0, adjList, nodeIndex, 5, 'rank');
 console.log(`  Blend (α=0, rank): ${fmt(performance.now() - t2b)}`);
 
-// Weight change
-weights['group'] = 1;
-weights['score'] = 8;
+// Strength change
+strengths['group'] = 1;
+strengths['score'] = 8;
 const t2c = performance.now();
-unifiedBlend(nodes, GROUP_NAMES, weights, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
-console.log(`  Weight change (reblend): ${fmt(performance.now() - t2c)}`);
+unifiedBlend(nodes, GROUP_NAMES, strengths, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
+console.log(`  Strength change (reblend): ${fmt(performance.now() - t2c)}`);
 
 // Topology
 const t2d = performance.now();
-unifiedBlend(nodes, GROUP_NAMES, weights, 0.3, adjList, nodeIndex, 5, 'gaussian', quantStats);
+unifiedBlend(nodes, GROUP_NAMES, strengths, 0.3, adjList, nodeIndex, 5, 'gaussian', quantStats);
 console.log(`  Topo blend (α=0.3, 5 passes): ${fmt(performance.now() - t2d)}`);
 
 // ─── Level building (two-phase) ──────────────────────────────────────────

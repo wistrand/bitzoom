@@ -1,4 +1,4 @@
-import { assertEquals, assertExists, assert } from "https://deno.land/std/assert/mod.ts";
+import { assertEquals, assertExists, assert, assertAlmostEquals } from "https://deno.land/std/assert/mod.ts";
 
 // Load algo first (pipeline depends on it)
 import {
@@ -14,6 +14,8 @@ import {
   parseEdgesFile, parseNodesFile, buildGraph,
   degreeBucket, tokenizeLabel, tokenizeNumeric, computeProjections, runPipeline, computeNodeSig,
 } from "../docs/bitzoom-pipeline.js";
+import { parseCSV, csvRowsToNodes, parseCSVToNodes, parseD3, parseJGF, parseXML, parseGraphML, parseGEXF, parseCytoscape, detectFormat, parseAny, isObjectFormat, isTextFormat, isSpecialFormat, OBJECT_FORMATS, FILE_EXTENSIONS, FILE_ACCEPT_ATTR } from "../docs/bitzoom-parsers.js";
+import { runPipelineFromObjects } from "../docs/bitzoom-pipeline.js";
 
 // ─── Unit tests: bitzoom-algo.js ─────────────────────────────────────────────
 
@@ -286,6 +288,1044 @@ Deno.test("runPipeline: works without labels", () => {
   }
 });
 
+// ─── Nodes-only (edgeless) pipeline ──────────────────────────────────────────
+
+Deno.test("parseEdgesFile: null text returns empty result", () => {
+  const r = parseEdgesFile(null);
+  assertEquals(r.edgeCount, 0);
+  assertEquals(r.edgeFrom.length, 0);
+  assertEquals(r.edgeTo.length, 0);
+  assertEquals(r.nodeIds.size, 0);
+  assertEquals(r.edgeTypeMap, null);
+});
+
+Deno.test("parseEdgesFile: empty string returns empty result", () => {
+  const r = parseEdgesFile("");
+  assertEquals(r.edgeCount, 0);
+  assertEquals(r.nodeIds.size, 0);
+});
+
+Deno.test("buildGraph: nodes-only from nodesMap when parsed is empty", () => {
+  const parsed = parseEdgesFile(null);
+  const nodesResult = parseNodesFile(SAMPLE_LABELS);
+  const graph = buildGraph(parsed, nodesResult.nodes, nodesResult.extraPropNames);
+
+  assertEquals(graph.nodeArray.length, 4);
+  assertEquals(graph.edges.length, 0);
+  // Every node has degree 0 and empty adjacency
+  for (const n of graph.nodeArray) {
+    assertEquals(n.degree, 0);
+    assertEquals(graph.adjList[n.id].length, 0);
+  }
+  // Property groups still include core + extras
+  assert(graph.groupNames.includes("group"));
+  assert(graph.groupNames.includes("label"));
+  assert(graph.groupNames.includes("score")); // extra prop preserved
+  // No edge types when no edges
+  assertEquals(graph.hasEdgeTypes, false);
+});
+
+Deno.test("buildGraph: unions ids from edges and nodesMap (orphan nodes preserved)", () => {
+  // Edges reference A, B, C. Nodes map also has D (orphan, no edges).
+  const parsed = parseEdgesFile("A\tB\nB\tC\n");
+  const nodesResult = parseNodesFile(SAMPLE_LABELS);
+  const graph = buildGraph(parsed, nodesResult.nodes, nodesResult.extraPropNames);
+
+  // 4 nodes: A, B, C (from edges + metadata), D (from metadata only)
+  assertEquals(graph.nodeArray.length, 4);
+  assertExists(graph.nodeIndex["D"]);
+  assertEquals(graph.nodeIndex["D"].degree, 0);
+  assertEquals(graph.nodeIndex["D"].label, "Dave");
+  assertEquals(graph.nodeIndex["D"].group, "animals");
+  // A, B, C have their edge-derived degrees
+  assertEquals(graph.nodeIndex["A"].degree, 1);
+  assertEquals(graph.nodeIndex["B"].degree, 2);
+  assertEquals(graph.nodeIndex["C"].degree, 1);
+});
+
+Deno.test("runPipeline: nodes-only (null edges) produces valid layout", () => {
+  const result = runPipeline(null, SAMPLE_LABELS);
+  assertEquals(result.nodeArray.length, 4);
+  assertEquals(result.edges.length, 0);
+  // Every node has metadata from the .nodes file
+  assertEquals(result.nodeIndex["A"].label, "Alice");
+  assertEquals(result.nodeIndex["A"].group, "people");
+  // Extra property group is present
+  assert(result.groupNames.includes("score"));
+  // Projections computed — buffer non-empty (2 coords × G groups × N nodes)
+  const G = result.groupNames.length;
+  assertEquals(result.projBuf.length, 4 * G * 2);
+  // No edge types
+  assertEquals(result.hasEdgeTypes, false);
+});
+
+Deno.test("runPipeline: nodes-only (empty edges string)", () => {
+  const result = runPipeline("", SAMPLE_LABELS);
+  assertEquals(result.nodeArray.length, 4);
+  assertEquals(result.edges.length, 0);
+  // Degree tokenization produces deg:0 for all — verify via adjGroups being empty
+  for (let i = 0; i < result.nodeArray.length; i++) {
+    assertEquals(result.adjGroups[i].length, 0);
+  }
+});
+
+// ─── CSV parser (bitzoom-parsers.js) ─────────────────────────────────────────
+
+Deno.test("parseCSV: basic comma-delimited", () => {
+  const r = parseCSV("id,label,group\na,Alice,eng\nb,Bob,eng\n");
+  assertEquals(r.delimiter, ",");
+  assertEquals(r.headers, ["id", "label", "group"]);
+  assertEquals(r.rows.length, 2);
+  assertEquals(r.rows[0], ["a", "Alice", "eng"]);
+  assertEquals(r.rows[1], ["b", "Bob", "eng"]);
+});
+
+Deno.test("parseCSV: auto-detects tab delimiter", () => {
+  const r = parseCSV("id\tlabel\ta\tAlice\tb\tBob");
+  assertEquals(r.delimiter, "\t");
+});
+
+Deno.test("parseCSV: auto-detects semicolon delimiter", () => {
+  const r = parseCSV("id;label;group\na;Alice;eng\nb;Bob;eng");
+  assertEquals(r.delimiter, ";");
+  assertEquals(r.rows[0], ["a", "Alice", "eng"]);
+});
+
+Deno.test("parseCSV: respects explicit delimiter opt", () => {
+  const r = parseCSV("id|label|group\na|Alice|eng", { delimiter: "|" });
+  assertEquals(r.delimiter, "|");
+  assertEquals(r.rows[0], ["a", "Alice", "eng"]);
+});
+
+Deno.test("parseCSV: handles quoted fields with embedded commas", () => {
+  const r = parseCSV('id,name,group\na,"Smith, John",eng\nb,"Doe, Jane",eng\n');
+  assertEquals(r.rows[0], ["a", "Smith, John", "eng"]);
+  assertEquals(r.rows[1], ["b", "Doe, Jane", "eng"]);
+});
+
+Deno.test("parseCSV: handles escaped quotes inside quoted fields", () => {
+  const r = parseCSV('id,quote\na,"She said ""hi"""\n');
+  assertEquals(r.rows[0], ["a", 'She said "hi"']);
+});
+
+Deno.test("parseCSV: handles embedded newlines in quoted fields", () => {
+  const r = parseCSV('id,desc\na,"line1\nline2"\nb,single\n');
+  assertEquals(r.rows.length, 2);
+  assertEquals(r.rows[0], ["a", "line1\nline2"]);
+  assertEquals(r.rows[1], ["b", "single"]);
+});
+
+Deno.test("parseCSV: strips UTF-8 BOM", () => {
+  const r = parseCSV("\uFEFFid,label\na,Alice\n");
+  assertEquals(r.headers, ["id", "label"]);
+  assertEquals(r.rows[0], ["a", "Alice"]);
+});
+
+Deno.test("parseCSV: handles CRLF line endings", () => {
+  const r = parseCSV("id,label\r\na,Alice\r\nb,Bob\r\n");
+  assertEquals(r.headers, ["id", "label"]);
+  assertEquals(r.rows[0], ["a", "Alice"]);
+  assertEquals(r.rows[1], ["b", "Bob"]);
+});
+
+Deno.test("parseCSV: skips empty lines", () => {
+  const r = parseCSV("id,label\n\na,Alice\n\n\nb,Bob\n");
+  assertEquals(r.rows.length, 2);
+});
+
+Deno.test("parseCSV: empty/null input", () => {
+  assertEquals(parseCSV("").rows.length, 0);
+  assertEquals(parseCSV(null).rows.length, 0);
+  assertEquals(parseCSV(undefined).rows.length, 0);
+});
+
+Deno.test("parseCSV: handles missing trailing newline", () => {
+  const r = parseCSV("id,label\na,Alice\nb,Bob");
+  assertEquals(r.rows.length, 2);
+  assertEquals(r.rows[1], ["b", "Bob"]);
+});
+
+// ─── csvRowsToNodes header sniffing ──────────────────────────────────────────
+
+Deno.test("csvRowsToNodes: maps id, label, group by name", () => {
+  const { nodes, extraPropNames } = csvRowsToNodes(
+    ["id", "label", "group", "score"],
+    [["a", "Alice", "eng", "5"], ["b", "Bob", "eng", "8"]]
+  );
+  assertEquals(nodes.size, 2);
+  const alice = nodes.get("a");
+  assertExists(alice);
+  assertEquals(alice.label, "Alice");
+  assertEquals(alice.group, "eng");
+  assertEquals(alice.extraProps.score, "5");
+  assertEquals(extraPropNames, ["score"]);
+});
+
+Deno.test("csvRowsToNodes: finds id via alternate names (name)", () => {
+  const { nodes } = csvRowsToNodes(
+    ["node_id", "name", "category"],
+    [["a", "Alice", "eng"]]
+  );
+  const alice = nodes.get("a");
+  assertExists(alice);
+  assertEquals(alice.label, "Alice");
+  assertEquals(alice.group, "eng");
+});
+
+Deno.test("csvRowsToNodes: case-insensitive header matching", () => {
+  const { nodes } = csvRowsToNodes(
+    ["ID", "Name", "Group"],
+    [["a", "Alice", "eng"]]
+  );
+  const alice = nodes.get("a");
+  assertExists(alice);
+  assertEquals(alice.label, "Alice");
+  assertEquals(alice.group, "eng");
+});
+
+Deno.test("csvRowsToNodes: positional fallback when no roles named", () => {
+  const { nodes, extraPropNames } = csvRowsToNodes(
+    ["foo", "bar", "baz", "qux"],
+    [["a", "Alice", "eng", "5"]]
+  );
+  const alice = nodes.get("a");
+  assertExists(alice);
+  assertEquals(alice.label, "Alice"); // col 1 = label positional
+  assertEquals(alice.group, "eng"); // col 2 = group positional
+  assertEquals(extraPropNames, ["qux"]); // only col 3 is extra
+  assertEquals(alice.extraProps.qux, "5");
+});
+
+Deno.test("csvRowsToNodes: id only, no positional label fallback when group is named", () => {
+  // group is matched by name but id/label aren't — only id gets a fallback (first unused col)
+  // label does NOT positional-fall-back, it uses the id value
+  const { nodes } = csvRowsToNodes(
+    ["foo", "category", "bar"],
+    [["a", "eng", "extra"]]
+  );
+  const alice = nodes.get("a");
+  assertExists(alice);
+  assertEquals(alice.label, "a"); // id fallback only, label = id
+  assertEquals(alice.group, "eng"); // from 'category'
+});
+
+Deno.test("csvRowsToNodes: rejects first column as id if it has duplicates (repurposes as group)", () => {
+  // Penguins-like: first column 'species' is categorical, not unique.
+  // Positional fallback would normally assign col 0 = id, col 1 = label, col 2 = group.
+  // Uniqueness check on col 0 fails → promote to group (overriding positional col 2 group).
+  const { nodes, extraPropNames } = csvRowsToNodes(
+    ["species", "island", "bill_length_mm"],
+    [
+      ["Adelie", "Torgersen", "39.1"],
+      ["Adelie", "Biscoe", "38.9"],
+      ["Gentoo", "Biscoe", "46.5"],
+    ]
+  );
+  assertEquals(nodes.size, 3);
+  // All ids should be anonymous (species rejected)
+  assertExists(nodes.get("row_0"));
+  assertExists(nodes.get("row_1"));
+  assertExists(nodes.get("row_2"));
+  // species promoted to group (overriding positional bill_length_mm group)
+  assertEquals(nodes.get("row_0").group, "Adelie");
+  assertEquals(nodes.get("row_1").group, "Adelie");
+  assertEquals(nodes.get("row_2").group, "Gentoo");
+  // col 1 (island) is still the positional label
+  assertEquals(nodes.get("row_0").label, "Torgersen");
+  // bill_length_mm (previously positional group) is released to extras
+  assert(extraPropNames.includes("bill_length_mm"));
+});
+
+Deno.test("csvRowsToNodes: generates anonymous ids for empty id fields", () => {
+  const { nodes } = csvRowsToNodes(
+    ["id", "label"],
+    [["", "Alice"], ["", "Bob"], ["c", "Carol"]]
+  );
+  assertEquals(nodes.size, 3);
+  assertExists(nodes.get("row_0"));
+  assertExists(nodes.get("row_1"));
+  assertExists(nodes.get("c"));
+  assertEquals(nodes.get("row_0").label, "Alice");
+});
+
+Deno.test("csvRowsToNodes: extra columns become property groups", () => {
+  const { nodes, extraPropNames } = csvRowsToNodes(
+    ["id", "label", "group", "platform", "kill chain", "score"],
+    [["T1059", "Command Interpreter", "execution", "windows", "execution", "7"]]
+  );
+  // "kill chain" → "kill_chain" (spaces → underscores)
+  assertEquals(extraPropNames, ["platform", "kill_chain", "score"]);
+  const n = nodes.get("T1059");
+  assertEquals(n.extraProps.platform, "windows");
+  assertEquals(n.extraProps.kill_chain, "execution");
+  assertEquals(n.extraProps.score, "7");
+});
+
+Deno.test("csvRowsToNodes: missing group defaults to 'unknown'", () => {
+  const { nodes } = csvRowsToNodes(
+    ["id", "label"],
+    [["a", "Alice"]]
+  );
+  assertEquals(nodes.get("a").group, "unknown");
+});
+
+// ─── parseCSVToNodes end-to-end ──────────────────────────────────────────────
+
+Deno.test("parseCSVToNodes: integrates parse + sniff", () => {
+  const text = "id,label,group,platform\nT1059,Command Interpreter,execution,windows\nT1053,Scheduled Task,persistence,windows\n";
+  const { nodes, extraPropNames } = parseCSVToNodes(text);
+  assertEquals(nodes.size, 2);
+  assertEquals(extraPropNames, ["platform"]);
+  assertEquals(nodes.get("T1059").label, "Command Interpreter");
+  assertEquals(nodes.get("T1059").extraProps.platform, "windows");
+});
+
+Deno.test("parseCSVToNodes: end-to-end via buildGraph/runPipeline", () => {
+  // Full integration: CSV → nodes map → synthetic nodes text → (edgeless) pipeline
+  const text = "id,label,group,score\na,Alice,eng,5\nb,Bob,eng,8\nc,Carol,sales,3\n";
+  const { nodes, extraPropNames } = parseCSVToNodes(text);
+
+  // Feed directly into buildGraph with empty edges
+  const emptyParsed = parseEdgesFile(null);
+  const graph = buildGraph(emptyParsed, nodes, extraPropNames);
+  assertEquals(graph.nodeArray.length, 3);
+  assertEquals(graph.edges.length, 0);
+  assertEquals(graph.nodeIndex["a"].label, "Alice");
+  assertEquals(graph.nodeIndex["a"].group, "eng");
+  assertEquals(graph.nodeIndex["a"].extraProps.score, "5");
+  assert(graph.groupNames.includes("score"));
+  assert(graph.groupNames.includes("label"));
+  // Score column is numeric (100% parseable) → should create numericBins
+  assertExists(graph.numericBins.score);
+});
+
+// ─── D3 JSON parser ──────────────────────────────────────────────────────────
+
+Deno.test("parseD3: basic {nodes, links}", () => {
+  const data = {
+    nodes: [
+      { id: "a", label: "Alice", group: "eng" },
+      { id: "b", label: "Bob", group: "eng" },
+    ],
+    links: [{ source: "a", target: "b" }],
+  };
+  const { nodes, edges, extraPropNames } = parseD3(data);
+  assertEquals(nodes.size, 2);
+  assertEquals(edges.length, 1);
+  assertEquals(edges[0], { src: "a", dst: "b" });
+  assertEquals(extraPropNames.length, 0);
+  assertEquals(nodes.get("a").label, "Alice");
+  assertEquals(nodes.get("a").group, "eng");
+});
+
+Deno.test("parseD3: accepts 'edges' key as alias for 'links'", () => {
+  const data = {
+    nodes: [{ id: "a" }, { id: "b" }],
+    edges: [{ src: "a", dst: "b" }],
+  };
+  const { edges } = parseD3(data);
+  assertEquals(edges[0], { src: "a", dst: "b" });
+});
+
+Deno.test("parseD3: extra node props become property groups", () => {
+  const data = {
+    nodes: [
+      { id: "a", label: "Alice", group: "eng", platform: "linux", score: 5 },
+      { id: "b", label: "Bob", group: "eng", platform: "windows", score: 8 },
+    ],
+    links: [],
+  };
+  const { nodes, extraPropNames } = parseD3(data);
+  assertEquals(extraPropNames.sort(), ["platform", "score"]);
+  assertEquals(nodes.get("a").extraProps.platform, "linux");
+  assertEquals(nodes.get("a").extraProps.score, "5"); // coerced to string
+});
+
+Deno.test("parseD3: edge type from 'type' or 'relation' field", () => {
+  const data = {
+    nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+    links: [
+      { source: "a", target: "b", type: "knows" },
+      { source: "b", target: "c", relation: "works-with" },
+    ],
+  };
+  const { edges } = parseD3(data);
+  assertEquals(edges[0].type, "knows");
+  assertEquals(edges[1].type, "works-with");
+});
+
+Deno.test("parseD3: missing nodes array throws", () => {
+  let thrown = false;
+  try { parseD3({}); } catch (_e) { thrown = true; }
+  assert(thrown, "Expected throw for missing nodes");
+});
+
+Deno.test("parseD3: numeric ids coerced to string", () => {
+  const data = {
+    nodes: [{ id: 1 }, { id: 2 }],
+    links: [{ source: 1, target: 2 }],
+  };
+  const { nodes, edges } = parseD3(data);
+  assertExists(nodes.get("1"));
+  assertExists(nodes.get("2"));
+  assertEquals(edges[0], { src: "1", dst: "2" });
+});
+
+Deno.test("parseD3: empty id gets anonymous row id", () => {
+  const data = {
+    nodes: [{ id: "", label: "Alice" }, { id: null, label: "Bob" }, { id: "c", label: "Carol" }],
+    links: [],
+  };
+  const { nodes } = parseD3(data);
+  assertEquals(nodes.size, 3);
+  assertExists(nodes.get("row_0"));
+  assertExists(nodes.get("row_1"));
+  assertExists(nodes.get("c"));
+});
+
+Deno.test("parseD3: falls back to 'name' when 'id' is absent (Miserables convention)", () => {
+  const data = {
+    nodes: [{ name: "Myriel", group: 1 }, { name: "Napoleon", group: 1 }],
+    links: [{ source: 0, target: 1, value: 1 }],
+  };
+  const { nodes, edges } = parseD3(data);
+  assertEquals(nodes.size, 2);
+  assertExists(nodes.get("Myriel"));
+  assertEquals(nodes.get("Myriel").label, "Myriel");
+  // Numeric link endpoints resolved as indices into nodes array
+  assertEquals(edges[0], { src: "Myriel", dst: "Napoleon" });
+});
+
+Deno.test("parseD3: numeric link endpoints prefer id match over index", () => {
+  // Nodes with explicit numeric ids — link endpoints should match those, not array indices
+  const data = {
+    nodes: [{ id: 10 }, { id: 20 }, { id: 30 }],
+    links: [{ source: 10, target: 30 }],
+  };
+  const { edges } = parseD3(data);
+  assertEquals(edges[0], { src: "10", dst: "30" });
+});
+
+Deno.test("parseD3: resolves object-form link endpoints (post d3-force)", () => {
+  const data = {
+    nodes: [{ id: "a" }, { id: "b" }],
+    links: [{ source: { id: "a" }, target: { id: "b" } }],
+  };
+  const { edges } = parseD3(data);
+  assertEquals(edges[0], { src: "a", dst: "b" });
+});
+
+Deno.test("parseJGF: accepts dict-form graph.nodes (JGF v1 convention)", () => {
+  const data = {
+    graph: {
+      nodes: {
+        "Myriel": { label: "Myriel", metadata: { group: 1 } },
+        "Napoleon": { label: "Napoleon", metadata: { group: 1 } },
+      },
+      edges: [{ source: "Myriel", target: "Napoleon", metadata: { value: 1 } }],
+    },
+  };
+  const { nodes, edges } = parseJGF(data);
+  assertEquals(nodes.size, 2);
+  assertExists(nodes.get("Myriel"));
+  assertEquals(nodes.get("Myriel").group, "1");
+  assertEquals(edges[0].src, "Myriel");
+});
+
+// ─── JGF parser ──────────────────────────────────────────────────────────────
+
+Deno.test("parseJGF: basic single-graph form", () => {
+  const data = {
+    graph: {
+      nodes: [
+        { id: "a", label: "Alice", metadata: { group: "eng", lang: "Go" } },
+        { id: "b", label: "Bob", metadata: { group: "eng", lang: "Rust" } },
+      ],
+      edges: [{ source: "a", target: "b", relation: "works-with" }],
+    },
+  };
+  const { nodes, edges, extraPropNames } = parseJGF(data);
+  assertEquals(nodes.size, 2);
+  assertEquals(nodes.get("a").label, "Alice");
+  assertEquals(nodes.get("a").group, "eng");
+  assertEquals(nodes.get("a").extraProps.lang, "Go");
+  assertEquals(extraPropNames, ["lang"]);
+  assertEquals(edges[0], { src: "a", dst: "b", type: "works-with" });
+});
+
+Deno.test("parseJGF: flattens metadata into property groups", () => {
+  const data = {
+    graph: {
+      nodes: [{
+        id: "T1059",
+        label: "Command Interpreter",
+        metadata: { group: "execution", platform: "windows", kill_chain: "execution", score: 7 },
+      }],
+      edges: [],
+    },
+  };
+  const { nodes, extraPropNames } = parseJGF(data);
+  assertEquals(extraPropNames.sort(), ["kill_chain", "platform", "score"]);
+  const n = nodes.get("T1059");
+  assertEquals(n.extraProps.platform, "windows");
+  assertEquals(n.extraProps.kill_chain, "execution");
+  assertEquals(n.extraProps.score, "7");
+});
+
+Deno.test("parseJGF: multi-graph form picks first graph", () => {
+  const data = {
+    graphs: [
+      { nodes: [{ id: "a" }, { id: "b" }], edges: [{ source: "a", target: "b" }] },
+      { nodes: [{ id: "x" }], edges: [] },
+    ],
+  };
+  const { nodes, edges } = parseJGF(data);
+  assertEquals(nodes.size, 2);
+  assertEquals(edges.length, 1);
+  assertExists(nodes.get("a"));
+});
+
+Deno.test("parseJGF: missing graph throws", () => {
+  let thrown = false;
+  try { parseJGF({}); } catch (_e) { thrown = true; }
+  assert(thrown);
+});
+
+Deno.test("parseJGF: no metadata defaults group to 'unknown'", () => {
+  const data = {
+    graph: {
+      nodes: [{ id: "a", label: "Alice" }],
+      edges: [],
+    },
+  };
+  const { nodes } = parseJGF(data);
+  assertEquals(nodes.get("a").group, "unknown");
+});
+
+// ─── runPipelineFromObjects ──────────────────────────────────────────────────
+
+Deno.test("runPipelineFromObjects: end-to-end with edges", () => {
+  const nodesMap = new Map([
+    ["a", { label: "Alice", group: "eng", extraProps: { lang: "Go" } }],
+    ["b", { label: "Bob", group: "eng", extraProps: { lang: "Rust" } }],
+    ["c", { label: "Carol", group: "sales", extraProps: { lang: "TS" } }],
+  ]);
+  const edges = [
+    { src: "a", dst: "b" },
+    { src: "b", dst: "c" },
+  ];
+  const result = runPipelineFromObjects(nodesMap, edges, ["lang"]);
+  assertEquals(result.nodeArray.length, 3);
+  assertEquals(result.edges.length, 2);
+  assertEquals(result.nodeIndex["a"].degree, 1);
+  assertEquals(result.nodeIndex["b"].degree, 2);
+  assert(result.groupNames.includes("lang"));
+  const G = result.groupNames.length;
+  assertEquals(result.projBuf.length, 3 * G * 2);
+});
+
+Deno.test("runPipelineFromObjects: nodes-only (null edges)", () => {
+  const nodesMap = new Map([
+    ["a", { label: "Alice", group: "eng", extraProps: {} }],
+    ["b", { label: "Bob", group: "eng", extraProps: {} }],
+  ]);
+  const result = runPipelineFromObjects(nodesMap, null, []);
+  assertEquals(result.nodeArray.length, 2);
+  assertEquals(result.edges.length, 0);
+  for (const n of result.nodeArray) assertEquals(n.degree, 0);
+});
+
+Deno.test("runPipelineFromObjects: edge types captured", () => {
+  const nodesMap = new Map([
+    ["a", { label: "A", group: "g", extraProps: {} }],
+    ["b", { label: "B", group: "g", extraProps: {} }],
+  ]);
+  const edges = [{ src: "a", dst: "b", type: "knows" }];
+  const result = runPipelineFromObjects(nodesMap, edges, []);
+  assertEquals(result.hasEdgeTypes, true);
+  assert(result.groupNames.includes("edgetype"));
+});
+
+Deno.test("parseD3 + runPipelineFromObjects: full D3 JSON pipeline", () => {
+  const data = {
+    nodes: [
+      { id: "a", label: "Alice", group: "eng", platform: "linux" },
+      { id: "b", label: "Bob", group: "eng", platform: "windows" },
+      { id: "c", label: "Carol", group: "sales", platform: "macos" },
+    ],
+    links: [{ source: "a", target: "b" }, { source: "b", target: "c" }],
+  };
+  const { nodes, edges, extraPropNames } = parseD3(data);
+  const result = runPipelineFromObjects(nodes, edges, extraPropNames);
+  assertEquals(result.nodeArray.length, 3);
+  assertEquals(result.edges.length, 2);
+  assert(result.groupNames.includes("platform"));
+  assertEquals(result.nodeIndex["a"].extraProps.platform, "linux");
+});
+
+Deno.test("parseJGF + runPipelineFromObjects: full JGF pipeline", () => {
+  const data = {
+    graph: {
+      nodes: [
+        { id: "T1", label: "Technique 1", metadata: { group: "execution", platform: "win" } },
+        { id: "T2", label: "Technique 2", metadata: { group: "persistence", platform: "linux" } },
+      ],
+      edges: [{ source: "T1", target: "T2", relation: "related" }],
+    },
+  };
+  const { nodes, edges, extraPropNames } = parseJGF(data);
+  const result = runPipelineFromObjects(nodes, edges, extraPropNames);
+  assertEquals(result.nodeArray.length, 2);
+  assertEquals(result.edges.length, 1);
+  assertEquals(result.hasEdgeTypes, true);
+  assert(result.groupNames.includes("platform"));
+  assertEquals(result.nodeIndex["T1"].group, "execution");
+});
+
+// ─── detectFormat ────────────────────────────────────────────────────────────
+
+Deno.test("detectFormat: CSV with comma delimiter", () => {
+  assertEquals(detectFormat("id,label,group\na,Alice,eng"), "csv");
+});
+
+Deno.test("detectFormat: CSV with semicolon delimiter", () => {
+  assertEquals(detectFormat("id;label;group\na;Alice;eng"), "csv");
+});
+
+Deno.test("detectFormat: SNAP from tab-delimited content without filename", () => {
+  assertEquals(detectFormat("A\tB\nB\tC\n"), "snap");
+});
+
+Deno.test("detectFormat: SNAP .nodes via # NodeId header", () => {
+  assertEquals(detectFormat("# NodeId\tLabel\tGroup\na\tAlice\teng\n"), "snap-nodes");
+});
+
+Deno.test("detectFormat: SNAP comment with tab → snap (ambiguous)", () => {
+  assertEquals(detectFormat("# comment\nA\tB\n"), "snap");
+});
+
+Deno.test("detectFormat: SNAP comment with comma → csv", () => {
+  assertEquals(detectFormat("# comment\na,b,c\n"), "csv");
+});
+
+Deno.test("detectFormat: filename hint overrides for .edges", () => {
+  assertEquals(detectFormat("A\tB\n", "data.edges"), "snap-edges");
+  assertEquals(detectFormat("A\tB\n", "data.edges.gz"), "snap-edges");
+});
+
+Deno.test("detectFormat: filename hint overrides for .nodes", () => {
+  assertEquals(detectFormat("a\tAlice\teng\n", "data.nodes"), "snap-nodes");
+  assertEquals(detectFormat("a\tAlice\teng\n", "data.labels"), "snap-nodes");
+});
+
+Deno.test("detectFormat: D3 JSON {nodes, links}", () => {
+  assertEquals(detectFormat('{"nodes":[{"id":"a"}],"links":[]}'), "d3");
+});
+
+Deno.test("detectFormat: D3 JSON {nodes, edges}", () => {
+  assertEquals(detectFormat('{"nodes":[{"id":"a"}],"edges":[]}'), "d3");
+});
+
+Deno.test("detectFormat: JGF single-graph", () => {
+  assertEquals(detectFormat('{"graph":{"nodes":[{"id":"a"}],"edges":[]}}'), "jgf");
+});
+
+Deno.test("detectFormat: JGF multi-graph", () => {
+  assertEquals(detectFormat('{"graphs":[{"nodes":[{"id":"a"}],"edges":[]}]}'), "jgf");
+});
+
+Deno.test("detectFormat: Cytoscape JSON", () => {
+  assertEquals(detectFormat('{"elements":{"nodes":[{"data":{"id":"a"}}]}}'), "cytoscape");
+});
+
+Deno.test("detectFormat: bare JSON array → d3-bare", () => {
+  assertEquals(detectFormat('[{"id":"a"},{"id":"b"}]'), "d3-bare");
+});
+
+Deno.test("detectFormat: GraphML XML", () => {
+  assertEquals(detectFormat('<?xml version="1.0"?><graphml xmlns="...">...</graphml>'), "graphml");
+});
+
+Deno.test("detectFormat: GEXF XML", () => {
+  assertEquals(detectFormat('<?xml version="1.0"?><gexf xmlns="...">...</gexf>'), "gexf");
+});
+
+Deno.test("detectFormat: unknown XML", () => {
+  assertEquals(detectFormat('<?xml version="1.0"?><svg>...</svg>'), "xml");
+});
+
+Deno.test("detectFormat: malformed JSON → unknown", () => {
+  assertEquals(detectFormat('{"nodes":[{'), "unknown");
+});
+
+Deno.test("detectFormat: empty / null input → unknown", () => {
+  assertEquals(detectFormat(""), "unknown");
+  assertEquals(detectFormat(null), "unknown");
+});
+
+Deno.test("detectFormat: BOM prefix doesn't break detection", () => {
+  assertEquals(detectFormat("\uFEFFid,label\na,Alice"), "csv");
+});
+
+// ─── parseAny dispatch ───────────────────────────────────────────────────────
+
+Deno.test("parseAny: CSV dispatch", () => {
+  const r = parseAny("id,label,group\na,Alice,eng\nb,Bob,eng\n");
+  assertEquals(r.format, "csv");
+  assertEquals(r.nodes.size, 2);
+  assertEquals(r.edges, null);
+});
+
+Deno.test("parseAny: D3 dispatch", () => {
+  const r = parseAny('{"nodes":[{"id":"a","label":"Alice"}],"links":[]}');
+  assertEquals(r.format, "d3");
+  assertEquals(r.nodes.size, 1);
+  assertEquals(r.edges.length, 0);
+});
+
+Deno.test("parseAny: JGF dispatch", () => {
+  const r = parseAny('{"graph":{"nodes":[{"id":"a","metadata":{"group":"eng"}}],"edges":[]}}');
+  assertEquals(r.format, "jgf");
+  assertEquals(r.nodes.size, 1);
+  assertEquals(r.nodes.get("a").group, "eng");
+});
+
+Deno.test("parseAny: SNAP .nodes via filename hint", () => {
+  const text = "# NodeId\tLabel\tGroup\na\tAlice\teng\nb\tBob\teng\n";
+  const r = parseAny(text, "data.nodes");
+  assertEquals(r.format, "snap-nodes");
+  assertEquals(r.nodes.size, 2);
+  assertEquals(r.edges, null);
+});
+
+Deno.test("parseAny: bare JSON array dispatches as d3-bare", () => {
+  const r = parseAny('[{"id":"a","label":"Alice"},{"id":"b","label":"Bob"}]');
+  assertEquals(r.format, "d3-bare");
+  assertEquals(r.nodes.size, 2);
+  assertEquals(r.edges.length, 0);
+});
+
+Deno.test("parseAny: SNAP .edges throws with clear error", () => {
+  let thrown = false, msg = "";
+  try { parseAny("A\tB\nB\tC\n", "data.edges"); }
+  catch (e) { thrown = true; msg = e.message; }
+  assert(thrown);
+  assert(msg.toLowerCase().includes("snap"));
+});
+
+Deno.test("parseAny: GraphML throws 'not yet supported'", () => {
+  let thrown = false, msg = "";
+  try { parseAny("<graphml></graphml>"); }
+  catch (e) { thrown = true; msg = e.message; }
+  assert(thrown);
+  assert(msg.includes("GraphML"));
+});
+
+Deno.test("parseAny: unknown format throws", () => {
+  let thrown = false;
+  try { parseAny(""); } catch (_e) { thrown = true; }
+  assert(thrown);
+});
+
+Deno.test("parseAny → runPipelineFromObjects: CSV end-to-end", () => {
+  const text = "id,label,group,score\na,Alice,eng,5\nb,Bob,eng,8\n";
+  const { nodes, edges, extraPropNames } = parseAny(text);
+  const result = runPipelineFromObjects(nodes, edges, extraPropNames);
+  assertEquals(result.nodeArray.length, 2);
+  assertEquals(result.edges.length, 0);
+  assert(result.groupNames.includes("score"));
+});
+
+Deno.test("parseAny → runPipelineFromObjects: D3 end-to-end", () => {
+  const text = '{"nodes":[{"id":"a","label":"Alice","group":"eng"},{"id":"b","label":"Bob","group":"eng"}],"links":[{"source":"a","target":"b"}]}';
+  const { nodes, edges, extraPropNames } = parseAny(text);
+  const result = runPipelineFromObjects(nodes, edges, extraPropNames);
+  assertEquals(result.nodeArray.length, 2);
+  assertEquals(result.edges.length, 1);
+});
+
+// ─── Minimal XML parser ──────────────────────────────────────────────────────
+
+Deno.test("parseXML: basic element tree", () => {
+  const xml = `<?xml version="1.0"?>
+<root>
+  <child id="a">text</child>
+  <child id="b"/>
+</root>`;
+  const tree = parseXML(xml);
+  assertEquals(tree.tag, "root");
+  assertEquals(tree.children.length, 2);
+  assertEquals(tree.children[0].tag, "child");
+  assertEquals(tree.children[0].attrs.id, "a");
+  assertEquals(tree.children[0].text, "text");
+  assertEquals(tree.children[1].attrs.id, "b");
+});
+
+Deno.test("parseXML: strips namespace prefixes", () => {
+  const xml = `<svg:root xmlns:svg="..."><svg:node id="a"/></svg:root>`;
+  const tree = parseXML(xml);
+  assertEquals(tree.tag, "root");
+  assertEquals(tree.children[0].tag, "node");
+});
+
+Deno.test("parseXML: handles comments, CDATA, DOCTYPE", () => {
+  const xml = `<?xml version="1.0"?>
+<!DOCTYPE root>
+<!-- a comment -->
+<root>
+  <data><![CDATA[raw & <stuff>]]></data>
+</root>`;
+  const tree = parseXML(xml);
+  assertEquals(tree.tag, "root");
+  assertEquals(tree.children[0].text, "raw & <stuff>");
+});
+
+Deno.test("parseXML: decodes standard entities", () => {
+  const xml = `<root><x attr="a &amp; b">&lt;value&gt;</x></root>`;
+  const tree = parseXML(xml);
+  assertEquals(tree.children[0].attrs.attr, "a & b");
+  assertEquals(tree.children[0].text, "<value>");
+});
+
+// ─── GraphML parser ──────────────────────────────────────────────────────────
+
+Deno.test("parseGraphML: basic graph with keys and data", () => {
+  const xml = `<?xml version="1.0"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <key id="d0" for="node" attr.name="color" attr.type="string"/>
+  <key id="d1" for="edge" attr.name="weight" attr.type="double"/>
+  <graph edgedefault="undirected">
+    <node id="n0"><data key="d0">red</data></node>
+    <node id="n1"><data key="d0">blue</data></node>
+    <edge source="n0" target="n1"><data key="d1">1.5</data></edge>
+  </graph>
+</graphml>`;
+  const { nodes, edges, extraPropNames } = parseGraphML(xml);
+  assertEquals(nodes.size, 2);
+  assertEquals(edges.length, 1);
+  assertEquals(edges[0].src, "n0");
+  assertEquals(edges[0].dst, "n1");
+  assertEquals(nodes.get("n0").extraProps.color, "red");
+  assert(extraPropNames.includes("color"));
+});
+
+Deno.test("parseGraphML: recognizes 'name' as label and 'Faction' as extra", () => {
+  const xml = `<?xml version="1.0"?>
+<graphml>
+  <key id="name" for="node" attr.name="name" attr.type="string"/>
+  <key id="Faction" for="node" attr.name="Faction" attr.type="int"/>
+  <graph>
+    <node id="n0"><data key="name">Mr Hi</data><data key="Faction">1</data></node>
+  </graph>
+</graphml>`;
+  const { nodes } = parseGraphML(xml);
+  assertEquals(nodes.get("n0").label, "Mr Hi");
+  assertEquals(nodes.get("n0").extraProps.Faction, "1");
+});
+
+Deno.test("parseGraphML: missing root throws", () => {
+  let thrown = false;
+  try { parseGraphML("<xml><not-graphml/></xml>"); } catch (_e) { thrown = true; }
+  assert(thrown);
+});
+
+// ─── GEXF parser ─────────────────────────────────────────────────────────────
+
+Deno.test("parseGEXF: basic graph with node attributes", () => {
+  const xml = `<?xml version="1.0"?>
+<gexf>
+  <graph>
+    <attributes class="node">
+      <attribute id="0" title="Gender" type="string"/>
+    </attributes>
+    <nodes>
+      <node id="1" label="Myriel">
+        <attvalues><attvalue for="0" value="M"/></attvalues>
+      </node>
+      <node id="2" label="Napoleon">
+        <attvalues><attvalue for="0" value="M"/></attvalues>
+      </node>
+    </nodes>
+    <edges>
+      <edge source="1" target="2"/>
+    </edges>
+  </graph>
+</gexf>`;
+  const { nodes, edges, extraPropNames } = parseGEXF(xml);
+  assertEquals(nodes.size, 2);
+  assertEquals(nodes.get("1").label, "Myriel");
+  assertEquals(nodes.get("1").extraProps.Gender, "M");
+  assertEquals(edges[0], { src: "1", dst: "2" });
+  assert(extraPropNames.includes("Gender"));
+});
+
+Deno.test("parseGEXF: edge label becomes edge type", () => {
+  const xml = `<?xml version="1.0"?>
+<gexf>
+  <graph>
+    <nodes>
+      <node id="a" label="A"/>
+      <node id="b" label="B"/>
+    </nodes>
+    <edges>
+      <edge source="a" target="b" label="knows"/>
+    </edges>
+  </graph>
+</gexf>`;
+  const { edges } = parseGEXF(xml);
+  assertEquals(edges[0].type, "knows");
+});
+
+Deno.test("parseGEXF: missing root throws", () => {
+  let thrown = false;
+  try { parseGEXF("<graphml></graphml>"); } catch (_e) { thrown = true; }
+  assert(thrown);
+});
+
+// ─── Cytoscape parser ────────────────────────────────────────────────────────
+
+Deno.test("parseCytoscape: grouped form", () => {
+  const data = {
+    elements: {
+      nodes: [
+        { data: { id: "a", label: "Alice", group: "eng", score: 5 } },
+        { data: { id: "b", label: "Bob", group: "eng" } },
+      ],
+      edges: [
+        { data: { source: "a", target: "b", weight: 1.5 } },
+      ],
+    },
+  };
+  const { nodes, edges, extraPropNames } = parseCytoscape(data);
+  assertEquals(nodes.size, 2);
+  assertEquals(edges.length, 1);
+  assertEquals(nodes.get("a").label, "Alice");
+  assertEquals(nodes.get("a").group, "eng");
+  assertEquals(nodes.get("a").extraProps.score, "5");
+  assertEquals(edges[0].src, "a");
+  assertEquals(edges[0].dst, "b");
+  assert(extraPropNames.includes("score"));
+});
+
+Deno.test("parseCytoscape: flat array form with group field", () => {
+  const data = {
+    elements: [
+      { group: "nodes", data: { id: "a", label: "Alice" } },
+      { group: "nodes", data: { id: "b", label: "Bob" } },
+      { group: "edges", data: { source: "a", target: "b" } },
+    ],
+  };
+  const { nodes, edges } = parseCytoscape(data);
+  assertEquals(nodes.size, 2);
+  assertEquals(edges.length, 1);
+});
+
+Deno.test("parseCytoscape: edge type from relation field", () => {
+  const data = {
+    elements: {
+      nodes: [{ data: { id: "a" } }, { data: { id: "b" } }],
+      edges: [{ data: { source: "a", target: "b", relation: "works-with" } }],
+    },
+  };
+  const { edges } = parseCytoscape(data);
+  assertEquals(edges[0].type, "works-with");
+});
+
+Deno.test("parseCytoscape: missing elements throws", () => {
+  let thrown = false;
+  try { parseCytoscape({}); } catch (_e) { thrown = true; }
+  assert(thrown);
+});
+
+// ─── detectFormat for new formats ────────────────────────────────────────────
+
+Deno.test("detectFormat + parseAny: GraphML dispatches correctly", () => {
+  const xml = `<?xml version="1.0"?><graphml><graph><node id="a"/></graph></graphml>`;
+  assertEquals(detectFormat(xml), "graphml");
+  const r = parseAny(xml);
+  assertEquals(r.format, "graphml");
+  assertEquals(r.nodes.size, 1);
+});
+
+Deno.test("detectFormat + parseAny: GEXF dispatches correctly", () => {
+  const xml = `<?xml version="1.0"?><gexf><graph><nodes><node id="a" label="A"/></nodes><edges/></graph></gexf>`;
+  assertEquals(detectFormat(xml), "gexf");
+  const r = parseAny(xml);
+  assertEquals(r.format, "gexf");
+  assertEquals(r.nodes.size, 1);
+});
+
+Deno.test("detectFormat + parseAny: Cytoscape dispatches correctly", () => {
+  const json = '{"elements":{"nodes":[{"data":{"id":"a"}}],"edges":[]}}';
+  assertEquals(detectFormat(json), "cytoscape");
+  const r = parseAny(json);
+  assertEquals(r.format, "cytoscape");
+  assertEquals(r.nodes.size, 1);
+});
+
+// ─── Format capability exports ───────────────────────────────────────────────
+
+Deno.test("detectFormat: STIX 2.x bundle", () => {
+  assertEquals(detectFormat('{"type":"bundle","id":"bundle--1","objects":[{"type":"indicator"}]}'), "stix");
+  assertEquals(detectFormat('{"objects":[{"type":"malware","id":"m1"}]}'), "stix");
+});
+
+Deno.test("isObjectFormat classifies parseAny-supported formats", () => {
+  for (const fmt of ['csv', 'd3', 'd3-bare', 'jgf', 'graphml', 'gexf', 'cytoscape', 'stix', 'snap-nodes']) {
+    assert(isObjectFormat(fmt), `${fmt} should be an object format`);
+  }
+  for (const fmt of ['snap-edges', 'snap', 'unknown', 'xml']) {
+    assert(!isObjectFormat(fmt), `${fmt} should NOT be an object format`);
+  }
+});
+
+Deno.test("isTextFormat classifies SNAP text-pipeline formats", () => {
+  assert(isTextFormat('snap-edges'));
+  assert(isTextFormat('snap'));
+  assert(!isTextFormat('csv'));
+  assert(!isTextFormat('snap-nodes'));
+});
+
+Deno.test("isSpecialFormat: empty set after STIX inlined", () => {
+  assert(!isSpecialFormat('stix'));
+  assert(!isSpecialFormat('graphml'));
+  assert(!isSpecialFormat('csv'));
+});
+
+Deno.test("FILE_EXTENSIONS includes all supported extensions", () => {
+  const required = ['.csv', '.tsv', '.json', '.graphml', '.gexf', '.xml', '.edges', '.nodes'];
+  for (const ext of required) {
+    assert(FILE_EXTENSIONS.includes(ext), `${ext} should be in FILE_EXTENSIONS`);
+  }
+  // accept attr is comma-joined
+  assert(FILE_ACCEPT_ATTR.includes('.csv'));
+  assert(FILE_ACCEPT_ATTR.includes('.graphml'));
+});
+
+Deno.test("OBJECT_FORMATS set matches isObjectFormat", () => {
+  for (const fmt of OBJECT_FORMATS) assert(isObjectFormat(fmt));
+});
+
+Deno.test("parseAny: STIX dispatches to parseSTIX and returns unified shape", () => {
+  const bundle = {
+    type: 'bundle',
+    id: 'bundle--1',
+    objects: [
+      { type: 'threat-actor', id: 'threat-actor--a', name: 'APT1', threat_actor_types: ['nation-state'] },
+      { type: 'malware', id: 'malware--m', name: 'Stuxnet', malware_types: ['worm'], is_family: false },
+      { type: 'relationship', id: 'relationship--r', source_ref: 'threat-actor--a', target_ref: 'malware--m', relationship_type: 'uses' },
+    ],
+  };
+  const r = parseAny(JSON.stringify(bundle));
+  assertEquals(r.format, 'stix');
+  assertEquals(r.nodes.size, 2); // threat-actor + malware (relationship is an SRO, filtered)
+  assertEquals(r.edges.length, 1);
+  assertEquals(r.edges[0].type, 'uses');
+  assertEquals(r.nodes.get('threat-actor--a').label, 'APT1');
+  assertEquals(r.nodes.get('threat-actor--a').group, 'threat-actor');
+  assertEquals(r.nodes.get('threat-actor--a').extraProps.subtype, 'nation-state');
+});
+
 // ─── Numeric tokenization ────────────────────────────────────────────────────
 
 Deno.test("tokenizeNumeric: emits 3 multi-resolution tokens for numbers", () => {
@@ -530,9 +1570,9 @@ Deno.test("buildLevel: creates supernodes and edges", () => {
   }
 
   // Blend to assign positions
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5);
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5);
 
   // Build level 1 (2x2 grid)
   const level = buildLevel(1, nodes, result.edges, nodeIndex,
@@ -592,9 +1632,9 @@ Deno.test("E2E: Epstein dataset loads and processes correctly", async () => {
     }
   }
 
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = g === "group" ? 3 : 1;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5);
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = g === "group" ? 3 : 1;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5);
 
   // Verify grid coords assigned
   for (const n of nodes) {
@@ -666,16 +1706,16 @@ Deno.test("E2E: Epstein with topology alpha > 0", async () => {
     }
   }
 
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = 1;
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = 1;
 
   // Blend with alpha=0
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5);
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5);
   const posAlpha0 = nodes.map(n => [n.px, n.py]);
 
   // Reset and blend with alpha=0.5
   for (const n of nodes) { n.px = 0; n.py = 0; n.gx = 0; n.gy = 0; }
-  unifiedBlend(nodes, result.groupNames, weights, 0.5, adjList, nodeIndex, 5);
+  unifiedBlend(nodes, result.groupNames, strengths, 0.5, adjList, nodeIndex, 5);
   const posAlpha05 = nodes.map(n => [n.px, n.py]);
 
   // Positions should differ
@@ -756,9 +1796,9 @@ Deno.test("buildLevelNodes: returns supernodes with empty snEdges", () => {
   for (const e of graph.edges) {
     if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
   }
-  const weights: Record<string, number> = {};
-  for (const g of graph.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, graph.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  const strengths: Record<string, number> = {};
+  for (const g of graph.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, graph.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
 
   const lvl = buildLevelNodes(4, nodes, n => n.group, n => n.label || n.id, () => '#888');
   assert(lvl.supernodes.length > 0, "Should have supernodes");
@@ -786,9 +1826,9 @@ Deno.test("buildLevelEdges: populates snEdges correctly", () => {
   for (const e of graph.edges) {
     if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
   }
-  const weights: Record<string, number> = {};
-  for (const g of graph.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, graph.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  const strengths: Record<string, number> = {};
+  for (const g of graph.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, graph.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
 
   // Phase 1
   const lvl = buildLevelNodes(4, nodes, n => n.group, n => n.label || n.id, () => '#888');
@@ -802,6 +1842,103 @@ Deno.test("buildLevelEdges: populates snEdges correctly", () => {
   const ref = buildLevel(4, nodes, graph.edges, nodeIndex, n => n.group, n => n.label || n.id, () => '#888');
   assertEquals(lvl.snEdges.length, ref.snEdges.length, "Edge count should match combined buildLevel");
   assertEquals(lvl.supernodes.length, ref.supernodes.length, "Supernode count should match");
+});
+
+// ─── Bearings (per-group rotation) ───────────────────────────────────────────
+
+/** Build a minimal two-node two-group graph for rotation tests.
+ *  Node A sits at projection (1,0) in group 'g1' and (0,0) in group 'g2'.
+ *  Node B sits at (0,0) in group 'g1' and (1,0) in group 'g2'.
+ *  With equal weights and no topology, A's position is (0.5, 0) and B's is (0.5, 0). */
+function makeRotationFixture() {
+  const nodes = [
+    { id: 'a', degree: 0, edgeTypes: null, extraProps: {}, projections: { g1: [1, 0], g2: [0, 0] }, px: 0, py: 0, gx: 0, gy: 0 },
+    { id: 'b', degree: 0, edgeTypes: null, extraProps: {}, projections: { g1: [0, 0], g2: [1, 0] }, px: 0, py: 0, gx: 0, gy: 0 },
+  ];
+  const nodeIndex = { a: nodes[0], b: nodes[1] };
+  const adjList = { a: [], b: [] };
+  return { nodes, nodeIndex, adjList, groupNames: ['g1', 'g2'] };
+}
+
+Deno.test("unifiedBlend: null/missing bearings preserves original behavior", () => {
+  const fA = makeRotationFixture();
+  const fB = makeRotationFixture();
+  const strengths = { g1: 5, g2: 5 };
+  // 9-arg legacy form (no bearings parameter)
+  unifiedBlend(fA.nodes, fA.groupNames, strengths, 0, fA.adjList, fA.nodeIndex, 0, 'gaussian', {});
+  // 10-arg form with explicit null bearings — must produce identical output
+  unifiedBlend(fB.nodes, fB.groupNames, strengths, 0, fB.adjList, fB.nodeIndex, 0, 'gaussian', {}, null);
+  for (let i = 0; i < fA.nodes.length; i++) {
+    assertEquals(fA.nodes[i].gx, fB.nodes[i].gx);
+    assertEquals(fA.nodes[i].gy, fB.nodes[i].gy);
+    assertAlmostEquals(fA.nodes[i].px, fB.nodes[i].px, 1e-9);
+    assertAlmostEquals(fA.nodes[i].py, fB.nodes[i].py, 1e-9);
+  }
+});
+
+Deno.test("unifiedBlend: empty bearings object is equivalent to null", () => {
+  const fA = makeRotationFixture();
+  const fB = makeRotationFixture();
+  const strengths = { g1: 5, g2: 5 };
+  unifiedBlend(fA.nodes, fA.groupNames, strengths, 0, fA.adjList, fA.nodeIndex, 0, 'gaussian', {}, null);
+  unifiedBlend(fB.nodes, fB.groupNames, strengths, 0, fB.adjList, fB.nodeIndex, 0, 'gaussian', {}, {});
+  for (let i = 0; i < fA.nodes.length; i++) {
+    assertAlmostEquals(fA.nodes[i].px, fB.nodes[i].px, 1e-9);
+    assertAlmostEquals(fA.nodes[i].py, fB.nodes[i].py, 1e-9);
+  }
+});
+
+Deno.test("unifiedBlend: 90° rotation on one group swaps x into y", () => {
+  const f = makeRotationFixture();
+  const strengths = { g1: 10, g2: 0 }; // pure g1 signal
+  const bearings = { g1: Math.PI / 2, g2: 0 };
+  // Call with 0 smoothing passes and temporarily disable the quantization to
+  // inspect raw px/py. Use passes=0 + smoothAlpha=0 → doQuant runs. We read
+  // nd.px/nd.py BEFORE quantization by using a fresh no-smooth call; but the
+  // unifiedBlend API always quantizes. Instead, capture by calling with
+  // gaussian quant and a fresh stats object — gx/gy will reflect the rotation.
+  unifiedBlend(f.nodes, f.groupNames, strengths, 0, f.adjList, f.nodeIndex, 0, 'gaussian', {}, bearings);
+  // After 90° CCW rotation, (1,0) becomes (0,1). Node A's raw contribution
+  // was (1,0) in g1 → rotated to (0,1). Node B's g1 contribution was (0,0) →
+  // still (0,0). The floor mechanism mixes in g2 at 10% of max (1.0), so A's
+  // rotated sum is floor-weighted, but with g1:10, g2:0 and floor = 1.0,
+  // effW = {g1: 10, g2: 1.0} → A = (10*0 + 0) / 11, (10*1 + 0) / 11 = (0, 10/11)
+  //      B = (10*0 + 1*1) / 11, (10*0 + 1*0) / 11 = (1/11, 0)
+  // The blend math works but quantization scrambles the exact values. Assert
+  // the ordering: after rotation, A.gy > B.gy (A is above B on screen).
+  assert(f.nodes[0].gy > f.nodes[1].gy, `After 90° rotation of g1, A.gy (${f.nodes[0].gy}) should exceed B.gy (${f.nodes[1].gy})`);
+});
+
+Deno.test("unifiedBlend: rotation changes layout when bearings are set", () => {
+  const f0 = makeRotationFixture();
+  const f90 = makeRotationFixture();
+  const strengths = { g1: 10, g2: 0 };
+  unifiedBlend(f0.nodes, f0.groupNames, strengths, 0, f0.adjList, f0.nodeIndex, 0, 'gaussian', {}, { g1: 0, g2: 0 });
+  unifiedBlend(f90.nodes, f90.groupNames, strengths, 0, f90.adjList, f90.nodeIndex, 0, 'gaussian', {}, { g1: Math.PI / 2, g2: 0 });
+  // At 0° rotation, the g1 signal extends horizontally (px differs, py equal).
+  // At 90° rotation, the g1 signal extends vertically (py differs, px equal).
+  // Verify the quantized positions differ between the two blends.
+  let differs = false;
+  for (let i = 0; i < f0.nodes.length; i++) {
+    if (f0.nodes[i].gx !== f90.nodes[i].gx || f0.nodes[i].gy !== f90.nodes[i].gy) {
+      differs = true;
+      break;
+    }
+  }
+  assert(differs, "Layout should differ between 0° and 90° bearings on a weighted group");
+});
+
+Deno.test("unifiedBlend: 360° rotation returns to original layout (mod numerical noise)", () => {
+  const f0 = makeRotationFixture();
+  const f360 = makeRotationFixture();
+  const strengths = { g1: 5, g2: 5 };
+  unifiedBlend(f0.nodes, f0.groupNames, strengths, 0, f0.adjList, f0.nodeIndex, 0, 'gaussian', {}, null);
+  unifiedBlend(f360.nodes, f360.groupNames, strengths, 0, f360.adjList, f360.nodeIndex, 0, 'gaussian', {}, { g1: 2 * Math.PI, g2: 2 * Math.PI });
+  for (let i = 0; i < f0.nodes.length; i++) {
+    // After full rotation, quantized grid positions should match (integer-valued)
+    assertEquals(f0.nodes[i].gx, f360.nodes[i].gx);
+    assertEquals(f0.nodes[i].gy, f360.nodes[i].gy);
+  }
 });
 
 // ─── SVG export tests ─────────────────────────────────────────────────────────
@@ -825,9 +1962,9 @@ function buildSVGView(viewOpts = {}) {
   for (const e of result.edges) {
     if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
   }
-  const weights: Record<string, number> = {};
-  for (const g of result.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  const strengths: Record<string, number> = {};
+  for (const g of result.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
 
   return createSVGView(nodes, result.edges, {
     width: 400, height: 300,

@@ -8,7 +8,7 @@ export { createBitZoomView, createBitZoomFromGraph, BitZoomCanvas } from './bitz
 export { BzGraph } from './bz-graph.js';
 
 // Utilities
-export { autoTuneWeights } from './bitzoom-utils.js';
+export { autoTuneStrengths, autoTuneStrengths as autoTuneWeights, autoTuneBearings } from './bitzoom-utils.js';
 export { exportSVG, createSVGView } from './bitzoom-svg.js';
 
 // Feature probes

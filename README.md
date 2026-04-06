@@ -2,7 +2,7 @@
 
 A deterministic layout and hierarchical aggregation viewer for large property graphs. Nodes are positioned by property similarity using MinHash signatures and Gaussian projection, with stable zoom levels derived from stored uint16 grid coordinates via bit shifts.
 
-![Datasets](https://img.shields.io/badge/datasets-9-blue) ![Tests](https://img.shields.io/badge/tests-48%20passing-green)
+![Datasets](https://img.shields.io/badge/datasets-14-blue) ![Tests](https://img.shields.io/badge/tests-177%20passing-green)
 
 **[Viewer](https://wistrand.github.io/bitzoom/viewer.html)** · [Website](https://wistrand.github.io/bitzoom/) · [Developer Guide](https://wistrand.github.io/bitzoom/howto.html) · [Layout Comparison](https://wistrand.github.io/bitzoom/comparison.html)
 
@@ -17,7 +17,7 @@ A deterministic layout and hierarchical aggregation viewer for large property gr
 - **Property-first layout** — nodes are positioned by what they are (properties), not who they're connected to (topology). Topology influence is a tunable parameter, not the primary organizing principle.
 - **Near-linear preprocessing** — MinHash signatures + random projection, O(n) per node. No force-directed O(n²) computation.
 - **Instant zoom** — all 14 aggregation levels derive from two stored uint16 coordinates per node via bit shifts. No recomputation on navigation.
-- **Interactive weight tuning** — change property weights and see the layout respond in real-time. No rehashing, no reprojection — just a weighted blend of fixed 2D anchors.
+- **Interactive strength tuning** — change property strengths and see the layout respond in real-time. No rehashing, no reprojection — just a strength-based blend of fixed 2D anchors.
 
 ## Quick Start
 
@@ -45,7 +45,7 @@ The viewer loads the default dataset and renders immediately. Use the dataset pi
 | H button            | Cycle heatmap: off → splat → density           |
 | n/e buttons         | Size by member count or edge count             |
 | Label dropdown      | Override label source property                 |
-| Weight sliders      | Adjust property group influence                |
+| Strength sliders    | Adjust property group influence                |
 
 ## Data Format (SNAP)
 
@@ -118,7 +118,7 @@ deno task src2snap data/output-prefix
 5. **Quantize** blended positions to a uint16 grid (65536×65536) — Gaussian (default, density-preserving) or rank (uniform occupancy)
 6. **Zoom** by bit-shifting grid coordinates: level L gives a 2^L × 2^L cell grid
 
-Weight changes only repeat steps 4-5: O(n × G) for anchor recomputation plus O(passes × (n + |E|)) for topology smoothing when α > 0. Zoom is O(1) per node. Signatures are not stored — recomputed on demand for detail panel visualization. See [SPEC.md](agent_docs/SPEC.md) for the full algorithm design.
+Strength changes only repeat steps 4-5: O(n × G) for anchor recomputation plus O(passes × (n + |E|)) for topology smoothing when α > 0. Zoom is O(1) per node. Signatures are not stored — recomputed on demand for detail panel visualization. See [SPEC.md](agent_docs/SPEC.md) for the full algorithm design.
 
 ## Architecture
 
@@ -137,7 +137,7 @@ All ES modules. No build step. No dependencies. See [ARCHITECTURE.md](agent_docs
 ## Testing
 
 ```sh
-deno task test    # 48 tests, ~100ms
+deno task test    # 177 tests, ~100ms
 ```
 
 Covers: MinHash determinism, projection correctness, bit-prefix containment, numeric tokenization, undefined value handling, E2E with Epstein dataset.

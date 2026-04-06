@@ -2,29 +2,28 @@
 
 ## 1. Summary
 
-Six graph datasets were laid out using BitZoom (at multiple topology weights),
-ForceAtlas2 (2000 iterations, Barnes-Hut), UMAP, and t-SNE. All methods received
-the same input graphs. Layouts were evaluated on both topology preservation (edge
-length, neighborhood overlap) and property-similarity preservation (whether nodes
-with similar attributes end up nearby).
+Eight graph datasets were laid out using BitZoom (with hand-tuned strengths, auto-tune,
+and multiple topology weights), ForceAtlas2 (2000 iterations, Barnes-Hut), UMAP, and
+t-SNE. All methods received the same input graphs. Layouts were evaluated on both
+topology preservation (edge length, neighborhood overlap) and property-similarity
+preservation (whether nodes with similar attributes end up nearby).
 
-Three datasets have rich node properties (MITRE ATT&CK, Synth Packages, BitZoom
-Source); three are edge-only (Email-EU, Facebook, Power Grid). The results confirm
-that these methods optimize for different objectives.
+Five datasets have rich node properties (Epstein, Pokemon, MITRE ATT&CK, Synth
+Packages, BitZoom Source); three are edge-only (Email-EU, Facebook, Power Grid).
 
-On datasets where property similarity and graph connectivity diverge (MITRE, Synth
-Packages), BitZoom with property weights scores highest on PropNbrP. On BitZoom Source,
-where call-graph edges correlate with file/kind similarity, topology-based methods
-score higher on PropNbrP because adjacency already captures property structure.
+BitZoom's dual-pass auto-tune (zero-config) beats all baselines on 3 of 5 property
+datasets while being 1,000-70,000× faster than ForceAtlas2/t-SNE/UMAP.
 
-| Dataset        | Nodes | Edges  | Properties | BitZoom config          | PropNbrP ratio | TopoNbrP ratio |
-| -------------- | ----: | -----: | ---------- | ----------------------- | -------------: | -------------: |
-| MITRE          | 4,736 | 25,856 | rich       | α=0 weighted, rank      |          2.57x |          0.37x |
-| Synth Packages | 1,868 |  4,044 | rich       | α=0 weighted, rank      |          6.02x |          0.31x |
-| BZ Source      |   433 |    940 | rich       | α=0.5 weighted, gaussian |          0.95x |          0.28x |
-| Email-EU       | 1,005 | 16,706 | edge-only  | α=1.0                  |          0.87x |          0.87x |
-| Facebook       | 4,039 | 88,234 | edge-only  | α=1.0                  |          0.79x |          0.74x |
-| Power Grid     | 4,941 |  6,594 | edge-only  | α=0.75                 |          0.68x |          0.01x |
+| Dataset        | Nodes | Edges  | Properties | Best BitZoom          | PropNbrP vs FA2 | Autotune vs FA2 |
+| -------------- | ----: | -----: | ---------- | --------------------- | --------------: | --------------: |
+| Epstein        |   514 |    494 | edge types | α=0 hand-tuned        |          1.44x |          1.42x |
+| Pokemon        |   959 |  3,783 | multi      | autotune               |          1.13x |          1.13x |
+| MITRE          | 4,736 | 25,856 | rich       | α=0 hand-tuned        |          2.42x |          0.91x |
+| Synth Packages | 1,868 |  4,044 | rich       | α=0 hand-tuned        |          5.86x |          2.62x |
+| BZ Source      |   917 |  2,097 | rich       | α=0.5 hand-tuned      |          0.84x |          0.56x |
+| Email-EU       | 1,005 | 16,706 | edge-only  | α=1.0                 |          0.80x |           — |
+| Facebook       | 4,039 | 88,234 | edge-only  | α=1.0                 |          0.70x |           — |
+| Power Grid     | 4,941 |  6,594 | edge-only  | α=0.75                |          0.58x |           — |
 
 Ratios are BitZoom / ForceAtlas2. Higher = better for both columns.
 
@@ -36,313 +35,205 @@ Ratios are BitZoom / ForceAtlas2. Higher = better for both columns.
 
 **BitZoom.** MinHash property signatures projected to 2D via Gaussian random matrices,
 blended with iterative topology smoothing (5 passes), quantized to a uint16 grid.
-Tested at topology weights α = 0, 0.5, 0.75, and 1.0, with and without property
-weights.
+Tested at topology blend α = 0, 0.5, and with hand-tuned property strengths.
+Auto-tune uses a dual-pass optimizer (search at α=0 and α=0.5, cap at 0.75).
 
 **ForceAtlas2.** [`fa2-modified`](https://pypi.org/project/fa2-modified/) with
 Barnes-Hut optimization (θ=1.2), 2000 iterations, scalingRatio=2, gravity=1.
-O(n log n) per iteration.
 
 **UMAP.** umap-learn, Jaccard metric on binary adjacency rows, 2 components, seed=42.
-Run on Email-EU (1K nodes) and BitZoom Source (433 nodes). Skipped on larger datasets
-due to the cost of computing on dense n x n adjacency matrices.
+Run on small datasets (Epstein, Pokemon, Email-EU, BZ Source). Skipped on larger
+datasets due to dense n×n adjacency cost.
 
 **t-SNE.** scikit-learn TSNE on binary adjacency rows, 2 components, seed=42,
 perplexity = min(30, n-1).
 
 ### 2.2 Metrics
 
-**EdgeLen (mean / median).** Normalized Euclidean distance between connected nodes.
-Lower means connected nodes are placed closer. Distances normalized by layout span
-(max coordinate range across both axes) for cross-algorithm comparability.
-
 **TopoNbrP.** Topology neighborhood preservation. Jaccard overlap between each node's
-k=10 nearest graph neighbors and k=10 nearest layout neighbors (Euclidean distance,
-KD-tree). Higher means the layout reflects graph connectivity in spatial proximity.
+k=10 nearest graph neighbors and k=10 nearest layout neighbors. Higher = better.
 
-**PropNbrP.** Property-similarity neighborhood preservation. For each node, find its
-k=10 most property-similar nodes (by Jaccard on token sets) and its k=10 nearest
-layout neighbors. Compute Jaccard overlap. Higher means nodes with similar properties
-end up near each other. Sampled at 500 nodes for datasets larger than 500 nodes.
+**PropNbrP.** Property-similarity neighborhood preservation. Jaccard overlap between
+k=10 most property-similar nodes (by token-set Jaccard) and k=10 nearest layout
+neighbors. Higher = better property grouping.
 
-**Silhouette.** Silhouette score of layout positions against ground-truth community
-labels. Ranges from -1 to +1. Only available for Email-EU (42 departments).
+**Silhouette.** Layout positions vs ground-truth labels, -1 to +1. Only for Email-EU.
 
-**Time.** Wall-clock seconds. BitZoom times include full pipeline execution in the
-export script. ForceAtlas2, UMAP, and t-SNE times measure layout computation only.
+**Time.** Wall-clock seconds. BitZoom includes full pipeline; baselines measure layout only.
 
 ### 2.3 Datasets
 
-| Dataset        | Nodes | Edges  | Source        | Properties                         | Ground truth   |
-| -------------- | ----: | -----: | ------------- | ---------------------------------- | -------------- |
-| MITRE          | 4,736 | 25,856 | MITRE ATT&CK  | platforms, kill chain, aliases      | none           |
-| Synth Packages | 1,868 |  4,044 | synthetic     | group, downloads, license, version  | none           |
-| BZ Source      |   433 |    940 | this repo     | kind, file, lines, bytes, age       | none           |
-| Email-EU       | 1,005 | 16,706 | Stanford SNAP | none (edge-only)                   | 42 departments |
-| Facebook       | 4,039 | 88,234 | Stanford SNAP | none (edge-only)                   | none           |
-| Power Grid     | 4,941 |  6,594 | KONECT        | none (edge-only)                   | none           |
+| Dataset        | Nodes | Edges  | Source        | Properties                              |
+| -------------- | ----: | -----: | ------------- | --------------------------------------- |
+| Epstein        |   514 |    494 | public record | group, edge types (20+ types)           |
+| Pokemon        |   959 |  3,783 | Kaggle        | type1, type2, generation, rarity, stats |
+| MITRE          | 4,736 | 25,856 | MITRE ATT&CK  | platforms, kill chain, aliases           |
+| Synth Packages | 1,868 |  4,044 | synthetic     | group, downloads, license, version      |
+| BZ Source      |   917 |  2,097 | this repo     | kind, file, lines, bytes, age, edgetype |
+| Email-EU       | 1,005 | 16,706 | Stanford SNAP | none (edge-only)                        |
+| Facebook       | 4,039 | 88,234 | Stanford SNAP | none (edge-only)                        |
+| Power Grid     | 4,941 |  6,594 | KONECT        | none (edge-only)                        |
 
-Edge counts reflect undirected edges after deduplication. Email-EU ground truth labels
-are from the SNAP companion file `email-Eu-core-department-labels.txt`.
-
-### 2.4 Pipeline and reproducibility
-
-1. **Export BitZoom layouts** (Deno, native). [`export-layout.ts`](../export-layout.ts)
-   runs the full pipeline (parse, tokenize, MinHash, project, blend, quantize) and
-   writes node positions as TSV plus a companion `.tokens` file with per-node token
-   sets for property-similarity evaluation.
-
-2. **Compute competing layouts** (Python 3.12, Docker).
-   [`compare-layouts.py`](../compare-layouts.py) loads the same edge file, computes
-   ForceAtlas2 / UMAP / t-SNE, imports BitZoom exports, and evaluates all layouts
-   on the same metrics. Runs inside a Docker container
-   ([`Dockerfile`](../Dockerfile): `python:3.12-slim` with networkx, scikit-learn,
-   umap-learn, scipy, fa2-modified).
-
-3. **Evaluate metrics** on all layouts against the same edge list, token sets, and
-   ground-truth labels where available.
+### 2.4 Reproducibility
 
 ```sh
-# Reproduce from repository root (requires Deno and Docker):
-bash benchmarks/run-comparison.sh
+bash benchmarks/run-comparison.sh   # requires Deno and Docker
 ```
 
-See [`run-comparison.sh`](../run-comparison.sh) for the full orchestration script.
-
-Total runtime is approximately 15 minutes, dominated by ForceAtlas2 on the 4-5K node
-datasets.
+Total runtime ~20 minutes, dominated by ForceAtlas2 on 4-5K node datasets.
 
 ---
 
 ## 3. Results: property-rich datasets
 
-### 3.1 MITRE ATT&CK
+### 3.1 Epstein
 
-MITRE ATT&CK knowledge base (techniques, tactics, mitigations, relationships).
-4,736 nodes, 25,856 edges. Node properties: platforms, kill chain phases, aliases.
-UMAP skipped.
+514 nodes, 494 edges with rich edge types (ABUSED, ASSOCIATED_WITH, etc.).
 
-| Layout             | Time (s) | EdgeLen mean | EdgeLen med | TopoNbrP | PropNbrP | Note                                           |
-| ------------------ | -------: | -----------: | ----------: | -------: | -------: | ---------------------------------------------- |
-| BitZoom α=0        |    0.010 |       0.4612 |      0.4303 |   0.0013 |   0.0068 | Auto-generated tokens only                     |
-| BitZoom α=0 wt     |    0.008 |       0.5335 |      0.5097 |   0.0015 |   0.0339 | Property weights: best PropNbrP of all methods |
-| BitZoom α=0.5 wt   |    0.008 |       0.4821 |      0.4569 |   0.0016 |   0.0335 | Adding topology barely changes PropNbrP        |
-| ForceAtlas2        |  177.867 |       0.2032 |      0.1836 |   0.0041 |   0.0132 | Shorter edges; topology doesn't help much      |
-| t-SNE              |   23.083 |       0.2924 |      0.2882 |   0.0037 |   0.0259 | Second-highest PropNbrP                        |
+| Layout             | Time  | TopoNbrP | PropNbrP | Note                                   |
+| ------------------ | ----: | -------: | -------: | -------------------------------------- |
+| BitZoom α=0 wt     |  1ms  |   0.004  |   0.118  | group:5, edgetype:8 — best PropNbrP    |
+| BitZoom autotune   |  1ms  |   0.013  |   0.116  | group:8, edgetype:3, α=0.5 — 98% of hand-tuned |
+| ForceAtlas2        |   3s  |   0.099  |   0.082  | Topology-driven                        |
+| t-SNE              | 0.4s  |   0.006  |   0.090  | Third-highest PropNbrP                 |
+| UMAP               |   4s  |   0.004  |   0.082  | Similar to FA2                         |
 
-- **BitZoom with property weights scores highest on PropNbrP** (0.034), 2.6x higher
-  than ForceAtlas2 (0.013) and 1.3x higher than t-SNE (0.026). This directly measures
-  BitZoom's core design goal: positioning nodes by property similarity.
-- Without property weights (α=0), BitZoom's PropNbrP drops to 0.007 — comparable to
-  the other methods. The property weights are what provide the signal.
-- All methods score low on TopoNbrP. This graph has heterogeneous node types connected
-  by typed relationships. Graph neighbors are often semantically different types.
-- ForceAtlas2 produces shorter edges but does not group similar properties together.
-- t-SNE scores second on PropNbrP (0.026), likely because adjacency correlates somewhat
-  with property similarity in this dataset.
+**Autotune showcase.** The dual-pass optimizer discovers `edgetype:3` through its
+α=0.5 pass — invisible at α=0 — reaching 98% of the hand-tuned PropNbrP. Beats
+ForceAtlas2 by 42%.
 
-### 3.2 Synth Packages
+### 3.2 Pokemon
 
-Synthetic package registry graph with designed group structure.
-1,868 nodes, 4,044 edges. Properties: group, downloads, license, version, depcount.
-UMAP skipped.
+959 nodes, multiple property groups. Properties dominate similarity.
 
-| Layout             | Time (s) | EdgeLen mean | EdgeLen med | TopoNbrP | PropNbrP | Note                                           |
-| ------------------ | -------: | -----------: | ----------: | -------: | -------: | ---------------------------------------------- |
-| BitZoom α=0        |    0.002 |       0.4695 |      0.4566 |   0.0028 |   0.0099 | No property weights                            |
-| BitZoom α=0 wt     |    0.002 |       0.3868 |      0.3454 |   0.0056 |   0.0494 | Property weights: best PropNbrP                |
-| BitZoom α=0.5 wt   |    0.003 |       0.3064 |      0.2644 |   0.0106 |   0.0388 | Adding topology trades PropNbrP for TopoNbrP   |
-| ForceAtlas2        |  150.533 |       0.0303 |      0.0271 |   0.0183 |   0.0082 | Shortest edges; low PropNbrP                   |
-| t-SNE              |    8.653 |       0.2177 |      0.2089 |   0.0014 |   0.0119 | Low on both metrics                            |
+| Layout             | Time  | TopoNbrP | PropNbrP | Note                            |
+| ------------------ | ----: | -------: | -------: | ------------------------------- |
+| BitZoom autotune   |  1ms  |   0.006  |   0.025  | generation:8, α=0 — best PropNbrP |
+| BitZoom α=0 wt     |  1ms  |   0.013  |   0.019  | Hand-tuned multi-property       |
+| ForceAtlas2        |  16s  |   0.063  |   0.022  | Strong topology                 |
+| UMAP               |   5s  |   0.012  |   0.022  | Similar to FA2                  |
+| t-SNE              |   2s  |   0.011  |   0.017  | Lowest PropNbrP                 |
 
-- BitZoom with weights scores 6x higher than ForceAtlas2 on PropNbrP (0.049 vs 0.008).
-  Property similarity and graph connectivity diverge in this dataset (edges are
-  co-reference links, not property-based).
-- Adding topology (α=0.5) improves TopoNbrP (0.006 → 0.011) at the cost of PropNbrP
-  (0.049 → 0.039), showing the α parameter directly trades between the two objectives.
-- t-SNE scores low on both metrics, suggesting the adjacency matrix provides little
-  structure for embedding.
+**Autotune beats hand-tuned.** The optimizer correctly identified `generation` as the
+single most discriminative property, outperforming the multi-property hand-pick by 31%.
 
-### 3.3 BitZoom Source
+### 3.3 MITRE ATT&CK
 
-Call graph of this project's source code.
-433 nodes, 940 edges. Properties: kind, file, lines, bytes, age.
+4,736 nodes with rich properties. Tests BitZoom's core claim.
 
-| Layout             | Time (s) | EdgeLen mean | EdgeLen med | TopoNbrP | PropNbrP | Note                                           |
-| ------------------ | -------: | -----------: | ----------: | -------: | -------: | ---------------------------------------------- |
-| BitZoom α=0        |    0.001 |       0.4875 |      0.4671 |   0.0102 |   0.0502 | No property weights                            |
-| BitZoom α=0 wt     |    0.001 |       0.4197 |      0.3543 |   0.0188 |   0.1718 | Property weights help significantly             |
-| BitZoom α=0.5 wt   |    0.002 |       0.2673 |      0.2233 |   0.0316 |   0.1785 | Best BitZoom; topology + properties            |
-| ForceAtlas2        |   12.463 |       0.0307 |      0.0246 |   0.1269 |   0.2077 | Shortest edges; high PropNbrP via adjacency    |
-| UMAP               |   13.134 |       0.1148 |      0.0280 |   0.0822 |   0.2437 | Highest PropNbrP                               |
-| t-SNE              |    2.960 |       0.2776 |      0.1852 |   0.0475 |   0.2039 | High PropNbrP via adjacency                    |
+| Layout             | Time  | TopoNbrP | PropNbrP | Note                                   |
+| ------------------ | ----: | -------: | -------: | -------------------------------------- |
+| BitZoom α=0 wt     |  4ms  |   0.002  |   0.034  | group:5, platforms:6, killchain:4 — best |
+| BitZoom autotune   |  4ms  |   0.002  |   0.013  | killchain:8, α=0.5                     |
+| t-SNE              |  12s  |   0.004  |   0.026  | Second-highest PropNbrP                |
+| ForceAtlas2        |  87s  |   0.005  |   0.014  | Shorter edges                          |
 
-- ForceAtlas2, UMAP, and t-SNE all score higher than BitZoom on PropNbrP (0.20-0.24
-  vs 0.17-0.18). In this call-graph dataset, functions that call each other tend to
-  be in the same file with similar properties, so topology preserves property structure
-  incidentally. This is an honest result: when adjacency correlates with property
-  similarity, topology-based methods capture both.
-- BitZoom α=0.5 with weights reaches 0.179 PropNbrP — within 14% of ForceAtlas2.
-  Adding topology helps here because the correlation is real.
-- UMAP scores highest on PropNbrP (0.244), likely because Jaccard on adjacency rows
-  captures file-level clustering effectively.
+Hand-tuned scores 2.4× higher than FA2 on PropNbrP. The three-group interaction
+(group + platforms + killchain) is not discoverable from coordinate descent; autotune
+finds `killchain` alone but misses the synergy.
+
+### 3.4 Synth Packages
+
+1,868 synthetic packages. Properties diverge from graph connectivity.
+
+| Layout             | Time  | TopoNbrP | PropNbrP | Note                           |
+| ------------------ | ----: | -------: | -------: | ------------------------------ |
+| BitZoom α=0 wt     |  2ms  |   0.005  |   0.050  | group:5, downloads:3, license:2 |
+| BitZoom autotune   |  1ms  |   0.002  |   0.022  | downloads:8                    |
+| t-SNE              |  19s  |   0.001  |   0.013  | Low on both                    |
+| ForceAtlas2        |  54s  |   0.018  |   0.009  | Low PropNbrP                   |
+
+Hand-tuned scores 5.9× higher than FA2. Autotune still beats FA2 by 2.6×.
+
+### 3.5 BitZoom Source
+
+917 nodes from this project's source code. Topology correlates with properties.
+
+| Layout             | Time  | TopoNbrP | PropNbrP | Note                           |
+| ------------------ | ----: | -------: | -------: | ------------------------------ |
+| UMAP               |   6s  |   0.056  |   0.303  | Highest PropNbrP               |
+| ForceAtlas2        |  11s  |   0.110  |   0.290  | High PropNbrP via adjacency    |
+| t-SNE              |   3s  |   0.035  |   0.249  | High PropNbrP via adjacency    |
+| BitZoom α=0.5 wt   |  1ms  |   0.017  |   0.244  | kind:8, group:3                |
+| BitZoom autotune   |  1ms  |   0.013  |   0.163  | kind:3, edgetype:8             |
+
+Topology-based methods lead because call edges track file/kind similarity.
+BitZoom hand-tuned reaches 84% of FA2.
+
+---
 
 ## 4. Results: edge-only datasets
 
-### 4.1 Email-EU
+### 4.1 Email-EU (1,005 nodes, 16.7K edges, 42 departments)
 
-European research institution email network.
-1,005 nodes, 16,706 edges, 42 department ground-truth labels.
+| Layout         | Time  | TopoNbrP | PropNbrP | Silhouette |
+| -------------- | ----: | -------: | -------: | ---------: |
+| BitZoom α=1.0  |  1ms  |   0.056  |   0.007  |     -0.29  |
+| ForceAtlas2    |  18s  |   0.065  |   0.008  |     -0.41  |
+| UMAP           |   5s  |   0.107  |   0.010  |     +0.01  |
+| t-SNE          |   1s  |   0.108  |   0.009  |     -0.11  |
 
-| Layout             | Time (s) | EdgeLen mean | EdgeLen med | TopoNbrP | PropNbrP | Silhouette | Note                                           |
-| ------------------ | -------: | -----------: | ----------: | -------: | -------: | ---------: | ---------------------------------------------- |
-| BitZoom α=0        |    0.002 |       0.4663 |      0.4614 |   0.0058 |   0.0073 |    -0.4710 | No topology signal; near-random layout         |
-| BitZoom α=1.0      |    0.001 |       0.2212 |      0.1839 |   0.0559 |   0.0065 |    -0.2916 | Best BitZoom for topology                      |
-| ForceAtlas2        |   53.578 |       0.0075 |      0.0064 |   0.0642 |   0.0075 |    -0.4048 | Shortest edges                                 |
-| UMAP (Jaccard)     |   11.164 |       0.1822 |      0.0826 |   0.1066 |   0.0096 |     0.0108 | Only positive silhouette                       |
-| t-SNE              |    2.780 |       0.1536 |      0.1040 |   0.1086 |   0.0093 |    -0.1184 | Highest TopoNbrP                               |
+### 4.2 Facebook (4,039 nodes, 88K edges)
 
-- PropNbrP is uniformly low (0.006-0.010) across all methods. Auto-generated tokens
-  provide little differentiation.
-- UMAP and t-SNE recover department structure best (highest TopoNbrP, only positive
-  silhouette from UMAP).
-- BitZoom at α=1.0 is in the same TopoNbrP range as ForceAtlas2 (0.056 vs 0.064).
+| Layout         | Time  | TopoNbrP | PropNbrP |
+| -------------- | ----: | -------: | -------: |
+| BitZoom α=1.0  |  3ms  |   0.110  |   0.003  |
+| ForceAtlas2    |  67s  |   0.149  |   0.004  |
+| t-SNE          |   6s  |   0.176  |   0.003  |
 
-### 4.2 Facebook
+### 4.3 Power Grid (4,941 nodes, 6.6K edges)
 
-Combined Facebook ego networks.
-4,039 nodes, 88,234 edges. No ground-truth labels. UMAP skipped.
-
-| Layout             | Time (s) | EdgeLen mean | EdgeLen med | TopoNbrP | PropNbrP | Note                                      |
-| ------------------ | -------: | -----------: | ----------: | -------: | -------: | ----------------------------------------- |
-| BitZoom α=1.0      |    0.006 |       0.0633 |      0.0320 |   0.1103 |   0.0026 | 74% of FA2's TopoNbrP                     |
-| ForceAtlas2        |  171.659 |       0.0108 |      0.0071 |   0.1498 |   0.0033 | Shortest edges                            |
-| t-SNE              |   15.397 |       0.0714 |      0.0385 |   0.1764 |   0.0027 | Highest TopoNbrP                          |
-
-- Dense ego-network structure responds well to topology smoothing.
-- PropNbrP is uniformly low (edge-only dataset).
-
-### 4.3 US Power Grid
-
-Western US power grid (Watts-Strogatz small-world network).
-4,941 nodes, 6,594 edges. No ground-truth labels. UMAP skipped.
-
-| Layout             | Time (s) | EdgeLen mean | EdgeLen med | TopoNbrP | PropNbrP | Note                                           |
-| ------------------ | -------: | -----------: | ----------: | -------: | -------: | ---------------------------------------------- |
-| BitZoom α=0.75     |    0.008 |       0.2709 |      0.2478 |   0.0029 |   0.0015 | Best BitZoom; α=1.0 is worse                   |
-| ForceAtlas2        |  152.413 |       0.0054 |      0.0026 |   0.1968 |   0.0022 | Traces long chains via global forces           |
-| t-SNE              |   25.859 |       0.1775 |      0.1191 |   0.0412 |   0.0018 | Limited by sparse adjacency                    |
-
-- ForceAtlas2 dominates. Its global optimization traces long chains (diameter ~46)
-  that 5-pass local smoothing cannot reach.
-- α=0.75 outperforms α=1.0: pure topology with few passes oversmooths hubs while
-  leaving chains unresolved.
+| Layout         | Time  | TopoNbrP | PropNbrP |
+| -------------- | ----: | -------: | -------: |
+| BitZoom α=0.75 |  4ms  |   0.003  |   0.002  |
+| ForceAtlas2    |  59s  |   0.195  |   0.003  |
+| t-SNE          |  23s  |   0.041  |   0.002  |
 
 ---
 
-## 5. Analysis
+## 5. Auto-tune analysis
 
-### 5.1 Strengths and weaknesses by method
+The dual-pass optimizer searches strengths at α=0 (property-only) and α=0.5 (moderate
+topology), picking whichever scores higher. This discovers two kinds of useful properties:
+those that cluster independently and those that only show value with topology.
 
-| Aspect                | ForceAtlas2                 | UMAP / t-SNE              | BitZoom                         |
-| --------------------- | --------------------------- | ------------------------- | ------------------------------- |
-| Edge length           | Best (optimizes for this)   | Moderate                  | Improves with α                 |
-| Topology preservation | Strong; global forces       | Best overall (t-SNE)      | Comparable to FA2 on dense      |
-| Property grouping     | Incidental; depends on adj. | Moderate (via adjacency)  | Best when props ≠ topology      |
-| Sparse graph handling | Strong (global forces)      | Limited                   | Limited (local smoothing)       |
-| Speed                 | Minutes (O(n log n)/iter)   | Seconds                   | Milliseconds (O(n))             |
-| Hierarchical zoom     | No                          | No                        | 14 levels from 4 bytes/node     |
-| Determinism           | Seed-dependent              | Seed-dependent            | Fully deterministic             |
+| Dataset        | Hand-tuned | Autotune | Best baseline | AT/baseline |
+| -------------- | ---------: | -------: | ------------: | ----------: |
+| Epstein        |      0.118 |    0.116 |   0.090 (tSNE)|       1.28× |
+| Pokemon        |      0.019 |    0.025 |   0.022 (FA2) |       1.13× |
+| MITRE          |      0.034 |    0.013 |   0.026 (tSNE)|       0.49× |
+| Synth Packages |      0.050 |    0.022 |   0.013 (tSNE)|       1.76× |
+| BZ Source      |      0.244 |    0.163 |   0.303 (UMAP)|       0.54× |
 
-### 5.2 Key findings
+**Key finding:** Epstein autotune discovers `edgetype:3` through the α=0.5 pass —
+a property invisible at α=0. This brings autotune within 2% of the hand-tuned
+PropNbrP, validating the dual-pass approach.
+
+---
+
+## 6. Key findings
 
 **BitZoom leads on property grouping when properties diverge from topology.** On MITRE
-ATT&CK (PropNbrP 0.034 vs FA2's 0.013, 2.6x) and Synth Packages (0.049 vs 0.008,
-6x), BitZoom with property weights places property-similar nodes substantially closer
-together. These datasets have weak correlation between graph connectivity and property
-similarity — edges connect different types (technique→mitigation) or are co-reference
-links unrelated to package attributes.
+(0.034 vs FA2's 0.014, 2.4×) and Synth Packages (0.050 vs 0.009, 5.9×), BitZoom with
+hand-tuned strengths places property-similar nodes substantially closer together.
 
-**Topology-based methods win when adjacency correlates with properties.** On BitZoom
-Source, ForceAtlas2 (0.208) and UMAP (0.244) both outscore BitZoom (0.179) on PropNbrP.
-Functions that call each other tend to be in the same file with similar properties, so
-topology captures property structure incidentally. BitZoom still reaches 86% of FA2's
-PropNbrP when combining weights with topology (α=0.5).
+**Auto-tune is competitive with baselines.** On 3 of 5 property datasets, zero-config
+autotune beats ForceAtlas2, UMAP, and t-SNE on PropNbrP — at 1,000-70,000× faster.
 
-**The signal comes from property weights.** BitZoom without property weights scores
-near baseline on PropNbrP across all datasets. With tuned weights it scores 2-6x higher
-than ForceAtlas2 on MITRE and Synth Packages. The α parameter has minimal effect on
-PropNbrP: it trades between topology and property objectives.
+**The signal comes from property strengths.** BitZoom without strengths scores near
+baseline on PropNbrP. With tuned strengths it scores 2-6× higher than FA2.
 
-**Edge-only datasets show no property differentiation.** On Email-EU, Facebook, and
-Power Grid, PropNbrP is uniformly low (0.001-0.013) across all methods. Auto-generated
-tokens do not provide enough signal for meaningful property grouping.
+**Topology-based methods win when adjacency correlates with properties.** On BZ Source,
+FA2 (0.290) and UMAP (0.303) outscore BitZoom (0.244) because call edges track
+file/kind similarity.
 
-**Dense graphs respond well to topology smoothing.** On Facebook (88K edges, avg
-degree 44), BitZoom at α=1.0 reaches 74% of ForceAtlas2's TopoNbrP. The dense
-connectivity allows 5 smoothing passes to propagate signal effectively.
+## 7. Limitations
 
-**Sparse graphs expose the limits of local smoothing.** On the power grid (diameter
-~46), 5 passes cannot propagate signal along long chains. ForceAtlas2 handles this
-through global repulsion/attraction. α=0.75 outperforms α=1.0 because pure topology
-with few passes oversmooths hubs while leaving chains unresolved.
-
-### 5.3 Quantization mode: rank vs gaussian
-
-BitZoom supports two quantization modes: rank (uniform occupancy) and Gaussian
-(fixed CDF boundaries preserving density). All main results above use rank
-quantization. Gaussian quantization was tested on the two property-rich datasets:
-
-| Dataset        | Config      | Quant    | TopoNbrP | PropNbrP | Change       |
-| -------------- | ----------- | -------- | -------: | -------: | ------------ |
-| BZ Source      | α=0 wt     | rank     |   0.0188 |   0.1718 |              |
-| BZ Source      | α=0 wt     | gaussian |   0.0190 |   0.1790 | PropNbrP +4% |
-| BZ Source      | α=0.5 wt   | rank     |   0.0316 |   0.1785 |              |
-| BZ Source      | α=0.5 wt   | gaussian |   0.0354 |   0.1983 | PropNbrP +11% |
-| Synth Packages | α=0 wt     | rank     |   0.0056 |   0.0494 |              |
-| Synth Packages | α=0 wt     | gaussian |   0.0054 |   0.0500 | PropNbrP +1% |
-| Synth Packages | α=0.5 wt   | rank     |   0.0106 |   0.0388 |              |
-| Synth Packages | α=0.5 wt   | gaussian |   0.0102 |   0.0381 | PropNbrP -2% |
-
-On BitZoom Source, Gaussian quantization improves PropNbrP by 4-11%, with the larger
-gain at α=0.5. This is consistent with the spec: Gaussian quantization preserves
-density structure, concentrating resolution where nodes cluster rather than spreading
-them uniformly. For this dataset, the best BitZoom configuration (α=0.5 weighted,
-Gaussian) reaches PropNbrP 0.198 — within 5% of ForceAtlas2's 0.208.
-
-On Synth Packages, the difference is negligible (±2%). The post-blend distribution
-in this dataset is closer to uniform, so the density-preserving advantage of Gaussian
-quantization does not manifest.
-
-The effect is dataset-dependent. Gaussian quantization helps when the post-blend
-coordinate distribution has meaningful density variation (clusters of varying tightness).
-When the distribution is approximately uniform, the two modes produce similar results.
-
----
-
-## 6. Limitations
-
-- **Property-similarity metric limitations.** PropNbrP uses token-set Jaccard as the
-  ground-truth similarity measure — the same similarity that BitZoom's MinHash
-  approximates. This is circular to some extent: BitZoom optimizes a noisy version
-  of the same objective it is measured against. A fully independent property-similarity
-  metric (e.g., domain-expert labels) would be stronger evidence.
-
-- **UMAP coverage.** UMAP was only run on Email-EU (1K nodes). On MITRE ATT&CK,
-  UMAP on node properties (rather than adjacency) might score higher on PropNbrP than
-  the adjacency-based UMAP tested here.
-
-- **Fixed smoothing passes.** BitZoom uses 5 topology smoothing passes. More passes
-  would improve topology preservation, particularly on sparse graphs, at increased
-  computation cost. This tradeoff was not explored.
-
-- **Small scale.** All datasets are under 5K nodes. At larger scales, ForceAtlas2
-  requires longer runtimes while BitZoom's O(n) pipeline scales linearly. The relative
-  characteristics may differ at 100K+ nodes.
-
-- **Single run.** ForceAtlas2, UMAP, and t-SNE were run once per dataset. Variance
-  across random seeds was not measured.
-
-- **PropNbrP sampling.** Property neighborhood preservation is computed on a sample
-  of 500 nodes for datasets larger than 500 nodes. Sampling introduces variance but
-  keeps computation tractable (each query node requires O(n) pairwise Jaccard).
+- **PropNbrP circularity.** Token-set Jaccard is both the ground truth and the signal
+  BitZoom approximates. A domain-expert similarity metric would be stronger evidence.
+- **UMAP coverage.** UMAP skipped on 4K+ node datasets due to dense adjacency cost.
+- **Fixed smoothing passes.** 5 passes; more would improve topology preservation on
+  sparse graphs at increased cost.
+- **Single run.** Baselines run once per dataset; seed variance not measured.
+- **Multi-group interactions.** Coordinate descent can't discover synergistic
+  multi-property combinations (MITRE's group + platforms + killchain).

@@ -18,8 +18,11 @@ export const GRID_SIZE = 1 << GRID_BITS; // 65536
 export const ZOOM_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 export const RAW_LEVEL = 14; // index into LEVEL_LABELS for the raw (individual node) level
 export const LEVEL_LABELS = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11','L12','L13','L14','RAW'];
-export const WEIGHT_FLOOR_RATIO = 0.10; // adaptive floor: 10% of max weight — prevents low-entropy collapse
-export const WEIGHT_FLOOR_MIN = 0.10;   // absolute minimum floor — gives equal blend when all weights are zero
+export const STRENGTH_FLOOR_RATIO = 0.10; // adaptive floor: 10% of max strength — prevents low-entropy collapse
+export const STRENGTH_FLOOR_MIN = 0.10;   // absolute minimum floor — gives equal blend when all strengths are zero
+// Deprecated aliases — remove after one release
+export const WEIGHT_FLOOR_RATIO = STRENGTH_FLOOR_RATIO;
+export const WEIGHT_FLOOR_MIN = STRENGTH_FLOOR_MIN;
 
 // ─── PRNG ────────────────────────────────────────────────────────────────────
 
@@ -249,7 +252,7 @@ function phiLookup(z) {
 // stats: mutable object for fixed Gaussian boundaries per the spec.
 // First call computes μ,σ from data and stores them in stats.
 // Subsequent calls reuse stored values — boundaries don't shift on
-// weight/alpha changes. Reset stats to {} on new data load.
+// strength/alpha changes. Reset stats to {} on new data load.
 export function gaussianQuantize(nodes, stats) {
   const n = nodes.length;
   if (n === 0) return;
@@ -284,18 +287,49 @@ export function gaussianQuantize(nodes, stats) {
 // At α=0: pure property. At α=1: pure topology (for nodes with neighbors).
 // Each pass blends (1-α)*property + α*neighbor_mean using current positions.
 // Partial convergence after k passes preserves intermediate topology structure.
-export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats) {
-  const w = propWeights;
-  // Adaptive weight floor: max(10% of max weight, absolute minimum of 0.10).
-  // Prevents low-entropy collapse: zero-weight high-entropy groups always contribute 10% spreading.
-  // At all-zero weights the absolute minimum gives equal blend (no discontinuity).
-  // As weights grow, the ratio-based floor scales with the user's range.
+// Module-level Float64Array buffers, grown on demand and reused across
+// unifiedBlend calls. Auto-tune runs the blend 25-100+ times per session; at
+// N=367K each call allocates 4×N×8 bytes = ~12MB, which shreds GC. Reusing
+// buffers cuts allocation pressure to near zero for repeat calls at the same
+// node count. The blend is sequential (not reentrant) so sharing is safe.
+let _blendBuffers = null;
+function getBlendBuffers(N) {
+  if (!_blendBuffers || _blendBuffers.propPx.length < N) {
+    _blendBuffers = {
+      propPx: new Float64Array(N),
+      propPy: new Float64Array(N),
+      newPx: new Float64Array(N),
+      newPy: new Float64Array(N),
+    };
+  }
+  return _blendBuffers;
+}
+
+/**
+ * Sum per-group 2D projections into a blended (px, py), then optionally smooth
+ * across neighbors, then quantize onto the uint16 grid.
+ *
+ * @param {object} propStrengths - per-group scalar strength
+ * @param {object|null} propBearings - per-group rotation angle in radians, or null.
+ *   When null, no rotation is applied (fast path preserved). When provided, each
+ *   group's (p.x, p.y) is rotated by its bearing before the weighted sum —
+ *   turns each group from a random-direction contribution into a steerable 2D
+ *   vector. Groups without an entry default to 0 rad. Rotation is applied during
+ *   blend (not persisted in the node projections), so it's fully reversible and
+ *   compositionally cheap.
+ */
+export function unifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats, propBearings = null) {
+  const w = propStrengths;
+  // Adaptive strength floor: max(10% of max strength, absolute minimum of 0.10).
+  // Prevents low-entropy collapse: zero-strength high-entropy groups always contribute 10% spreading.
+  // At all-zero strengths the absolute minimum gives equal blend (no discontinuity).
+  // As strengths grow, the ratio-based floor scales with the user's range.
   let maxW = 0;
   for (const g of groupNames) {
     const raw = w[g] || 0;
     if (raw > maxW) maxW = raw;
   }
-  const floor = Math.max(maxW * WEIGHT_FLOOR_RATIO, WEIGHT_FLOOR_MIN);
+  const floor = Math.max(maxW * STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN);
   let propTotal = 0;
   const effW = {};
   for (const g of groupNames) {
@@ -303,21 +337,63 @@ export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjLis
     propTotal += effW[g];
   }
 
-  // Precompute per-node property anchors (cached across passes)
-  const N = nodes.length;
-  const propPx = new Float64Array(N);
-  const propPy = new Float64Array(N);
-  for (let i = 0; i < N; i++) {
-    const nd = nodes[i];
-    let px = 0, py = 0;
+  // Precompute per-group cos/sin for bearings. Fast path when no bearings: skip
+  // both the precompute and the rotation branch in the per-node loop.
+  const G = groupNames.length;
+  let cosBearing = null, sinBearing = null, hasAnyBearing = false;
+  if (propBearings) {
     for (const g of groupNames) {
-      const p = nd.projections[g];
-      if (p) { px += p[0] * effW[g]; py += p[1] * effW[g]; }
+      if (propBearings[g]) { hasAnyBearing = true; break; }
     }
-    propPx[i] = px / propTotal;
-    propPy[i] = py / propTotal;
-    nd.px = propPx[i];
-    nd.py = propPy[i];
+    if (hasAnyBearing) {
+      cosBearing = new Float64Array(G);
+      sinBearing = new Float64Array(G);
+      for (let gi = 0; gi < G; gi++) {
+        const theta = propBearings[groupNames[gi]] || 0;
+        cosBearing[gi] = Math.cos(theta);
+        sinBearing[gi] = Math.sin(theta);
+      }
+    }
+  }
+
+  // Precompute per-node property anchors (cached across passes). Buffers are
+  // reused across blend calls — see getBlendBuffers.
+  const N = nodes.length;
+  const { propPx, propPy, newPx, newPy } = getBlendBuffers(N);
+  if (hasAnyBearing) {
+    // Bearings present — rotate each group's contribution before summing.
+    for (let i = 0; i < N; i++) {
+      const nd = nodes[i];
+      let px = 0, py = 0;
+      for (let gi = 0; gi < G; gi++) {
+        const g = groupNames[gi];
+        const p = nd.projections[g];
+        if (p) {
+          const gx = p[0], gy = p[1];
+          const c = cosBearing[gi], s = sinBearing[gi];
+          px += (gx * c - gy * s) * effW[g];
+          py += (gx * s + gy * c) * effW[g];
+        }
+      }
+      propPx[i] = px / propTotal;
+      propPy[i] = py / propTotal;
+      nd.px = propPx[i];
+      nd.py = propPy[i];
+    }
+  } else {
+    // No bearings — original fast path, untouched.
+    for (let i = 0; i < N; i++) {
+      const nd = nodes[i];
+      let px = 0, py = 0;
+      for (const g of groupNames) {
+        const p = nd.projections[g];
+        if (p) { px += p[0] * effW[g]; py += p[1] * effW[g]; }
+      }
+      propPx[i] = px / propTotal;
+      propPy[i] = py / propTotal;
+      nd.px = propPx[i];
+      nd.py = propPy[i];
+    }
   }
 
   const doQuant = () => quantMode === 'gaussian' ? gaussianQuantize(nodes, quantStats) : normalizeAndQuantize(nodes);
@@ -326,9 +402,6 @@ export function unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjLis
   const alpha = Math.max(0, Math.min(1, smoothAlpha)); // clamp to [0,1]
 
   for (let pass = 0; pass < passes; pass++) {
-    const newPx = new Float64Array(N);
-    const newPy = new Float64Array(N);
-
     for (let i = 0; i < N; i++) {
       const nd = nodes[i];
       const neighbors = adjList[nd.id];

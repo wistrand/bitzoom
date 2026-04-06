@@ -15,8 +15,9 @@
 <meta name="twitter:image" content="images/bitzoom-2.png">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <script type="module" src="bitzoom.js"></script>
+<script type="module" src="bz-compass.js"></script>
 <style>
-  bz-graph:not(:defined) { visibility: hidden; }
+  bz-graph:not(:defined), bz-compass:not(:defined) { visibility: hidden; }
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
 
   :root {
@@ -128,7 +129,7 @@
   <a href="#from-js">From JS Objects</a>
   <a href="#options">Options</a>
   <a href="#callbacks">Callbacks</a>
-  <a href="#weights">Weight Tuning</a>
+  <a href="#strengths">Strength Tuning</a>
   <a href="#autotune">Auto-Tune</a>
   <a href="#svg-export">SVG Export</a>
   <a href="#offline">Offline Pipeline</a>
@@ -232,7 +233,7 @@ eve	Eve	management	director	12</pre>
   heatmapMode: <span class="string">'density'</span>,
   showLegend: true,
   showResetBtn: true,
-  weights: { group: 8, edgetype: 4 },
+  strengths: { group: 8, edgetype: 4 },
   labelProps: [<span class="string">'label'</span>],
 });</pre>
 
@@ -269,7 +270,7 @@ eve	Eve	management	director	12</pre>
   initialLevel: 3,
   showLegend: true,
   showResetBtn: true,
-  weights: { group: 5, lang: 8 },
+  strengths: { group: 5, lang: 8 },
 });</pre>
 
 <p>Only <code>id</code> is required. <code>group</code> defaults to <code>"unknown"</code> and <code>label</code> defaults to the node's <code>id</code>. Any other property becomes an extra property group. Numeric values (like <code>exp</code>) get multi-resolution tokenization automatically.</p>
@@ -294,7 +295,7 @@ eve	Eve	management	director	12</pre>
   <tr><td><code>sizeBy</code></td><td>string</td><td><code>'edges'</code></td><td>Node size: <code>'edges'</code> (degree) or <code>'members'</code> (count)</td></tr>
   <tr><td><code>sizeLog</code></td><td>boolean</td><td>false</td><td>Log scale for node size</td></tr>
   <tr><td><code>smoothAlpha</code></td><td>number</td><td>0</td><td>Topology blend weight, 0 (property only) to 1 (topology only)</td></tr>
-  <tr><td><code>weights</code></td><td>object</td><td><code>{group:3, rest:1}</code></td><td>Override property group weights</td></tr>
+  <tr><td><code>strengths</code></td><td>object</td><td><code>{group:3, rest:1}</code></td><td>Override property group strengths</td></tr>
   <tr><td><code>labelProps</code></td><td>array</td><td>[]</td><td>Property names to show as node labels</td></tr>
   <tr><td><code>showLegend</code></td><td>boolean</td><td>false</td><td>Draw color legend in bottom-right corner</td></tr>
   <tr><td><code>showResetBtn</code></td><td>boolean</td><td>false</td><td>Draw reset button in top-right corner</td></tr>
@@ -304,7 +305,7 @@ eve	Eve	management	director	12</pre>
   <tr><td><code>useGPU</code></td><td>boolean</td><td>false</td><td>Force WebGPU compute for projection and blend (<a href="webgpu.html">details</a>)</td></tr>
   <tr><td><code>autoGPU</code></td><td>boolean</td><td>true</td><td>Automatically enable WebGPU when dataset is large enough to benefit (N&times;G &gt; 2000). Set to <code>false</code> to disable.</td></tr>
   <tr><td><code>colorScheme</code></td><td>number</td><td>0</td><td>Color scheme index: 0=vivid, 1=viridis, 2=plasma, 3=inferno, 4=thermal, 5=grayscale, 6=diverging, 7=greens, 8=reds</td></tr>
-  <tr><td><code>colorBy</code></td><td>string</td><td>null</td><td>Override which property group controls node colors. <code>null</code> = auto (highest-weight group). Set to a group name to pin coloring.</td></tr>
+  <tr><td><code>colorBy</code></td><td>string</td><td>null</td><td>Override which property group controls node colors. <code>null</code> = auto (highest-strength group). Set to a group name to pin coloring.</td></tr>
   <tr><td><code>lightMode</code></td><td>boolean</td><td>false</td><td>Light theme for labels, legend, and grid. Press <kbd>C</kbd> to cycle color schemes, set <code>view.lightMode = true</code> at runtime.</td></tr>
 </table>
 
@@ -372,9 +373,9 @@ console.log(view.colorSchemeName);   <span class="comment">// "thermal"</span></
 
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<h2 id="weights">Weight Tuning</h2>
+<h2 id="strengths">Strength Tuning</h2>
 
-<p>Property weights control which attributes dominate the layout. Change them at any time. No rehashing, no reprojection. Just a weighted blend of fixed 2D anchors.</p>
+<p>Property strengths control which attributes dominate the layout. Change them at any time. No rehashing, no reprojection. Just a weighted blend of fixed 2D anchors.</p>
 
 <div style="display:flex;gap:12px;margin:24px 0;flex-wrap:wrap">
   <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
@@ -387,9 +388,9 @@ console.log(view.colorSchemeName);   <span class="comment">// "thermal"</span></
   </div>
 </div>
 
-<pre><span class="comment">// Change weights after creation</span>
-view.<span class="fn">setWeights</span>({ kind: 8, group: 1 }); <span class="comment">// cluster by file type</span>
-view.<span class="fn">setWeights</span>({ kind: 1, group: 8 }); <span class="comment">// cluster by module</span>
+<pre><span class="comment">// Change strengths after creation</span>
+view.<span class="fn">setStrengths</span>({ kind: 8, group: 1 }); <span class="comment">// cluster by file type</span>
+view.<span class="fn">setStrengths</span>({ kind: 1, group: 8 }); <span class="comment">// cluster by module</span>
 
 <span class="comment">// Adjust topology smoothing</span>
 view.<span class="fn">setAlpha</span>(0.5); <span class="comment">// pull connected nodes together</span>
@@ -406,17 +407,17 @@ view.<span class="fn">setOptions</span>({
 
 <h2 id="autotune">Auto-Tune</h2>
 
-<p>When loading an unfamiliar dataset, the default weights may produce a collapsed or uniform layout. The auto-tune optimizer searches the weight/alpha/quant parameter space to find a configuration with good visual structure, then applies it automatically.</p>
+<p>When loading an unfamiliar dataset, the default strengths may produce a collapsed or uniform layout. The auto-tune optimizer searches the strength/alpha/quant parameter space to find a configuration with good visual structure, then applies it automatically.</p>
 
-<p>Synth Packages dataset: default weights (left) vs auto-tuned (right).</p>
+<p>Synth Packages dataset: default strengths (left) vs auto-tuned (right).</p>
 
 <div style="display:flex;gap:12px;margin:24px 0;flex-wrap:wrap">
   <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Default weights</div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Default strengths</div>
     <canvas id="demo-autotune-default" style="width:100%;height:240px;display:block;background:var(--bg)"></canvas>
   </div>
   <div style="flex:1;min-width:280px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)">
-    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">autoTune: { weights: true, alpha: true, quant: true }</div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">autoTune: { strengths: true, alpha: true, quant: true }</div>
     <canvas id="demo-autotune-tuned" style="width:100%;height:240px;display:block;background:var(--bg)"></canvas>
   </div>
 </div>
@@ -437,22 +438,22 @@ view.<span class="fn">setOptions</span>({
 
 <p>Control which parameters are tuned:</p>
 
-<pre><span class="comment">// Only tune weights, keep alpha and quant as specified</span>
+<pre><span class="comment">// Only tune strengths, keep alpha and quant as specified</span>
 <span class="keyword">const</span> view = <span class="fn">createBitZoomView</span>(canvas, edges, nodes, {
   smoothAlpha: 0.5,
   quantMode: <span class="string">'gaussian'</span>,
-  autoTune: { weights: <span class="keyword">true</span>, alpha: <span class="keyword">false</span>, quant: <span class="keyword">false</span> },
+  autoTune: { strengths: <span class="keyword">true</span>, alpha: <span class="keyword">false</span>, quant: <span class="keyword">false</span> },
 });</pre>
 
-<p>Explicit <code>weights</code>, <code>smoothAlpha</code>, and <code>quantMode</code> in the options take precedence over tuned values.</p>
+<p>Explicit <code>strengths</code>, <code>smoothAlpha</code>, and <code>quantMode</code> in the options take precedence over tuned values.</p>
 
 <h3>Programmatic usage</h3>
 
-<p>Call <code>autoTuneWeights</code> directly for full control:</p>
+<p>Call <code>autoTuneStrengths</code> directly for full control:</p>
 
-<pre><span class="keyword">import</span> { autoTuneWeights } <span class="keyword">from</span> <span class="string">'./bitzoom.js'</span>;
+<pre><span class="keyword">import</span> { autoTuneStrengths } <span class="keyword">from</span> <span class="string">'./bitzoom.js'</span>;
 
-<span class="keyword">const</span> result = <span class="keyword">await</span> <span class="fn">autoTuneWeights</span>(
+<span class="keyword">const</span> result = <span class="keyword">await</span> <span class="fn">autoTuneStrengths</span>(
   view.nodes, view.groupNames, view.adjList, view.nodeIndexFull,
   {
     weights: <span class="keyword">true</span>, alpha: <span class="keyword">true</span>, quant: <span class="keyword">true</span>,
@@ -463,21 +464,21 @@ view.<span class="fn">setOptions</span>({
 );
 
 console.log(result);
-<span class="comment">// { weights: {group:8, ...}, alpha: 0.5, quantMode: 'gaussian',</span>
+<span class="comment">// { strengths: {group:8, ...}, alpha: 0.5, quantMode: 'gaussian',</span>
 <span class="comment">//   labelProps: ['group'], score: 0.42, blends: 87, quants: 174, timeMs: 320 }</span>
 
 <span class="comment">// Apply to an existing view</span>
-<span class="keyword">for</span> (<span class="keyword">const</span> g <span class="keyword">of</span> view.groupNames) view.propWeights[g] = result.weights[g];
+<span class="keyword">for</span> (<span class="keyword">const</span> g <span class="keyword">of</span> view.groupNames) view.propStrengths[g] = result.strengths[g];
 view.smoothAlpha = result.alpha;
 view.quantMode = result.quantMode;
-view.setWeights(result.weights); <span class="comment">// triggers re-blend and render</span></pre>
+view.setStrengths(result.strengths); <span class="comment">// triggers re-blend and render</span></pre>
 
 <h3>How it works</h3>
 
 <p>The optimizer maximizes <strong>spread &times; clumpiness</strong> at zoom level L5 (32&times;32 grid). Spread (fraction of cells occupied) penalizes collapse. Clumpiness (coefficient of variation of per-cell node counts) penalizes uniform scatter and rewards clusters with gaps between them. The search runs in two phases:</p>
 
 <ol>
-<li><strong>Preset scan.</strong> Balanced weights and each group solo, crossed with alpha values and quant modes. Picks the best starting point.</li>
+<li><strong>Preset scan.</strong> Balanced strengths and each group solo, crossed with alpha values and quant modes. Picks the best starting point.</li>
 <li><strong>Coordinate descent.</strong> Optimizes one parameter at a time from the best preset. Three rounds, early exit if no improvement.</li>
 </ol>
 
@@ -549,10 +550,10 @@ console.log(result.groupNames);  <span class="comment">// ['group', 'label', 'st
   }
 }
 
-<span class="comment">// Blend with custom weights</span>
-<span class="keyword">const</span> weights = { group: 5, edgetype: 8 };
-<span class="keyword">for</span> (<span class="keyword">const</span> g <span class="keyword">of</span> result.groupNames) weights[g] ??= 1;
-<span class="fn">unifiedBlend</span>(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, <span class="string">'rank'</span>);
+<span class="comment">// Blend with custom strengths</span>
+<span class="keyword">const</span> strengths = { group: 5, edgetype: 8 };
+<span class="keyword">for</span> (<span class="keyword">const</span> g <span class="keyword">of</span> result.groupNames) strengths[g] ??= 1;
+<span class="fn">unifiedBlend</span>(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, <span class="string">'rank'</span>);
 
 <span class="comment">// Build a zoom level and inspect supernodes</span>
 <span class="keyword">const</span> level = <span class="fn">buildLevel</span>(4, nodes, result.edges, nodeIndex,
@@ -730,12 +731,12 @@ viewGL.useWebGL = <span class="keyword">true</span>;   <span class="comment">// 
 
 &lt;bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
           level="3" heatmap="density" legend
-          weights="group:5,edgetype:8" label-props="label"&gt;
+          strengths="group:5,edgetype:8" label-props="label"&gt;
 &lt;/bz-graph&gt;</pre>
 
 <bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
           level="3" heatmap="density" edge-mode="curves" legend
-          weights="group:5,edgetype:8" label-props="label"
+          strengths="group:5,edgetype:8" label-props="label"
           style="height:280px;border:1px solid var(--border);border-radius:8px;margin:16px 0">
 </bz-graph>
 
@@ -775,13 +776,13 @@ carol	alice
   <tr><td><code>edge-mode</code></td><td><code>"curves"</code></td><td>Edge mode: <code>curves</code>, <code>lines</code>, <code>none</code></td></tr>
   <tr><td><code>alpha</code></td><td><code>"0.5"</code></td><td>Topology blend alpha (0&ndash;1)</td></tr>
   <tr><td><code>color-scheme</code></td><td><code>"1"</code></td><td>Color scheme index (0&ndash;8)</td></tr>
-  <tr><td><code>weights</code></td><td><code>"group:5,kind:8"</code></td><td>Property weights</td></tr>
+  <tr><td><code>strengths</code></td><td><code>"group:5,kind:8"</code></td><td>Property strengths</td></tr>
   <tr><td><code>label-props</code></td><td><code>"label,group"</code></td><td>Properties shown as labels</td></tr>
   <tr><td><code>legend</code></td><td>(boolean)</td><td>Show color legend</td></tr>
   <tr><td><code>reset-btn</code></td><td>(boolean)</td><td>Show reset button</td></tr>
   <tr><td><code>light-mode</code></td><td>(boolean)</td><td>Light theme</td></tr>
   <tr><td><code>webgl</code></td><td>(boolean)</td><td>WebGL2 rendering</td></tr>
-  <tr><td><code>color-by</code></td><td><code>"group"</code></td><td>Override color group (null = auto, highest-weight group)</td></tr>
+  <tr><td><code>color-by</code></td><td><code>"group"</code></td><td>Override color group (null = auto, highest-strength group)</td></tr>
 </table>
 
 <p>Access the underlying <code>BitZoomCanvas</code> via <code>element.view</code> for programmatic control:</p>
@@ -791,7 +792,58 @@ el.view.colorScheme = 3;      <span class="comment">// change at runtime</span>
 el.view.cycleColorScheme();   <span class="comment">// next scheme</span>
 el.setAttribute(<span class="string">'level'</span>, <span class="string">'5'</span>); <span class="comment">// reactive attribute</span></pre>
 
-<p>See the <a href="bz-graph-demo.html">full demo page</a> for more examples.</p>
+<p>The <code>ready</code> event fires when the graph finishes loading and is available for programmatic access:</p>
+
+<pre>el.addEventListener(<span class="string">'ready'</span>, () =&gt; {
+  console.log(el.view.groupNames); <span class="comment">// ['group', 'label', ...]</span>
+});</pre>
+
+<h3 id="compass">&lt;bz-compass&gt; Radial Control</h3>
+
+<p>The <code>&lt;bz-compass&gt;</code> component provides a radial 2D control for adjusting property strengths and bearings simultaneously. Each property group is a spoke &mdash; drag distance from center sets the strength, angular offset sets the bearing rotation.</p>
+
+<p>Connect it to a <code>&lt;bz-graph&gt;</code> with the <code>for</code> attribute &mdash; no JavaScript needed:</p>
+
+<pre>&lt;script type="module" src="bz-compass.js"&gt;&lt;/script&gt;
+
+&lt;bz-graph id="myGraph" edges="data/synth-packages.edges" nodes="data/synth-packages.nodes"
+          level="3" legend auto-tune='{"strengths":true,"alpha":true}'&gt;
+&lt;/bz-graph&gt;
+&lt;bz-compass for="myGraph"&gt;&lt;/bz-compass&gt;</pre>
+
+<div style="display:flex;gap:8px;align-items:stretch;max-width:820px;margin:16px 0">
+  <bz-graph id="synthCompass" edges="data/synth-packages.edges" nodes="data/synth-packages.nodes"
+            level="3" heatmap="density" edge-mode="curves" legend
+            auto-tune='{"strengths":true,"alpha":true}'
+            style="flex:1;min-width:0;height:320px;border:1px solid var(--border);border-radius:8px">
+  </bz-graph>
+  <bz-compass for="synthCompass"
+              style="width:200px;flex-shrink:0;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+  </bz-compass>
+</div>
+
+<p>The compass auto-discovers groups when the graph loads and keeps in sync bidirectionally &mdash; dragging a compass handle updates the graph, and external changes (e.g. auto-tune) update the compass.</p>
+
+<table>
+  <tr><th>Attribute</th><th>Example</th><th>Description</th></tr>
+  <tr><td><code>for</code></td><td><code>"myGraph"</code></td><td>ID of a <code>&lt;bz-graph&gt;</code> to bind to</td></tr>
+  <tr><td><code>max-strength</code></td><td><code>"10"</code></td><td>Maximum strength value (default 10)</td></tr>
+</table>
+
+<p><b>Interaction:</b> drag handles freely (strength + bearing), <b>Shift+drag</b> for strength only, <b>Alt+drag</b> for bearing only. Double-click resets a handle to zero. Right-click resets bearing only. Keyboard: <b>Tab</b> cycles handles, <b>&uarr;&darr;</b> adjust strength, <b>&larr;&rarr;</b> adjust bearing.</p>
+
+<p>Standalone (programmatic) usage without <code>&lt;bz-graph&gt;</code>:</p>
+
+<pre><span class="keyword">const</span> compass = document.createElement(<span class="string">'bz-compass'</span>);
+compass.groups = [
+  { name: <span class="string">'group'</span>, color: <span class="string">'#e64'</span>, strength: 8, bearing: 0 },
+  { name: <span class="string">'kind'</span>,  color: <span class="string">'#4ae'</span>, strength: 3, bearing: 0.5 },
+];
+compass.addEventListener(<span class="string">'input'</span>, e =&gt; {
+  console.log(e.detail); <span class="comment">// { name, strength, bearing }</span>
+});</pre>
+
+<p>See the <a href="bz-graph-demo.html">full demo page</a> for live examples.</p>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
@@ -867,7 +919,7 @@ createBitZoomFromGraph(document.getElementById('demo-from-js'),
     { src: 'eve',   dst: 'alice' }, { src: 'eve',   dst: 'hank' },
     { src: 'hank',  dst: 'bob' },   { src: 'frank', dst: 'eve' },
   ],
-  { initialLevel: 3, edgeMode: 'lines', showLegend: true, showResetBtn: true, weights: { group: 5, lang: 8 } }
+  { initialLevel: 3, edgeMode: 'lines', showLegend: true, showResetBtn: true, strengths: { group: 5, lang: 8 } }
 );
 
 // Epstein demo
@@ -876,7 +928,7 @@ fetch('data/epstein.edges').then(r => r.text()).then(edges => {
     createBitZoomView(document.getElementById('demo-epstein'), edges, nodes, {
       initialLevel: 3, edgeMode: 'lines', heatmapMode: 'density',
       showLegend: true, showResetBtn: true,
-      weights: { group: 8, edgetype: 4 }, labelProps: ['label'],
+      strengths: { group: 8, edgetype: 4 }, labelProps: ['label'],
     });
   });
 });
@@ -886,11 +938,11 @@ fetch('data/bitzoom-source.edges').then(r => r.text()).then(edges => {
   fetch('data/bitzoom-source.nodes').then(r => r.text()).then(nodes => {
     createBitZoomView(document.getElementById('demo-kind'), edges, nodes, {
       initialLevel: 4, edgeMode: 'lines', showLegend: true, showResetBtn: true,
-      weights: { kind: 8, group: 1 }, labelProps: ['kind'],
+      strengths: { kind: 8, group: 1 }, labelProps: ['kind'],
     });
     createBitZoomView(document.getElementById('demo-group'), edges, nodes, {
       initialLevel: 4, edgeMode: 'lines', showLegend: true, showResetBtn: true,
-      weights: { kind: 1, group: 8 }, labelProps: ['file'],
+      strengths: { kind: 1, group: 8 }, labelProps: ['file'],
     });
   });
 });
@@ -903,7 +955,7 @@ fetch('data/synth-packages.edges').then(r => r.text()).then(edges => {
     });
     createBitZoomView(document.getElementById('demo-autotune-tuned'), edges, nodes, {
       initialLevel: 4, edgeMode: 'lines', showLegend: true, showResetBtn: true,
-      autoTune: { weights: true, alpha: true, quant: true },
+      autoTune: { strengths: true, alpha: true, quant: true },
     });
   });
 });
@@ -913,7 +965,7 @@ fetch('data/epstein.edges').then(r => r.text()).then(edges => {
   fetch('data/epstein.nodes').then(r => r.text()).then(nodes => {
     const shared = {
       initialLevel: 3, edgeMode: 'curves', showLegend: true, showResetBtn: true,
-      weights: { group: 8, edgetype: 4 }, labelProps: ['label'],
+      strengths: { group: 8, edgetype: 4 }, labelProps: ['label'],
     };
     createBitZoomView(document.getElementById('demo-gl-canvas2d'), edges, nodes, shared);
     createBitZoomView(document.getElementById('demo-gl-webgl'), edges, nodes, { ...shared, webgl: true });

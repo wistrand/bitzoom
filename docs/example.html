@@ -28,7 +28,7 @@ const [edges, nodes] = await Promise.all([
 ]);
 createBitZoomView(document.getElementById('c1'), edges, nodes, {
   initialLevel: 3, edgeMode: 'lines', heatmapMode: 'density', showLegend: true,
-  weights: { group: 5, edgetype: 8 }, labelProps: ['label'],
+  strengths: { group: 5, edgetype: 8 }, labelProps: ['label'],
 });
 
 // Graph 2: inline data
@@ -46,7 +46,7 @@ createBitZoomFromGraph(document.getElementById('c2'),
     { src: 'b', dst: 'f' }, { src: 'c', dst: 'd' },
     { src: 'e', dst: 'a' }, { src: 'e', dst: 'd' },
   ],
-  { initialLevel: 2, edgeMode: 'curves', showLegend: true, weights: { group: 5, lang: 8 } },
+  { initialLevel: 2, edgeMode: 'curves', showLegend: true, strengths: { group: 5, lang: 8 } },
 );
 </script>
 </body>
