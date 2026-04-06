@@ -10,7 +10,7 @@ interface TestCase {
   name: string;
   edges: string;
   nodes: string | null;
-  weights: Record<string, number>;
+  strengths: Record<string, number>;
   alpha: number;
   quant: string;
 }
@@ -18,31 +18,31 @@ interface TestCase {
 const cases: TestCase[] = [
   { name: 'karate-balanced',
     edges: 'docs/data/karate.edges', nodes: 'docs/data/karate.nodes',
-    weights: { group: 3, label: 1 }, alpha: 0, quant: 'gaussian' },
+    strengths: { group: 3, label: 1 }, alpha: 0, quant: 'gaussian' },
   { name: 'karate-topo',
     edges: 'docs/data/karate.edges', nodes: 'docs/data/karate.nodes',
-    weights: { group: 3, label: 1 }, alpha: 0.75, quant: 'gaussian' },
+    strengths: { group: 3, label: 1 }, alpha: 0.75, quant: 'gaussian' },
   { name: 'epstein-edgetype',
     edges: 'docs/data/epstein.edges', nodes: 'docs/data/epstein.nodes',
-    weights: { group: 5, edgetype: 8 }, alpha: 0, quant: 'gaussian' },
+    strengths: { group: 5, edgetype: 8 }, alpha: 0, quant: 'gaussian' },
   { name: 'epstein-topo',
     edges: 'docs/data/epstein.edges', nodes: 'docs/data/epstein.nodes',
-    weights: { group: 5, edgetype: 8 }, alpha: 0.75, quant: 'gaussian' },
+    strengths: { group: 5, edgetype: 8 }, alpha: 0.75, quant: 'gaussian' },
   { name: 'bzsource-kind',
     edges: 'docs/data/bitzoom-source.edges', nodes: 'docs/data/bitzoom-source.nodes',
-    weights: { kind: 8, group: 3 }, alpha: 0, quant: 'gaussian' },
+    strengths: { kind: 8, group: 3 }, alpha: 0, quant: 'gaussian' },
   { name: 'bzsource-topo',
     edges: 'docs/data/bitzoom-source.edges', nodes: 'docs/data/bitzoom-source.nodes',
-    weights: { kind: 8, group: 3 }, alpha: 0.5, quant: 'gaussian' },
+    strengths: { kind: 8, group: 3 }, alpha: 0.5, quant: 'gaussian' },
   { name: 'mitre-weighted',
     edges: 'docs/data/mitre-attack.edges', nodes: 'docs/data/mitre-attack.nodes',
-    weights: { group: 5, platforms: 6, killchain: 4 }, alpha: 0, quant: 'gaussian' },
+    strengths: { group: 5, platforms: 6, killchain: 4 }, alpha: 0, quant: 'gaussian' },
   { name: 'mitre-rank',
     edges: 'docs/data/mitre-attack.edges', nodes: 'docs/data/mitre-attack.nodes',
-    weights: { group: 5, platforms: 6, killchain: 4 }, alpha: 0, quant: 'rank' },
+    strengths: { group: 5, platforms: 6, killchain: 4 }, alpha: 0, quant: 'rank' },
   { name: 'email-topo',
     edges: 'docs/data/email-eu.edges', nodes: null,
-    weights: {}, alpha: 0.75, quant: 'rank' },
+    strengths: {}, alpha: 0.75, quant: 'rank' },
 ];
 
 const outDir = 'tests/ground-truth';
@@ -76,19 +76,19 @@ for (const tc of cases) {
   const nodeIndexFull: Record<string, any> = {};
   for (const n of nodes) nodeIndexFull[n.id] = n;
 
-  // Set weights (fill unspecified with 0)
-  const propWeights: Record<string, number> = {};
-  for (const g of result.groupNames) propWeights[g] = tc.weights[g] ?? 0;
+  // Set strengths (fill unspecified with 0)
+  const propStrengths: Record<string, number> = {};
+  for (const g of result.groupNames) propStrengths[g] = tc.strengths[g] ?? 0;
 
   // Blend + quantize
-  unifiedBlend(nodes, result.groupNames, propWeights, tc.alpha, adjList, nodeIndexFull, 5, tc.quant, {});
+  unifiedBlend(nodes, result.groupNames, propStrengths, tc.alpha, adjList, nodeIndexFull, 5, tc.quant, {});
 
   // Save: id, px, py, gx, gy, projections per group
   const lines: string[] = [];
   // Header
   const projHeaders = result.groupNames.map((g: string) => `proj_${g}_x\tproj_${g}_y`).join('\t');
   lines.push(`# id\tpx\tpy\tgx\tgy\t${projHeaders}`);
-  lines.push(`# config: weights=${JSON.stringify(tc.weights)} alpha=${tc.alpha} quant=${tc.quant}`);
+  lines.push(`# config: strengths=${JSON.stringify(tc.strengths)} alpha=${tc.alpha} quant=${tc.quant}`);
   lines.push(`# nodes=${nodes.length} groups=${result.groupNames.join(',')}`);
 
   for (const n of nodes) {

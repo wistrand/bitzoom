@@ -1,10 +1,10 @@
 // bitzoom-utils.js — Utility functions (auto-tune, etc).
 // Depends on bitzoom-algo.js for unifiedBlend and quantization.
 
-import { unifiedBlend, normalizeAndQuantize, gaussianQuantize } from './bitzoom-algo.js';
+import { unifiedBlend, normalizeAndQuantize, gaussianQuantize, STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN } from './bitzoom-algo.js';
 
 // ─── Auto-tune optimizer ─────────────────────────────────────────────────────
-// Async heuristic search for weights/alpha/quant that maximize layout quality.
+// Async heuristic search for strengths/alpha/quant that maximize layout quality.
 // Yields to the browser between phases so progress can be painted.
 //
 // Objective: spread × clumpiness at an adaptive grid level.
@@ -75,22 +75,22 @@ function quantizeOnly(nodes, mode) {
 
 // Cooperative yield that works in both browser and non-browser environments.
 // Browsers get requestAnimationFrame (aligns with paint, ~60Hz); Deno/Node fall
-// back to setTimeout(0) so autoTuneWeights can run from CLI tools and tests
+// back to setTimeout(0) so autoTuneStrengths can run from CLI tools and tests
 // without any caller-side polyfill.
 const yieldFrame = typeof requestAnimationFrame !== 'undefined'
   ? () => new Promise(resolve => requestAnimationFrame(resolve))
   : () => new Promise(resolve => setTimeout(resolve, 0));
 
-export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull, opts = {}) {
+export async function autoTuneStrengths(nodes, groupNames, adjList, nodeIndexFull, opts = {}) {
   const t0 = performance.now();
-  const doWeights = opts.weights !== false;
+  const doStrengths = (opts.strengths ?? opts.weights) !== false;
   const doAlpha = opts.alpha !== false;
   const doQuant = opts.quant !== false;
   const onProgress = opts.onProgress;
   const signal = opts.signal;
   const timeoutMs = opts.timeout ?? 20000;
 
-  const WEIGHT_VALS = [0, 3, 8, 10];
+  const STRENGTH_VALS = [0, 3, 8, 10];
   const ALPHA_VALS = [0, 0.25, 0.5, 0.75, 1.0];
   const QUANT_VALS = doQuant ? ['rank', 'gaussian'] : ['gaussian'];
   // Skip topology blending search for nodes-only graphs — no edges means alpha
@@ -105,7 +105,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   // Determine tunable groups: 'group' + extra properties + edgetype if rich.
   // Exclude label (too high cardinality), structure (degree buckets), neighbors (auto-generated).
   // Also exclude any group with only one distinct value across all nodes —
-  // it provides no spreading signal, so any weight on it is a no-op (pulls all
+  // it provides no spreading signal, so any strength on it is a no-op (pulls all
   // nodes toward a constant offset) that would just show up as noise in the UI.
   const ALWAYS_EXCLUDE = new Set(['label', 'structure', 'neighbors']);
   const tunableGroups = groupNames.filter(g => {
@@ -152,9 +152,9 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   }
 
   // Detect edge-only datasets: if all tunable groups have <=1 distinct value,
-  // skip weight search (no property signal to optimize).
+  // skip strength search (no property signal to optimize).
   let hasPropertySignal = false;
-  if (doWeights) {
+  if (doStrengths) {
     for (const g of tunableGroups) {
       const vals = new Set();
       for (const n of nodes) {
@@ -166,17 +166,20 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
       if (hasPropertySignal) break;
     }
   }
-  const effectiveDoWeights = doWeights && hasPropertySignal;
+  const effectiveDoStrengths = doStrengths && hasPropertySignal;
 
-  let bestScore = -1, bestWeights = {}, bestAlpha = 0, bestQuant = 'gaussian';
+  let bestScore = -1, bestStrengths = {}, bestAlpha = 0, bestQuant = 'gaussian';
   let blends = 0, quants = 0, step = 0;
 
   const G = tunableGroups.length;
-  const presetCount = (effectiveDoWeights ? G + 2 : 1) * alphaVals.length; // +2 for balanced + interaction
-  const descentPerRound = (effectiveDoWeights ? G * WEIGHT_VALS.length : 0) + alphaVals.length;
-  // Refinement phase: 4 deltas per non-zero group + 4 alpha deltas (upper bound)
-  const refineSteps = (effectiveDoWeights ? G * 4 : 0) + (doAlpha && hasEdges ? 4 : 0);
-  const totalEstimate = presetCount + descentPerRound * 3 + refineSteps;
+  // Dual-pass: run preset+descent+refine at α=0 and α=0.5, then sweep α
+  const nPasses = (effectiveDoStrengths && hasEdges && doAlpha) ? 2 : 1;
+  const presetCount = effectiveDoStrengths ? G + 2 : 1;
+  const descentPerRound = effectiveDoStrengths ? G * STRENGTH_VALS.length : 0;
+  const refineSteps = effectiveDoStrengths ? G * 4 : 0;
+  const perPass = presetCount + descentPerRound * 3 + refineSteps;
+  const alphaSteps = (doAlpha && hasEdges) ? alphaVals.length + 4 : 0;
+  const totalEstimate = perPass * nPasses + alphaSteps;
 
   let lastYield = performance.now();
   let aborted = false;
@@ -210,34 +213,34 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   // full passes for the actual layout the user sees.
   const TUNE_PASSES = 2;
   // Pick the category array for purity scoring based on the current trial's
-  // dominant weight. Falls back to the 'group' category cache, otherwise the
+  // dominant strength. Falls back to the 'group' category cache, otherwise the
   // first available cached group, otherwise null (purity skipped).
-  const pickCategoryArray = (weights) => {
+  const pickCategoryArray = (strengths) => {
     if (categoryCache.size === 0) return null;
     let dominant = null, maxW = 0;
     for (const g of tunableGroups) {
-      const w = weights[g] || 0;
-      if (w > maxW && categoryCache.has(g)) { maxW = w; dominant = g; }
+      const s = strengths[g] || 0;
+      if (s > maxW && categoryCache.has(g)) { maxW = s; dominant = g; }
     }
     if (dominant) return categoryCache.get(dominant);
-    // No weighted categorical — use any cached one (prefer 'group')
+    // No dominant categorical — use any cached one (prefer 'group')
     return categoryCache.get('group') || categoryCache.values().next().value || null;
   };
-  // Memoize (weights, alpha) → result so refinement/descent revisits don't re-blend.
+  // Memoize (strengths, alpha) → result so refinement/descent revisits don't re-blend.
   const scoreCache = new Map();
-  const cacheKey = (weights, alpha) => {
+  const cacheKey = (strengths, alpha) => {
     let k = alpha.toFixed(3) + '|';
-    for (const g of tunableGroups) k += (weights[g] || 0) + ',';
+    for (const g of tunableGroups) k += (strengths[g] || 0) + ',';
     return k;
   };
-  const blendAndScore = (weights, alpha) => {
-    const key = cacheKey(weights, alpha);
+  const blendAndScore = (strengths, alpha) => {
+    const key = cacheKey(strengths, alpha);
     const cached = scoreCache.get(key);
     if (cached) { step++; return cached; }
-    blendFn(nodes, groupNames, weights, alpha, adjList, nodeIndexFull, TUNE_PASSES, 'gaussian', {});
+    blendFn(nodes, groupNames, strengths, alpha, adjList, nodeIndexFull, TUNE_PASSES, 'gaussian', {});
     blends++;
     for (let i = 0; i < nodes.length; i++) { savedPx[i] = nodes[i].px; savedPy[i] = nodes[i].py; }
-    const nodeCategory = pickCategoryArray(weights);
+    const nodeCategory = pickCategoryArray(strengths);
     let localBest = -1, localQuant = 'gaussian';
     for (const q of QUANT_VALS) {
       for (let i = 0; i < nodes.length; i++) { nodes[i].px = savedPx[i]; nodes[i].py = savedPy[i]; }
@@ -252,16 +255,28 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
     return out;
   };
 
-  // Phase 1: Presets
-  const presets = [];
+  // ── Dual-pass strength search ──────────────────────────────────────────────
+  // Searching strengths at α=0 prevents topology from masking property signal.
+  // But some strength configs only show value WITH topology (e.g., MITRE's
+  // "platforms" group helps when connected techniques share platforms).
+  //
+  // Solution: run the full preset → descent → refine pipeline at two α levels
+  // (0 and 0.5), then pick whichever produces the higher score. This explores
+  // both the property-only and property+topology landscapes.
+  //
+  // For property datasets, cap α at 0.75 (never 1.0 — full topology collapses
+  // property structure via CV inflation). Edge-only datasets use the full range.
+  const maxAlpha = effectiveDoStrengths ? 0.75 : 1.0;
+  const searchAlphas = (effectiveDoStrengths && hasEdges && doAlpha) ? [0, 0.5] : [0];
 
-  // Balanced (all tunable groups at weight 3)
+  const presets = [];
+  // Balanced (all tunable groups at strength 3)
   const balanced = {};
   for (const g of groupNames) balanced[g] = tunableGroups.includes(g) ? 3 : 0;
   presets.push(balanced);
 
-  if (effectiveDoWeights) {
-    // Each tunable group solo at weight 8
+  if (effectiveDoStrengths) {
+    // Each tunable group solo at strength 8
     for (const g of tunableGroups) {
       const solo = {};
       for (const g2 of groupNames) solo[g2] = (g2 === g) ? 8 : 0;
@@ -269,153 +284,156 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
     }
   }
 
-  await forceYield('presets');
   const soloWinners = []; // track top solo scorers for interaction presets
-  for (let pi = 0; pi < presets.length; pi++) {
+
+  for (const searchAlpha of searchAlphas) {
     if (aborted) break;
-    const weights = presets[pi];
-    for (const alpha of alphaVals) {
-      const { score, quant } = blendAndScore(weights, alpha);
-      if (score > bestScore) {
-        bestScore = score;
-        bestWeights = { ...weights };
-        bestAlpha = alpha;
-        bestQuant = quant;
+    let passScore = -1, passStrengths = {}, passQuant = 'gaussian';
+
+    // ── Preset scan at this α ────────────────────────────────────────────
+    await forceYield('presets');
+    for (let pi = 0; pi < presets.length; pi++) {
+      if (aborted) break;
+      const preset = presets[pi];
+      const { score, quant } = blendAndScore(preset, searchAlpha);
+      if (score > passScore) {
+        passScore = score;
+        passStrengths = { ...preset };
+        passQuant = quant;
       }
-      // Track solo preset scores (pi > 0 are solo presets)
-      if (pi > 0 && alpha === 0) {
+      if (pi > 0 && searchAlpha === 0) {
         soloWinners.push({ group: tunableGroups[pi - 1], score });
       }
       await maybeYield('presets');
-      if (aborted) break;
     }
-  }
 
-  // Interaction presets: combine top 2 solo winners
-  if (effectiveDoWeights && soloWinners.length >= 2 && !aborted) {
-    soloWinners.sort((a, b) => b.score - a.score);
-    const g1 = soloWinners[0].group, g2 = soloWinners[1].group;
-    const combo = {};
-    for (const g of groupNames) combo[g] = (g === g1 || g === g2) ? 5 : 0;
-    for (const alpha of alphaVals) {
-      if (aborted) break;
-      const { score, quant } = blendAndScore(combo, alpha);
-      if (score > bestScore) {
-        bestScore = score;
-        bestWeights = { ...combo };
-        bestAlpha = alpha;
-        bestQuant = quant;
+    // Interaction presets: combine top 2 solo winners
+    if (effectiveDoStrengths && soloWinners.length >= 2 && !aborted && searchAlpha === 0) {
+      soloWinners.sort((a, b) => b.score - a.score);
+      const g1 = soloWinners[0].group, g2 = soloWinners[1].group;
+      const combo = {};
+      for (const g of groupNames) combo[g] = (g === g1 || g === g2) ? 5 : 0;
+      const { score, quant } = blendAndScore(combo, searchAlpha);
+      if (score > passScore) {
+        passScore = score;
+        passStrengths = { ...combo };
+        passQuant = quant;
       }
       await maybeYield('presets');
     }
-  }
 
-  // Phase 2: Coordinate descent (3 rounds)
-  for (let round = 0; round < 3 && !aborted; round++) {
-    let improved = false;
-    await forceYield('descent');
-    if (aborted) break;
+    // ── Coordinate descent at this α (3 rounds) ──────────────────────────
+    for (let round = 0; round < 3 && !aborted; round++) {
+      let improved = false;
+      await forceYield('descent');
+      if (aborted) break;
 
-    if (effectiveDoWeights) {
-      for (const g of tunableGroups) {
-        if (aborted) break;
-        let bestV = bestWeights[g];
-        for (const v of WEIGHT_VALS) {
-          bestWeights[g] = v;
-          const { score, quant } = blendAndScore(bestWeights, bestAlpha);
-          if (score > bestScore) {
-            bestScore = score;
-            bestV = v;
-            bestQuant = quant;
-            improved = true;
-          }
-          await maybeYield('descent');
+      if (effectiveDoStrengths) {
+        for (const g of tunableGroups) {
           if (aborted) break;
+          let bestV = passStrengths[g];
+          for (const v of STRENGTH_VALS) {
+            passStrengths[g] = v;
+            const { score, quant } = blendAndScore(passStrengths, searchAlpha);
+            if (score > passScore) {
+              passScore = score;
+              bestV = v;
+              passQuant = quant;
+              improved = true;
+            }
+            await maybeYield('descent');
+            if (aborted) break;
+          }
+          passStrengths[g] = bestV;
         }
-        bestWeights[g] = bestV;
       }
+      if (!improved) break;
     }
 
-    if (doAlpha && hasEdges && !aborted) {
-      for (const a of alphaVals) {
-        const { score, quant } = blendAndScore(bestWeights, a);
-        if (score > bestScore) {
-          bestScore = score;
-          bestAlpha = a;
-          bestQuant = quant;
-          improved = true;
-        }
-        await maybeYield('descent');
-        if (aborted) break;
-      }
-    }
-
-    if (!improved) break;
-  }
-
-  // Phase 3: Local refinement around the best discrete point.
-  // Descent's weight grid is [0,3,8,10]; the true optimum often sits between.
-  // Probe ±1 and ±2 around each non-zero weight, and ±0.05 / ±0.15 around alpha.
-  // One pass, each parameter independently (greedy per-parameter).
-  if (!aborted) {
-    await forceYield('refine');
-    if (effectiveDoWeights && !aborted) {
+    // ── Strength refinement at this α ────────────────────────────────────
+    if (!aborted && effectiveDoStrengths) {
+      await forceYield('refine');
       for (const g of tunableGroups) {
         if (aborted) break;
-        const original = bestWeights[g];
-        if (original === 0) continue; // leave zeros alone — the descent decided they don't contribute
+        const original = passStrengths[g];
+        if (original === 0) continue;
         let groupBestV = original;
         for (const delta of [-2, -1, 1, 2]) {
           const v = original + delta;
           if (v < 0 || v > 15) continue;
-          bestWeights[g] = v;
-          const { score, quant } = blendAndScore(bestWeights, bestAlpha);
-          if (score > bestScore) {
-            bestScore = score;
-            bestQuant = quant;
+          passStrengths[g] = v;
+          const { score, quant } = blendAndScore(passStrengths, searchAlpha);
+          if (score > passScore) {
+            passScore = score;
+            passQuant = quant;
             groupBestV = v;
           }
           await maybeYield('refine');
           if (aborted) break;
         }
-        bestWeights[g] = groupBestV;
+        passStrengths[g] = groupBestV;
       }
     }
-    if (doAlpha && hasEdges && !aborted) {
+
+    // ── Keep this pass if it beats the current best ──────────────────────
+    if (passScore > bestScore) {
+      bestScore = passScore;
+      bestStrengths = { ...passStrengths };
+      bestAlpha = searchAlpha;
+      bestQuant = passQuant;
+    }
+  }
+
+  // ── Alpha fine-tuning (around the winning α) ──────────────────────────────
+  // Sweep nearby α values to find the sweet spot. Cap at maxAlpha.
+  if (doAlpha && hasEdges && !aborted) {
+    await forceYield('alpha');
+    const constrainedAlphaVals = alphaVals.filter(a => a <= maxAlpha);
+    for (const a of constrainedAlphaVals) {
+      if (aborted) break;
+      const { score, quant } = blendAndScore(bestStrengths, a);
+      if (score > bestScore) {
+        bestScore = score;
+        bestAlpha = a;
+        bestQuant = quant;
+      }
+      await maybeYield('alpha');
+    }
+    if (!aborted && bestAlpha > 0) {
       const original = bestAlpha;
       for (const delta of [-0.15, -0.05, 0.05, 0.15]) {
         if (aborted) break;
-        const a = Math.max(0, Math.min(1, original + delta));
+        const a = Math.max(0, Math.min(maxAlpha, original + delta));
         if (a === original) continue;
-        const { score, quant } = blendAndScore(bestWeights, a);
+        const { score, quant } = blendAndScore(bestStrengths, a);
         if (score > bestScore) {
           bestScore = score;
           bestAlpha = a;
           bestQuant = quant;
         }
-        await maybeYield('refine');
+        await maybeYield('alpha');
       }
     }
   }
 
   // Interpretability constraint: if descent zeroed out every tunable group
   // (e.g. karate, where topology alone scores best), auto-select ONE group to
-  // carry a small positive weight so colorBy has something meaningful to use.
+  // carry a small positive strength so colorBy has something meaningful to use.
   // Pick the highest-scoring solo winner — that's the group with the most
-  // information content per the metric. Use a small weight (3) that minimally
+  // information content per the metric. Use a small strength (3) that minimally
   // perturbs the topology-driven layout but gives the legend/colors purpose.
-  if (effectiveDoWeights && !aborted) {
-    const anyNonZero = tunableGroups.some(g => (bestWeights[g] || 0) > 0);
+  if (effectiveDoStrengths && !aborted) {
+    const anyNonZero = tunableGroups.some(g => (bestStrengths[g] || 0) > 0);
     if (!anyNonZero && soloWinners.length > 0) {
       soloWinners.sort((a, b) => b.score - a.score);
       const pickGroup = soloWinners[0].group;
-      bestWeights[pickGroup] = 3;
+      bestStrengths[pickGroup] = 3;
       // Don't re-score — this is an aesthetic override, not a performance tweak.
     }
   }
 
   // Final blend with best params
-  unifiedBlend(nodes, groupNames, bestWeights, bestAlpha, adjList, nodeIndexFull, 5, bestQuant, {});
+  unifiedBlend(nodes, groupNames, bestStrengths, bestAlpha, adjList, nodeIndexFull, 5, bestQuant, {});
   if (onProgress) onProgress({ phase: 'done', step: totalEstimate, total: totalEstimate, score: bestScore });
 
   // Pick label properties.
@@ -441,7 +459,7 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   //    when it has few distinct values (categorical, not a continuous property).
   let maxTunedW = 0, dominantGroup = null;
   for (const g of tunableGroups) {
-    if ((bestWeights[g] || 0) > maxTunedW) { maxTunedW = bestWeights[g] || 0; dominantGroup = g; }
+    if ((bestStrengths[g] || 0) > maxTunedW) { maxTunedW = bestStrengths[g] || 0; dominantGroup = g; }
   }
   if (dominantGroup && dominantGroup !== 'label' && !labelProps.includes(dominantGroup)) {
     const distinct = new Set();
@@ -458,7 +476,8 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
   }
 
   return {
-    weights: bestWeights,
+    strengths: bestStrengths,
+    weights: bestStrengths, // deprecated alias
     alpha: bestAlpha,
     quantMode: bestQuant,
     labelProps,
@@ -466,4 +485,145 @@ export async function autoTuneWeights(nodes, groupNames, adjList, nodeIndexFull,
     blends, quants,
     timeMs: Math.round(performance.now() - t0),
   };
+}
+
+// ─── Bearing auto-tune (closed-form trace maximization) ─────────────────────
+// For each group with non-trivial strength, find the rotation θ that maximizes
+// trace(Cov(blended positions)) = Var(x) + Var(y). With other groups fixed,
+// the trace is  K + 2A·cos(θ) + 2B·sin(θ)  ⟹  optimum at θ* = atan2(B, A).
+// Two coordinate-descent passes over groups. Cost: O(N·G) per pass — same as
+// one blend call. Returns a bearings object {groupName: radians}.
+
+export function autoTuneBearings(nodes, groupNames, propStrengths) {
+  const G = groupNames.length;
+  if (G < 2) return {};
+
+  // Compute effective strengths (mirrors unifiedBlend's floor logic).
+  let maxW = 0;
+  for (const g of groupNames) {
+    const raw = propStrengths[g] || 0;
+    if (raw > maxW) maxW = raw;
+  }
+  const floor = Math.max(maxW * STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN);
+  const effW = new Float64Array(G);
+  let propTotal = 0;
+  for (let gi = 0; gi < G; gi++) {
+    effW[gi] = Math.max(propStrengths[groupNames[gi]] || 0, floor);
+    propTotal += effW[gi];
+  }
+  // Skip if fewer than 2 groups have any user-set strength (floor-only groups
+  // still contribute via the strength floor, but if the user set only 1 group,
+  // the floored groups are noise — rotating them won't help).
+  let userSet = 0;
+  for (let gi = 0; gi < G; gi++) if ((propStrengths[groupNames[gi]] || 0) > 0) userSet++;
+  if (userSet < 2) return {};
+
+  const N = nodes.length;
+  if (N < 4) return {};
+
+  // Per-group weighted projection arrays (unrotated). ux[gi][i], uy[gi][i].
+  const ux = new Array(G);
+  const uy = new Array(G);
+  for (let gi = 0; gi < G; gi++) {
+    const gxArr = new Float64Array(N);
+    const gyArr = new Float64Array(N);
+    const g = groupNames[gi];
+    const w = effW[gi] / propTotal;
+    for (let i = 0; i < N; i++) {
+      const p = nodes[i].projections[g];
+      if (p) { gxArr[i] = p[0] * w; gyArr[i] = p[1] * w; }
+    }
+    ux[gi] = gxArr;
+    uy[gi] = gyArr;
+  }
+
+  // Current bearings (start from zero).
+  const bearings = new Float64Array(G); // radians
+
+  // Sum arrays: total blended x, y per node.
+  const sumX = new Float64Array(N);
+  const sumY = new Float64Array(N);
+
+  const recomputeSum = () => {
+    sumX.fill(0);
+    sumY.fill(0);
+    for (let gi = 0; gi < G; gi++) {
+      const c = Math.cos(bearings[gi]), s = Math.sin(bearings[gi]);
+      const gx = ux[gi], gy = uy[gi];
+      for (let i = 0; i < N; i++) {
+        sumX[i] += gx[i] * c - gy[i] * s;
+        sumY[i] += gx[i] * s + gy[i] * c;
+      }
+    }
+  };
+
+  recomputeSum();
+
+  // Two coordinate-descent passes.
+  for (let pass = 0; pass < 2; pass++) {
+    for (let gi = 0; gi < G; gi++) {
+      if (effW[gi] <= floor + 0.01) continue; // skip trivial groups
+
+      // Subtract group gi's current contribution from sum.
+      const oldC = Math.cos(bearings[gi]), oldS = Math.sin(bearings[gi]);
+      const gx = ux[gi], gy = uy[gi];
+      for (let i = 0; i < N; i++) {
+        sumX[i] -= gx[i] * oldC - gy[i] * oldS;
+        sumY[i] -= gx[i] * oldS + gy[i] * oldC;
+      }
+
+      // Compute covariances for closed-form solution.
+      // A = Cov(S_x, U_x) + Cov(S_y, U_y)
+      // B = Cov(S_y, U_x) - Cov(S_x, U_y)
+      // where S = sum without gi, U = (gx, gy) for group gi.
+      let mSx = 0, mSy = 0, mUx = 0, mUy = 0;
+      for (let i = 0; i < N; i++) {
+        mSx += sumX[i]; mSy += sumY[i];
+        mUx += gx[i]; mUy += gy[i];
+      }
+      mSx /= N; mSy /= N; mUx /= N; mUy /= N;
+
+      let covSxUx = 0, covSyUy = 0, covSyUx = 0, covSxUy = 0;
+      for (let i = 0; i < N; i++) {
+        const dSx = sumX[i] - mSx, dSy = sumY[i] - mSy;
+        const dUx = gx[i] - mUx, dUy = gy[i] - mUy;
+        covSxUx += dSx * dUx;
+        covSyUy += dSy * dUy;
+        covSyUx += dSy * dUx;
+        covSxUy += dSx * dUy;
+      }
+
+      const A = covSxUx + covSyUy;
+      const B = covSyUx - covSxUy;
+
+      // If A and B are both ~0, this group's projection is uncorrelated with
+      // the rest — any angle is equally good, keep current.
+      if (Math.abs(A) < 1e-12 && Math.abs(B) < 1e-12) {
+        // Add back old contribution.
+        for (let i = 0; i < N; i++) {
+          sumX[i] += gx[i] * oldC - gy[i] * oldS;
+          sumY[i] += gx[i] * oldS + gy[i] * oldC;
+        }
+        continue;
+      }
+
+      bearings[gi] = Math.atan2(B, A);
+
+      // Add back with new bearing.
+      const newC = Math.cos(bearings[gi]), newS = Math.sin(bearings[gi]);
+      for (let i = 0; i < N; i++) {
+        sumX[i] += gx[i] * newC - gy[i] * newS;
+        sumY[i] += gx[i] * newS + gy[i] * newC;
+      }
+    }
+  }
+
+  // Build result object. Only include non-zero bearings.
+  const result = {};
+  for (let gi = 0; gi < G; gi++) {
+    if (Math.abs(bearings[gi]) > 1e-6) {
+      result[groupNames[gi]] = bearings[gi];
+    }
+  }
+  return result;
 }

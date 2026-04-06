@@ -5,7 +5,7 @@ import {
     buildGaussianProjection, cellIdAtLevel,
 } from './bitzoom-algo.js';
 import { generateGroupColors } from './bitzoom-colors.js';
-import { autoTuneWeights } from './bitzoom-utils.js';
+import { autoTuneStrengths, autoTuneBearings } from './bitzoom-utils.js';
 import { initGPU, computeProjectionsGPU } from './bitzoom-gpu.js';
 import { isWebGL2Available } from './bitzoom-gl-renderer.js';
 import { exportSVG } from './bitzoom-svg.js';
@@ -62,7 +62,7 @@ function pickInitialLevel(nodes, zoomLevels, rawLevel) {
     return rawLevel;
 }
 
-// Dataset definitions. Optional `settings` configures initial weights and label checkboxes.
+// Dataset definitions. Optional `settings` configures initial strengths and label checkboxes.
 let DATASETS = [];
 
 class BitZoom {
@@ -144,6 +144,28 @@ class BitZoom {
         parts.push(`y=${v.pan.y.toFixed(0)}`);
         parts.push(`bl=${v.baseLevel}`);
         if (v.selectedId) parts.push(`s=${encodeURIComponent(v.selectedId)}`);
+        // Strengths (per-group, non-default only)
+        if (v.propStrengths) {
+            const strengthEntries = [];
+            for (const g of v.groupNames) {
+                const s = v.propStrengths[g];
+                if (s) strengthEntries.push(`${encodeURIComponent(g)}:${Math.round(s * 10) / 10}`);
+            }
+            if (strengthEntries.length) parts.push(`st=${strengthEntries.join(',')}`);
+        }
+        // Bearings (per-group rotation in degrees, integer-rounded). Only serialize
+        // non-zero entries to keep the hash compact; absent entries default to 0.
+        if (v.propBearings) {
+            const bearingEntries = [];
+            for (const g of v.groupNames) {
+                const rad = v.propBearings[g];
+                if (rad) {
+                    const deg = Math.round((rad * 180 / Math.PI) % 360);
+                    if (deg !== 0) bearingEntries.push(`${encodeURIComponent(g)}:${deg}`);
+                }
+            }
+            if (bearingEntries.length) parts.push(`b=${bearingEntries.join(',')}`);
+        }
         return parts.join('&');
     }
 
@@ -182,11 +204,47 @@ class BitZoom {
             const n = v.nodeIndexFull[params.s];
             if (n) this._showDetail({ type: 'node', item: n });
         }
+        // Strengths: `st=group:5,kind:8`
+        if (params.st) {
+            for (const entry of params.st.split(',')) {
+                const [g, val] = entry.split(':');
+                if (g && val !== undefined) {
+                    const key = decodeURIComponent(g);
+                    if (v.groupNames.includes(key)) {
+                        v.propStrengths[key] = parseFloat(val) || 0;
+                    }
+                }
+            }
+        }
+        // Bearings: `b=group:90,platform:45` — degrees, absent = 0
+        let bearingsChanged = false;
+        if (params.b) {
+            const obj = {};
+            for (const entry of params.b.split(',')) {
+                const [g, deg] = entry.split(':');
+                if (g && deg !== undefined) {
+                    const key = decodeURIComponent(g);
+                    if (v.groupNames.includes(key)) {
+                        obj[key] = (parseFloat(deg) || 0) * Math.PI / 180;
+                    }
+                }
+            }
+            if (Object.keys(obj).length) {
+                v.bulkSetBearings(obj);
+                bearingsChanged = true;
+            }
+        }
         this._updateStepperUI();
-        v.layoutAll();
-        this._updateAlgoInfo();
-        this._updateOverview();
-        v.render();
+        // If bearings were restored, trigger a re-blend so the layout reflects them.
+        // Otherwise just a layout + render (no projection change).
+        if (bearingsChanged) {
+            v._blend().then(() => { v.layoutAll(); this._updateAlgoInfo(); this._updateOverview(); v.render(); });
+        } else {
+            v.layoutAll();
+            this._updateAlgoInfo();
+            this._updateOverview();
+            v.render();
+        }
     }
 
     // ─── Algorithm wrappers ────────────────────────────────────────────────────
@@ -309,8 +367,13 @@ class BitZoom {
             return false; // let canvas handle nav neighbor rebuild
         }
         if (e.key === 'Escape') {
+            if (this._compassOpen) { this._toggleCompass(false); return true; }
             document.getElementById('node-panel').classList.remove('open');
             return false; // let canvas handle deselect
+        }
+        if (e.key === 'r') {
+            this._toggleCompass();
+            return true;
         }
         if (e.key === 'a') {
             document.body.classList.toggle('a11y-debug');
@@ -318,7 +381,7 @@ class BitZoom {
         }
         if (e.key === 's') {
             e.preventDefault();
-            const svg = exportSVG(this.view, { metadata: this._currentDatasetId || undefined });
+            const svg = exportSVG(this.view, { metadata: this._currentDatasetId || undefined, compass: this._compassOpen ? this._compassSVGOpts() : null });
             const blob = new Blob([svg], { type: 'image/svg+xml' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -330,7 +393,7 @@ class BitZoom {
         }
         if (e.key === 'S') {
             e.preventDefault();
-            const svg = exportSVG(this.view, { metadata: this._currentDatasetId || undefined });
+            const svg = exportSVG(this.view, { metadata: this._currentDatasetId || undefined, compass: this._compassOpen ? this._compassSVGOpts() : null });
             navigator.clipboard.writeText(svg).then(() => {
                 this.view.showProgress('SVG copied to clipboard');
                 setTimeout(() => { this.view._progressText = null; this.view.render(); }, 1500);
@@ -673,12 +736,26 @@ class BitZoom {
 
     async _applyDatasetSettings(settings) {
         const v = this.view;
-        if ('weights' in settings) {
-            // Zero all weights first, then apply specified values
-            for (const g of v.groupNames) v.propWeights[g] = 0;
-            for (const [prop, val] of Object.entries(settings.weights)) {
-                if (prop in v.propWeights) v.propWeights[prop] = val;
+        const strengthSettings = settings.strengths || settings.weights;
+        if (strengthSettings) {
+            // Zero all strengths first, then apply specified values
+            for (const g of v.groupNames) v.propStrengths[g] = 0;
+            for (const [prop, val] of Object.entries(strengthSettings)) {
+                if (prop in v.propStrengths) v.propStrengths[prop] = val;
             }
+        }
+        // Bearings: `settings.bearings = {groupName: degrees}`. Stored in degrees
+        // for human readability in datasets.json; converted to radians for the
+        // canvas `propBearings` field. Absent groups default to 0 (no rotation).
+        v.propBearings = {};
+        if (settings.bearings) {
+            const obj = {};
+            for (const [prop, deg] of Object.entries(settings.bearings)) {
+                if (v.groupNames.includes(prop)) {
+                    obj[prop] = (parseFloat(deg) || 0) * Math.PI / 180;
+                }
+            }
+            v.bulkSetBearings(obj);
         }
         v.labelProps.clear();
         if (settings.labelProps) {
@@ -695,9 +772,10 @@ class BitZoom {
             document.getElementById('nudgeSlider').value = v.smoothAlpha;
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
         }
-        this._syncWeightUI();
+        this._syncStrengthUI();
+        this._syncCompass();
         this._syncLabelCheckboxes();
-        v._quantStats = {}; // re-snapshot boundaries from dataset-tuned weights
+        v._quantStats = {}; // re-snapshot boundaries from dataset-tuned strengths
         v._refreshPropCache();
         await this.rebuildProjections();
         if (settings.initialLevel != null) {
@@ -728,21 +806,29 @@ class BitZoom {
             presetRow.appendChild(btn);
         }
 
-        const sliderContainer = document.getElementById('weightSliders');
+        const sliderContainer = document.getElementById('strengthSliders');
         sliderContainer.innerHTML = '';
         for (const key of v.groupNames) {
             const row = document.createElement('div');
-            row.className = 'weight-row';
+            row.className = 'strength-row';
+            const initialDeg = Math.round(((v.propBearings?.[key] || 0) * 180 / Math.PI) % 360);
             row.innerHTML = `
         <input type="checkbox" id="lbl-${esc(key)}" title="Include in label">
-        <span class="weight-label">${esc(key)}</span>
-        <input class="weight-slider" type="range" id="w-${key}" min="0" max="10" step="0.5" value="${v.propWeights[key]}">
-        <span class="weight-val" id="wv-${key}">${v.propWeights[key]}</span>`;
+        <span class="strength-label">${esc(key)}</span>
+        <input class="strength-slider" type="range" id="s-${key}" min="0" max="10" step="0.1" value="${v.propStrengths[key]}">
+        <span class="strength-val" id="sv-${key}">${Math.round(v.propStrengths[key] * 10) / 10}</span>
+        <div class="bearing-dial${initialDeg ? ' nonzero' : ''}" id="bd-${esc(key)}" tabindex="0" role="slider"
+             aria-label="Bearing for ${esc(key)}" aria-valuemin="0" aria-valuemax="359" aria-valuenow="${initialDeg}"
+             aria-valuetext="${initialDeg} degrees"
+             title="Bearing: ${initialDeg}° — drag to rotate, Shift+drag snaps to 45°">
+          <div class="bearing-tick" style="transform:rotate(${initialDeg}deg)"></div>
+        </div>`;
             sliderContainer.appendChild(row);
-            row.querySelector('.weight-slider').addEventListener('input', e => {
-                v.propWeights[key] = parseFloat(e.target.value);
-                document.getElementById(`wv-${key}`).textContent = v.propWeights[key];
+            row.querySelector('.strength-slider').addEventListener('input', e => {
+                v.propStrengths[key] = parseFloat(e.target.value);
+                document.getElementById(`sv-${key}`).textContent = Math.round(v.propStrengths[key] * 10) / 10;
                 document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                this._syncCompass();
                 this._scheduleRebuild();
             });
             row.querySelector('input[type=checkbox]').addEventListener('change', e => {
@@ -752,17 +838,124 @@ class BitZoom {
                 v.render();
             });
             // Click group name to set colorBy
-            row.querySelector('.weight-label').addEventListener('click', () => {
+            row.querySelector('.strength-label').addEventListener('click', () => {
                 v.colorBy = (v.colorBy === key) ? null : key;
                 this._updateColorByUI();
             });
+            // Bearing dial — pointer drag + keyboard arrows
+            const dialEl = row.querySelector('.bearing-dial');
+            if (dialEl) {
+                this._wireBearingDial(dialEl, key);
+            } else {
+                console.warn('[bearings] dial element missing for group', key);
+            }
         }
         this._updateColorByUI();
+        this._syncCompass();
+    }
+
+    /** Wire pointer + keyboard events on a single bearing dial element.
+     *  Drag behavior mirrors music-software knobs: vertical mouse delta drives
+     *  the value (drag up to increase, drag down to decrease), regardless of
+     *  pointer position relative to the dial. Absolute pointer angle is not
+     *  used — only the accumulated delta from drag start. Shift = fine mode
+     *  (4× slower). Ctrl/Cmd click = reset to 0°. Double-click = reset to 0°. */
+    _wireBearingDial(dial, groupKey) {
+        const v = this.view;
+        const tick = dial.querySelector('.bearing-tick');
+        const setDeg = (deg) => {
+            // Normalize to [0, 360), round to integer for UI stability.
+            // Snap to 0° when within ±5° of north (dead zone prevents jitter near reset).
+            let d = Math.round(deg) % 360;
+            if (d < 0) d += 360;
+            if (d <= 5 || d >= 355) d = 0;
+            tick.style.transform = `rotate(${d}deg)`;
+            dial.classList.toggle('nonzero', d !== 0);
+            dial.setAttribute('aria-valuenow', String(d));
+            dial.setAttribute('aria-valuetext', `${d} degrees`);
+            dial.title = `Bearing: ${d}° — drag up/down to rotate · Shift for fine · double-click to reset`;
+            v.setBearing(groupKey, d * Math.PI / 180);
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            this._syncCompass();
+        };
+
+        // Vertical drag — standard music software knob behavior.
+        // PIXELS_PER_FULL_ROTATION = how many vertical pixels to drag for 360°.
+        // 200 px matches typical DAW sensitivity; Shift divides by 4 for fine control.
+        const PIXELS_PER_FULL_ROTATION = 200;
+        let dragging = false;
+        let startY = 0;
+        let startDeg = 0;
+        dial.addEventListener('pointerdown', e => {
+            // Ctrl/Cmd click resets to 0
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                setDeg(0);
+                return;
+            }
+            e.preventDefault();
+            dial.focus();
+            dragging = true;
+            startY = e.clientY;
+            startDeg = parseInt(dial.getAttribute('aria-valuenow') || '0', 10);
+            dial.setPointerCapture(e.pointerId);
+            dial.classList.add('active');
+        });
+        dial.addEventListener('pointermove', e => {
+            if (!dragging) return;
+            // Drag UP increases value, drag DOWN decreases. Vertical delta only.
+            const dy = startY - e.clientY;
+            const sensitivity = e.shiftKey ? PIXELS_PER_FULL_ROTATION * 4 : PIXELS_PER_FULL_ROTATION;
+            setDeg(startDeg + (dy / sensitivity) * 360);
+        });
+        const endDrag = (e) => {
+            if (!dragging) return;
+            dragging = false;
+            try { dial.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+            dial.classList.remove('active');
+        };
+        dial.addEventListener('pointerup', endDrag);
+        dial.addEventListener('pointercancel', endDrag);
+
+        // Double-click resets to 0° (common music software convention)
+        dial.addEventListener('dblclick', e => {
+            e.preventDefault();
+            setDeg(0);
+        });
+
+        // Keyboard accessibility: arrows nudge by 15°, Shift+arrows by 45°.
+        // Stop propagation on consumed keys so the canvas's window-level keydown
+        // handler doesn't also trigger node navigation.
+        dial.addEventListener('keydown', e => {
+            const current = parseInt(dial.getAttribute('aria-valuenow') || '0', 10);
+            const step = e.shiftKey ? 45 : 15;
+            let consumed = false;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                setDeg(current + step); consumed = true;
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                setDeg(current - step); consumed = true;
+            } else if (e.key === 'PageUp') {
+                setDeg(current + 45); consumed = true;
+            } else if (e.key === 'PageDown') {
+                setDeg(current - 45); consumed = true;
+            } else if (e.key === 'Home' || e.key === '0') {
+                setDeg(0); consumed = true;
+            } else if (e.key === 'End') {
+                setDeg(359); consumed = true;
+            }
+            if (consumed) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        dial.addEventListener('focus', () => dial.classList.add('focused'));
+        dial.addEventListener('blur', () => dial.classList.remove('focused'));
     }
 
     _updateColorByUI() {
         const v = this.view;
-        document.querySelectorAll('.weight-label').forEach(el => {
+        document.querySelectorAll('.strength-label').forEach(el => {
             const g = el.textContent;
             const isColorBy = v.colorBy === g;
             el.style.textDecoration = isColorBy ? 'underline' : 'none';
@@ -772,16 +965,70 @@ class BitZoom {
     }
 
     _scheduleRebuild() {
-        if (this.rebuildTimer) clearTimeout(this.rebuildTimer);
-        this.rebuildTimer = setTimeout(async () => { await this.rebuildProjections(); this._updateColorByUI(); this.rebuildTimer = null; }, 150);
+        if (this.rebuildTimer) return;
+        this.rebuildTimer = requestAnimationFrame(async () => { this.rebuildTimer = null; await this.rebuildProjections(); this._updateColorByUI(); });
     }
 
-    _syncWeightUI() {
+    _syncStrengthUI() {
         const v = this.view;
-        for (const [key, val] of Object.entries(v.propWeights)) {
-            const sl = document.getElementById(`w-${key}`);
-            const vl = document.getElementById(`wv-${key}`);
-            if (sl) { sl.value = val; vl.textContent = val; }
+        for (const [key, val] of Object.entries(v.propStrengths)) {
+            const sl = document.getElementById(`s-${key}`);
+            const vl = document.getElementById(`sv-${key}`);
+            if (sl) { sl.value = val; vl.textContent = Math.round(val * 10) / 10; }
+        }
+    }
+
+    _compassSVGOpts() {
+        const widget = document.getElementById('compassWidget');
+        const panel = document.getElementById('compassPanel');
+        const canvas = document.getElementById('canvas');
+        if (!widget || !panel || !canvas) return null;
+        const cr = canvas.getBoundingClientRect();
+        const pr = panel.getBoundingClientRect();
+        // Compass content area (below titlebar)
+        const titlebarH = 30;
+        return {
+            widget,
+            x: pr.left - cr.left,
+            y: pr.top - cr.top + titlebarH,
+            w: pr.width,
+            h: pr.height - titlebarH,
+        };
+    }
+
+    _syncCompass() {
+        const v = this.view;
+        const widget = document.getElementById('compassWidget');
+        if (!widget || !v.groupNames) return;
+        const colorProp = v.colorBy || v.groupNames.find(g => (v.propStrengths[g] || 0) > 0) || v.groupNames[0];
+        const colors = v.propColors || {};
+        const groups = v.groupNames.filter(g => g !== 'label' && g !== 'structure' && g !== 'neighbors').map(g => {
+            // Pick a representative color for this group
+            const cmap = colors[g];
+            const color = cmap ? Object.values(cmap)[0] || '#888' : '#888';
+            return {
+                name: g,
+                color,
+                strength: v.propStrengths[g] || 0,
+                bearing: v.propBearings[g] || 0,
+            };
+        });
+        widget.groups = groups;
+    }
+
+    _syncBearingUI() {
+        const v = this.view;
+        for (const g of v.groupNames) {
+            const dial = document.getElementById(`bd-${g}`);
+            if (!dial) continue;
+            const rad = v.propBearings[g] || 0;
+            const d = Math.round((rad * 180 / Math.PI) % 360 + 360) % 360;
+            const tick = dial.querySelector('.bearing-tick');
+            if (tick) tick.style.transform = `rotate(${d}deg)`;
+            dial.setAttribute('aria-valuenow', String(d));
+            dial.setAttribute('aria-valuetext', `${d} degrees`);
+            dial.classList.toggle('nonzero', d !== 0);
+            dial.title = `Bearing: ${d}° — drag up/down to rotate · Shift for fine · double-click to reset`;
         }
     }
 
@@ -789,8 +1036,9 @@ class BitZoom {
         const v = this.view;
         const p = this.presets[name];
         if (!p) return;
-        Object.assign(v.propWeights, p);
-        this._syncWeightUI();
+        Object.assign(v.propStrengths, p);
+        this._syncStrengthUI();
+        this._syncCompass();
         document.querySelectorAll('.preset-btn').forEach(b => {
             b.classList.toggle('active', b.dataset.preset === name);
         });
@@ -1051,11 +1299,12 @@ class BitZoom {
             }
         }
 
-        v.propWeights = {};
+        v.propStrengths = {};
+        v.propBearings = {}; // reset rotation state on fresh dataset load
         this.presets = { balanced: {} };
         for (const g of v.groupNames) {
-            v.propWeights[g] = (g === 'group') ? 3 : (g === 'label') ? 1 : 0;
-            this.presets.balanced[g] = v.propWeights[g];
+            v.propStrengths[g] = (g === 'group') ? 3 : (g === 'label') ? 1 : 0;
+            this.presets.balanced[g] = v.propStrengths[g];
         }
         for (const g of v.groupNames) {
             const preset = {};
@@ -1160,7 +1409,10 @@ class BitZoom {
             // Restore hash state: use saved initial params on first load, live hash after
             const params = this._initialHashParams || this._restoreFromHash();
             this._initialHashParams = null; // consumed
-            const hasHashStrengths = params && params.d === dataset?.id && params.w;
+            // Skip auto-tune if the user brought explicit strengths (`w=`) or
+            // bearings (`b=`) in the URL hash — they have a specific view they
+            // want to reproduce exactly.
+            const hasHashStrengths = params && params.d === dataset?.id && (params.st || params.b);
             if (params && params.d === dataset?.id) {
                 this._applyHashState(params);
                 v.render();
@@ -1180,7 +1432,7 @@ class BitZoom {
         });
     }
 
-    /** Run autoTuneWeights on the freshly loaded dataset. Best-effort: logs
+    /** Run autoTuneStrengths on the freshly loaded dataset. Best-effort: logs
      *  errors but never throws. Skipped by _finalizeLoad when the dataset has
      *  preset settings or the URL hash carries explicit strengths. */
     async _autoTuneFresh() {
@@ -1192,8 +1444,8 @@ class BitZoom {
             this._tuneAbort = new AbortController();
             if (autoBtn) { autoBtn.style.background = 'var(--accent)'; autoBtn.style.color = '#fff'; autoBtn.textContent = 'Stop'; }
             const t0 = performance.now();
-            const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
-                weights: true, alpha: true, quant: false,
+            const result = await autoTuneStrengths(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
+                strengths: true, alpha: true, quant: false,
                 signal: this._tuneAbort.signal,
                 onProgress: (info) => {
                     const pct = Math.round(100 * info.step / Math.max(1, info.total));
@@ -1357,6 +1609,7 @@ class BitZoom {
         document.getElementById('loadNewBtn').style.display = 'none';
         document.getElementById('cancelLoadBtn').style.display = hadData ? '' : 'none';
         document.getElementById('sidebar').style.display = 'none';
+        if (this._compassOpen) this._toggleCompass(false);
         document.getElementById('datasetSelect').disabled = false; document.getElementById('datasetLoadBtn').disabled = false;
     }
 
@@ -1454,7 +1707,7 @@ class BitZoom {
         // and the manual click path share it — Stop works for both.
         const autoBtn = document.getElementById('autoTuneBtn');
         this._applyTuneResult = async (result) => {
-            for (const g of v.groupNames) v.propWeights[g] = result.weights[g] ?? 0;
+            for (const g of v.groupNames) v.propStrengths[g] = result.strengths[g] ?? 0;
             v.smoothAlpha = result.alpha;
             v.quantMode = result.quantMode;
             v._quantStats = {};
@@ -1465,7 +1718,12 @@ class BitZoom {
                 }
                 this._syncLabelCheckboxes();
             }
-            this._syncWeightUI();
+            // Auto-tune bearings: closed-form trace maximization.
+            const bearings = autoTuneBearings(v.nodes, v.groupNames, result.strengths);
+            v.propBearings = bearings;
+            this._syncBearingUI();
+            this._syncCompass();
+            this._syncStrengthUI();
             document.getElementById('nudgeSlider').value = v.smoothAlpha;
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
             this._updateQuantBtn();
@@ -1476,6 +1734,9 @@ class BitZoom {
             autoBtn.style.background = '';
             autoBtn.style.color = '';
             this._tuneAbort = null;
+            // Reset compass A button
+            const cBtn = document.getElementById('compassWidget')?.shadowRoot?.querySelector('[data-action="auto"]');
+            if (cBtn) { cBtn.textContent = 'A'; cBtn.title = 'Auto-tune strengths and bearings'; }
         };
         autoBtn.addEventListener('click', async () => {
             // If a tune is running (manual or auto-on-load), abort and apply best so far.
@@ -1486,12 +1747,13 @@ class BitZoom {
             autoBtn.style.color = '#fff';
             autoBtn.textContent = 'Stop';
             try {
-                const result = await autoTuneWeights(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
-                    weights: true, alpha: true, quant: false,
+                const result = await autoTuneStrengths(v.nodes, v.groupNames, v.adjList, v.nodeIndexFull, {
+                    strengths: true, alpha: true, quant: false,
                     signal: this._tuneAbort.signal,
                     onProgress: (info) => {
                         const pct = Math.round(100 * info.step / Math.max(1, info.total));
                         const phase = info.phase === 'presets' ? 'scanning presets'
+                            : info.phase === 'alpha' ? 'tuning topology'
                             : info.phase === 'done' ? 'done' : 'refining';
                         v.showProgress(`Auto-tuning: ${phase} (${pct}%) — click Stop to apply`);
                     },
@@ -1633,9 +1895,131 @@ class BitZoom {
             `<div style="padding:3px 0"><span style="color:var(--accent)">Home</span> Select largest visible node</div>` +
             `<div style="padding:3px 0"><span style="color:var(--accent)">Enter</span> Open detail panel</div>` +
             `<div style="padding:3px 0"><span style="color:var(--accent)">, / .</span> Change zoom level</div>` +
+            `<div style="padding:3px 0"><span style="color:var(--accent)">R</span> Toggle compass panel</div>` +
             `</div>`;
             dlg.showModal();
         }, sig);
+
+        // Compass panel
+        this._compassOpen = false;
+        const compassPanel = document.getElementById('compassPanel');
+        const compassBtn = document.getElementById('compassBtn');
+        const compassClose = document.getElementById('compassClose');
+        const compassTitlebar = document.getElementById('compassTitlebar');
+        this._toggleCompass = (force) => {
+            this._compassOpen = force ?? !this._compassOpen;
+            if (this._compassOpen) {
+                compassPanel.style.display = '';
+                // Default position: center of viewport
+                if (!compassPanel.dataset.placed) {
+                    compassPanel.dataset.placed = '1';
+                    const vw = window.innerWidth, vh = window.innerHeight;
+                    compassPanel.style.left = Math.round(vw / 2 - 130) + 'px';
+                    compassPanel.style.top = Math.round(vh / 2 - 140) + 'px';
+                }
+                compassBtn.style.background = 'var(--accent)';
+                compassBtn.style.color = '#fff';
+                // Defer sync so layout has computed non-zero dimensions
+                requestAnimationFrame(() => this._syncCompass());
+            } else {
+                compassPanel.style.display = 'none';
+                compassBtn.style.background = '';
+                compassBtn.style.color = '';
+            }
+        };
+        compassBtn.addEventListener('click', () => this._toggleCompass(), sig);
+        compassClose.addEventListener('click', () => this._toggleCompass(false), sig);
+        document.getElementById('compassHelp').addEventListener('click', () => {
+            const w = document.getElementById('compassWidget');
+            if (w) { w._showHelp = !w._showHelp; w._scheduleRender(); }
+        }, sig);
+
+        // Titlebar drag — listeners on window so fast moves don't escape
+        let _cdrag = false, _cdx = 0, _cdy = 0;
+        const startDrag = (clientX, clientY) => {
+            _cdrag = true;
+            const rect = compassPanel.getBoundingClientRect();
+            _cdx = clientX - rect.left;
+            _cdy = clientY - rect.top;
+        };
+        const moveDrag = (clientX, clientY) => {
+            if (!_cdrag) return;
+            compassPanel.style.left = (clientX - _cdx) + 'px';
+            compassPanel.style.top = (clientY - _cdy) + 'px';
+        };
+        const endDrag = () => { _cdrag = false; };
+        compassTitlebar.addEventListener('mousedown', e => {
+            if (e.target === compassClose) return;
+            e.preventDefault();
+            startDrag(e.clientX, e.clientY);
+        });
+        window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+        window.addEventListener('mouseup', endDrag);
+        compassTitlebar.addEventListener('touchstart', e => {
+            if (e.target === compassClose) return;
+            e.preventDefault();
+            startDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+        window.addEventListener('touchmove', e => {
+            if (_cdrag) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: true });
+        window.addEventListener('touchend', endDrag);
+        window.addEventListener('touchcancel', endDrag);
+
+        // Compass ↔ canvas sync
+        const compassWidget = document.getElementById('compassWidget');
+        let _compassRafPending = false;
+        const onCompassInput = (e) => {
+            const { name, strength, bearing } = e.detail;
+            v.propStrengths[name] = strength;
+            v.propBearings[name] = bearing;
+            // Update sidebar controls
+            const sl = document.getElementById(`s-${name}`);
+            const vl = document.getElementById(`sv-${name}`);
+            if (sl) { sl.value = strength; vl.textContent = Math.round(strength * 10) / 10; }
+            const dial = document.getElementById(`bd-${name}`);
+            if (dial) {
+                const d = Math.round((bearing * 180 / Math.PI) % 360 + 360) % 360;
+                const tick = dial.querySelector('.bearing-tick');
+                if (tick) tick.style.transform = `rotate(${d}deg)`;
+                dial.setAttribute('aria-valuenow', String(d));
+                dial.setAttribute('aria-valuetext', `${d} degrees`);
+                dial.classList.toggle('nonzero', d !== 0);
+            }
+            // rAF-gated rebuild — one blend per frame, no timer delay
+            if (!_compassRafPending) {
+                _compassRafPending = true;
+                requestAnimationFrame(async () => {
+                    _compassRafPending = false;
+                    v._quantStats = {};
+                    v.levels = new Array(ZOOM_LEVELS.length).fill(null);
+                    await v._blend();
+                    v.layoutAll();
+                    v.render();
+                });
+            }
+        };
+        compassWidget.addEventListener('input', onCompassInput);
+        compassWidget.addEventListener('change', (e) => {
+            onCompassInput(e);
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        });
+        compassWidget.addEventListener('colorby', (e) => {
+            v.colorBy = (v.colorBy === e.detail.name) ? null : e.detail.name;
+            this._updateColorByUI();
+        });
+        compassWidget.addEventListener('autotune', () => {
+            // Trigger the same autotune flow as the Auto button
+            const autoBtn2 = document.getElementById('autoTuneBtn');
+            autoBtn2?.click();
+            // Sync compass A button — check toolbar button text (set synchronously in click handler)
+            const running = autoBtn2?.textContent === 'Stop';
+            const cBtn = compassWidget.shadowRoot?.querySelector('[data-action="auto"]');
+            if (cBtn) {
+                cBtn.textContent = running ? '■' : 'A';
+                cBtn.title = running ? 'Stop auto-tune' : 'Auto-tune strengths and bearings';
+            }
+        });
 
         // Sidebar
         document.getElementById('sidebarToggle').addEventListener('click', () => this._toggleSidebar(), sig);
@@ -1664,14 +2048,15 @@ class BitZoom {
             if (!this.dataLoaded) return;
             v.smoothAlpha = parseFloat(e.target.value);
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
-            if (this.smoothDebounceTimer) clearTimeout(this.smoothDebounceTimer);
-            this.smoothDebounceTimer = setTimeout(async () => {
-                v.levels = new Array(ZOOM_LEVELS.length).fill(null);
-                await v._blend();
-                v.layoutAll();
-                v.render();
-                this.smoothDebounceTimer = null;
-            }, 120);
+            if (!this.smoothDebounceTimer) {
+                this.smoothDebounceTimer = requestAnimationFrame(async () => {
+                    this.smoothDebounceTimer = null;
+                    v.levels = new Array(ZOOM_LEVELS.length).fill(null);
+                    await v._blend();
+                    v.layoutAll();
+                    v.render();
+                });
+            }
         }, sig);
 
         // Load button + file inputs + drop zone
@@ -1984,6 +2369,12 @@ class BitZoom {
 }
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
+// Defer until stylesheets are loaded to avoid forced layout before CSS is ready.
+const ready = document.readyState === 'complete'
+  ? Promise.resolve()
+  : new Promise(r => window.addEventListener('load', r, { once: true }));
+await ready;
+
 const bz = new BitZoom();
 window.bz = bz;
 

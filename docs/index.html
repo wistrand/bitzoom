@@ -228,7 +228,7 @@
     </div>
     <div class="prop">
       <div class="prop-title">Interactive tuning</div>
-      <div class="prop-desc">Adjust property weights and topology influence in real-time. No rehashing, no reprojection.</div>
+      <div class="prop-desc">Adjust property strengths and topology influence in real-time. No rehashing, no reprojection.</div>
     </div>
   </div>
 
@@ -263,10 +263,10 @@
 import { createBitZoomView } from './bitzoom.js';
 
 const PRESETS = {
-  'epstein':        { initialLevel: 3, weights: { group: 8, edgetype: 4 }, labelProps: ['label'] },
+  'epstein':        { initialLevel: 3, strengths: { group: 8, edgetype: 4 }, labelProps: ['label'] },
   'karate':{ initialLevel: 3 },
-  'bitzoom-source': { initialLevel: 4, weights: { kind: 8, group: 3 }, labelProps: ['file', 'kind'] },
-  'mitre-attack':   { initialLevel: 4, weights: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'], quantMode: 'rank', edgeMode: 'none' },
+  'bitzoom-source': { initialLevel: 4, strengths: { kind: 8, group: 3 }, labelProps: ['file', 'kind'] },
+  'mitre-attack':   { initialLevel: 4, strengths: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'], quantMode: 'rank', edgeMode: 'none' },
 };
 
 let view = null;
@@ -288,7 +288,7 @@ async function loadDemo(name) {
     heatmapMode: 'density',
     showLegend: true,
     showResetBtn: true,
-    weights: preset.weights || {},
+    strengths: preset.strengths || {},
     labelProps: preset.labelProps || [],
     quantMode: preset.quantMode,
   });

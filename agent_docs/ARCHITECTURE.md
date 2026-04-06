@@ -7,6 +7,8 @@ This is the top-level architecture overview. Subsystems have their own docs:
 - [ARCHITECTURE-webgl.md](ARCHITECTURE-webgl.md) — WebGL2 instanced renderer, dual-canvas layout, shaders
 - [ARCHITECTURE-webgpu.md](ARCHITECTURE-webgpu.md) — WebGPU compute for projection and blend
 - [ARCHITECTURE-svg.md](ARCHITECTURE-svg.md) — SVG export
+- [ARCHITECTURE-bearings.md](ARCHITECTURE-bearings.md) — per-group rotation, blend math, sidebar dial, auto-tune
+- [ARCHITECTURE-compass.md](ARCHITECTURE-compass.md) — `<bz-compass>` web component, viewer panel, declarative binding
 
 ## Overview
 
@@ -99,7 +101,7 @@ Pure functions, no DOM. Single source of truth for MinHash/projection.
 - **Constants**: `MINHASH_K=128`, `GRID_BITS=16`, `GRID_SIZE=65536`, `ZOOM_LEVELS[1..14]`, `RAW_LEVEL=14`, `LEVEL_LABELS`
 - **MinHash** (GC-optimized): `HASH_PARAMS_A/B` (Int32Array), `computeMinHashInto` → reusable `_sig` Float64Array (NaN sentinel for empty tokens), `computeMinHash` (allocating wrapper). Universal hash via Mersenne fast-mod (`hashSlot` + `mersMod`) — split 16-bit halves to stay within safe integer range.
 - **Projection** (GC-optimized): `projectInto(sig, ROT, buf, offset)` → writes to buffer, `projectWith` (convenience wrapper returning `[px, py]`). NaN sentinel check: `sig[0] !== sig[0]`.
-- **Blend**: `unifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats)`
+- **Blend**: `unifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats)`
 - **Quantization**: `normalizeAndQuantize(nodes)` (rank-based, O(n log n)), `gaussianQuantize(nodes, stats)` (Φ(z) via precomputed lookup table, O(n)). Default: Gaussian. Reasonable fit when blended coordinates are roughly bell-shaped; an approximation, not a guarantee.
 - **Grid**: `cellIdAtLevel(gx, gy, level)`
 - **Level building**: `buildLevelNodes` (phase 1: bucket nodes into supernodes, O(n)) + `buildLevelEdges` (phase 2: aggregate edges, O(|E|), numeric key packing for levels 1-13, string keys for level 14) + `buildLevel` (combined wrapper). Caches `cachedColor`/`cachedLabel` on supernodes.
@@ -182,7 +184,7 @@ on Canvas 2D overlay. See [`ARCHITECTURE-webgl.md`](ARCHITECTURE-webgl.md) for f
 
 Standalone embeddable canvas component. No external DOM dependencies beyond a `<canvas>` element.
 
-**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propWeights, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Always owns its event handlers (`_bindEvents`). Constructor accepts `onRender`, `showLegend`, `showResetBtn`, `webgl`, `autoGPU`, `colorBy`, `clickDelay` (ms, for single/double-click disambiguation), `keyboardTarget` (default canvas element), and extension callbacks (`onSelect`, `onHover`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`).
+**`BitZoomCanvas`**: holds all graph state (nodes, edges, adjList, groupNames, propStrengths, propColors), view state (zoom, pan, level, selection), property caching, level building, rendering delegates. Always owns its event handlers (`_bindEvents`). Constructor accepts `onRender`, `showLegend`, `showResetBtn`, `webgl`, `autoGPU`, `colorBy`, `clickDelay` (ms, for single/double-click disambiguation), `keyboardTarget` (default canvas element), and extension callbacks (`onSelect`, `onHover`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`).
 
 **`colorBy`**: getter/setter overrides which property group controls node colors. Default `null` = auto (highest-weight group). Setting to a valid group name pins coloring to that group; setting to `null` returns to auto. In the viewer, clicking a group name label toggles colorBy (underlined = active). `<bz-graph>` supports the `color-by` attribute.
 
@@ -325,10 +327,10 @@ when N×G > 2000 (default true).
 - Jaccard on discretised tokens is crude for continuous/ordinal properties.
 - 2D projection doesn't preserve distances — provides ordering signal, not metric embedding.
 - Rank quantization (when selected) destroys density information; Gaussian quantization tends to preserve it better but assumes approximately normal marginals.
-- Gaussian quantization uses fixed boundaries (μ,σ frozen from dataset-tuned weights, reset in `_applyDatasetSettings`) — subsequent weight changes can shift the distribution far from stored boundaries, pushing nodes to grid extremes.
-- Low-entropy and undefined-value collapse mitigated by adaptive weight floor (`WEIGHT_FLOOR_RATIO = 0.10`, `WEIGHT_FLOOR_MIN = 0.10`). Empty fields → neutral [0,0] projection; low-entropy properties → few distinct projections. The floor ensures zero-weight high-entropy groups always contribute 10% spreading. At 10% with 3 zero-weight groups, the dominant group controls ~83% of layout. No special all-zero case: the floor produces equal blend naturally, with smooth transitions as weights change.
+- Gaussian quantization uses fixed boundaries (μ,σ frozen from dataset-tuned strengths, reset in `_applyDatasetSettings`) — subsequent strength changes can shift the distribution far from stored boundaries, pushing nodes to grid extremes.
+- Low-entropy and undefined-value collapse mitigated by adaptive strength floor (`STRENGTH_FLOOR_RATIO = 0.10`, `STRENGTH_FLOOR_MIN = 0.10`). Empty fields → neutral [0,0] projection; low-entropy properties → few distinct projections. The floor ensures zero-strength high-entropy groups always contribute 10% spreading. At 10% with 3 zero-strength groups, the dominant group controls ~83% of layout. No special all-zero case: the floor produces equal blend naturally, with smooth transitions as strengths change.
 - Supernode centroids use post-quantization display coordinates, not the original continuous blended coordinates. The nonlinear quantization transform (rank or Φ) means centroids in quantized space differ from centroids in blended space. The discrepancy is typically small at fine zoom levels and can be more noticeable at coarse levels (L1-L3).
-- Weight stability is piecewise constant after quantization.
+- Strength stability is piecewise constant after quantization.
 - Oversmoothing at high α with many passes.
 - Layout quality depends entirely on tokenisation quality.
 

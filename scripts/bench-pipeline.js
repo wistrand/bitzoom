@@ -45,24 +45,24 @@ for (const ds of DATASETS) {
       adjList[e.dst].push(e.src);
     }
   }
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
 
   // Blend (α=0, no topology smoothing)
   const t1 = performance.now();
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'gaussian');
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'gaussian');
   const tBlendNoAlpha = performance.now() - t1;
   console.log(`  Blend (α=0, gaussian): ${fmt(tBlendNoAlpha)}`);
 
   // Re-blend with topology
   const t2 = performance.now();
-  unifiedBlend(nodes, result.groupNames, weights, 0.5, adjList, nodeIndex, 5, 'gaussian');
+  unifiedBlend(nodes, result.groupNames, strengths, 0.5, adjList, nodeIndex, 5, 'gaussian');
   const tBlendAlpha = performance.now() - t2;
   console.log(`  Blend (α=0.5, 5 passes, gaussian): ${fmt(tBlendAlpha)}`);
 
   // Rank quantization comparison
   const t2b = performance.now();
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
   const tBlendRank = performance.now() - t2b;
   console.log(`  Blend (α=0, rank): ${fmt(tBlendRank)}`);
 

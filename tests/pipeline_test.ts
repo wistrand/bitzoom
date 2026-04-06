@@ -1,4 +1,4 @@
-import { assertEquals, assertExists, assert } from "https://deno.land/std/assert/mod.ts";
+import { assertEquals, assertExists, assert, assertAlmostEquals } from "https://deno.land/std/assert/mod.ts";
 
 // Load algo first (pipeline depends on it)
 import {
@@ -1570,9 +1570,9 @@ Deno.test("buildLevel: creates supernodes and edges", () => {
   }
 
   // Blend to assign positions
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5);
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5);
 
   // Build level 1 (2x2 grid)
   const level = buildLevel(1, nodes, result.edges, nodeIndex,
@@ -1632,9 +1632,9 @@ Deno.test("E2E: Epstein dataset loads and processes correctly", async () => {
     }
   }
 
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = g === "group" ? 3 : 1;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5);
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = g === "group" ? 3 : 1;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5);
 
   // Verify grid coords assigned
   for (const n of nodes) {
@@ -1706,16 +1706,16 @@ Deno.test("E2E: Epstein with topology alpha > 0", async () => {
     }
   }
 
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = 1;
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = 1;
 
   // Blend with alpha=0
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5);
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5);
   const posAlpha0 = nodes.map(n => [n.px, n.py]);
 
   // Reset and blend with alpha=0.5
   for (const n of nodes) { n.px = 0; n.py = 0; n.gx = 0; n.gy = 0; }
-  unifiedBlend(nodes, result.groupNames, weights, 0.5, adjList, nodeIndex, 5);
+  unifiedBlend(nodes, result.groupNames, strengths, 0.5, adjList, nodeIndex, 5);
   const posAlpha05 = nodes.map(n => [n.px, n.py]);
 
   // Positions should differ
@@ -1796,9 +1796,9 @@ Deno.test("buildLevelNodes: returns supernodes with empty snEdges", () => {
   for (const e of graph.edges) {
     if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
   }
-  const weights: Record<string, number> = {};
-  for (const g of graph.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, graph.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  const strengths: Record<string, number> = {};
+  for (const g of graph.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, graph.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
 
   const lvl = buildLevelNodes(4, nodes, n => n.group, n => n.label || n.id, () => '#888');
   assert(lvl.supernodes.length > 0, "Should have supernodes");
@@ -1826,9 +1826,9 @@ Deno.test("buildLevelEdges: populates snEdges correctly", () => {
   for (const e of graph.edges) {
     if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
   }
-  const weights: Record<string, number> = {};
-  for (const g of graph.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, graph.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  const strengths: Record<string, number> = {};
+  for (const g of graph.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, graph.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
 
   // Phase 1
   const lvl = buildLevelNodes(4, nodes, n => n.group, n => n.label || n.id, () => '#888');
@@ -1842,6 +1842,103 @@ Deno.test("buildLevelEdges: populates snEdges correctly", () => {
   const ref = buildLevel(4, nodes, graph.edges, nodeIndex, n => n.group, n => n.label || n.id, () => '#888');
   assertEquals(lvl.snEdges.length, ref.snEdges.length, "Edge count should match combined buildLevel");
   assertEquals(lvl.supernodes.length, ref.supernodes.length, "Supernode count should match");
+});
+
+// ─── Bearings (per-group rotation) ───────────────────────────────────────────
+
+/** Build a minimal two-node two-group graph for rotation tests.
+ *  Node A sits at projection (1,0) in group 'g1' and (0,0) in group 'g2'.
+ *  Node B sits at (0,0) in group 'g1' and (1,0) in group 'g2'.
+ *  With equal weights and no topology, A's position is (0.5, 0) and B's is (0.5, 0). */
+function makeRotationFixture() {
+  const nodes = [
+    { id: 'a', degree: 0, edgeTypes: null, extraProps: {}, projections: { g1: [1, 0], g2: [0, 0] }, px: 0, py: 0, gx: 0, gy: 0 },
+    { id: 'b', degree: 0, edgeTypes: null, extraProps: {}, projections: { g1: [0, 0], g2: [1, 0] }, px: 0, py: 0, gx: 0, gy: 0 },
+  ];
+  const nodeIndex = { a: nodes[0], b: nodes[1] };
+  const adjList = { a: [], b: [] };
+  return { nodes, nodeIndex, adjList, groupNames: ['g1', 'g2'] };
+}
+
+Deno.test("unifiedBlend: null/missing bearings preserves original behavior", () => {
+  const fA = makeRotationFixture();
+  const fB = makeRotationFixture();
+  const strengths = { g1: 5, g2: 5 };
+  // 9-arg legacy form (no bearings parameter)
+  unifiedBlend(fA.nodes, fA.groupNames, strengths, 0, fA.adjList, fA.nodeIndex, 0, 'gaussian', {});
+  // 10-arg form with explicit null bearings — must produce identical output
+  unifiedBlend(fB.nodes, fB.groupNames, strengths, 0, fB.adjList, fB.nodeIndex, 0, 'gaussian', {}, null);
+  for (let i = 0; i < fA.nodes.length; i++) {
+    assertEquals(fA.nodes[i].gx, fB.nodes[i].gx);
+    assertEquals(fA.nodes[i].gy, fB.nodes[i].gy);
+    assertAlmostEquals(fA.nodes[i].px, fB.nodes[i].px, 1e-9);
+    assertAlmostEquals(fA.nodes[i].py, fB.nodes[i].py, 1e-9);
+  }
+});
+
+Deno.test("unifiedBlend: empty bearings object is equivalent to null", () => {
+  const fA = makeRotationFixture();
+  const fB = makeRotationFixture();
+  const strengths = { g1: 5, g2: 5 };
+  unifiedBlend(fA.nodes, fA.groupNames, strengths, 0, fA.adjList, fA.nodeIndex, 0, 'gaussian', {}, null);
+  unifiedBlend(fB.nodes, fB.groupNames, strengths, 0, fB.adjList, fB.nodeIndex, 0, 'gaussian', {}, {});
+  for (let i = 0; i < fA.nodes.length; i++) {
+    assertAlmostEquals(fA.nodes[i].px, fB.nodes[i].px, 1e-9);
+    assertAlmostEquals(fA.nodes[i].py, fB.nodes[i].py, 1e-9);
+  }
+});
+
+Deno.test("unifiedBlend: 90° rotation on one group swaps x into y", () => {
+  const f = makeRotationFixture();
+  const strengths = { g1: 10, g2: 0 }; // pure g1 signal
+  const bearings = { g1: Math.PI / 2, g2: 0 };
+  // Call with 0 smoothing passes and temporarily disable the quantization to
+  // inspect raw px/py. Use passes=0 + smoothAlpha=0 → doQuant runs. We read
+  // nd.px/nd.py BEFORE quantization by using a fresh no-smooth call; but the
+  // unifiedBlend API always quantizes. Instead, capture by calling with
+  // gaussian quant and a fresh stats object — gx/gy will reflect the rotation.
+  unifiedBlend(f.nodes, f.groupNames, strengths, 0, f.adjList, f.nodeIndex, 0, 'gaussian', {}, bearings);
+  // After 90° CCW rotation, (1,0) becomes (0,1). Node A's raw contribution
+  // was (1,0) in g1 → rotated to (0,1). Node B's g1 contribution was (0,0) →
+  // still (0,0). The floor mechanism mixes in g2 at 10% of max (1.0), so A's
+  // rotated sum is floor-weighted, but with g1:10, g2:0 and floor = 1.0,
+  // effW = {g1: 10, g2: 1.0} → A = (10*0 + 0) / 11, (10*1 + 0) / 11 = (0, 10/11)
+  //      B = (10*0 + 1*1) / 11, (10*0 + 1*0) / 11 = (1/11, 0)
+  // The blend math works but quantization scrambles the exact values. Assert
+  // the ordering: after rotation, A.gy > B.gy (A is above B on screen).
+  assert(f.nodes[0].gy > f.nodes[1].gy, `After 90° rotation of g1, A.gy (${f.nodes[0].gy}) should exceed B.gy (${f.nodes[1].gy})`);
+});
+
+Deno.test("unifiedBlend: rotation changes layout when bearings are set", () => {
+  const f0 = makeRotationFixture();
+  const f90 = makeRotationFixture();
+  const strengths = { g1: 10, g2: 0 };
+  unifiedBlend(f0.nodes, f0.groupNames, strengths, 0, f0.adjList, f0.nodeIndex, 0, 'gaussian', {}, { g1: 0, g2: 0 });
+  unifiedBlend(f90.nodes, f90.groupNames, strengths, 0, f90.adjList, f90.nodeIndex, 0, 'gaussian', {}, { g1: Math.PI / 2, g2: 0 });
+  // At 0° rotation, the g1 signal extends horizontally (px differs, py equal).
+  // At 90° rotation, the g1 signal extends vertically (py differs, px equal).
+  // Verify the quantized positions differ between the two blends.
+  let differs = false;
+  for (let i = 0; i < f0.nodes.length; i++) {
+    if (f0.nodes[i].gx !== f90.nodes[i].gx || f0.nodes[i].gy !== f90.nodes[i].gy) {
+      differs = true;
+      break;
+    }
+  }
+  assert(differs, "Layout should differ between 0° and 90° bearings on a weighted group");
+});
+
+Deno.test("unifiedBlend: 360° rotation returns to original layout (mod numerical noise)", () => {
+  const f0 = makeRotationFixture();
+  const f360 = makeRotationFixture();
+  const strengths = { g1: 5, g2: 5 };
+  unifiedBlend(f0.nodes, f0.groupNames, strengths, 0, f0.adjList, f0.nodeIndex, 0, 'gaussian', {}, null);
+  unifiedBlend(f360.nodes, f360.groupNames, strengths, 0, f360.adjList, f360.nodeIndex, 0, 'gaussian', {}, { g1: 2 * Math.PI, g2: 2 * Math.PI });
+  for (let i = 0; i < f0.nodes.length; i++) {
+    // After full rotation, quantized grid positions should match (integer-valued)
+    assertEquals(f0.nodes[i].gx, f360.nodes[i].gx);
+    assertEquals(f0.nodes[i].gy, f360.nodes[i].gy);
+  }
 });
 
 // ─── SVG export tests ─────────────────────────────────────────────────────────
@@ -1865,9 +1962,9 @@ function buildSVGView(viewOpts = {}) {
   for (const e of result.edges) {
     if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
   }
-  const weights: Record<string, number> = {};
-  for (const g of result.groupNames) weights[g] = 1;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'rank');
+  const strengths: Record<string, number> = {};
+  for (const g of result.groupNames) strengths[g] = 1;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'rank');
 
   return createSVGView(nodes, result.edges, {
     width: 400, height: 300,

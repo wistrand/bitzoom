@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BitZoom — Layout Comparison</title>
-<meta name="description" content="BitZoom vs force-directed, UMAP, and t-SNE on four graph datasets.">
+<meta name="description" content="BitZoom vs force-directed, UMAP, and t-SNE on eight graph datasets.">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
@@ -248,38 +248,86 @@ BitZoom's core design goal.</p>
 
 <p>On topology metrics, ForceAtlas2 and t-SNE lead. On property-similarity, the answer
 depends on whether properties correlate with graph connectivity. When they don't
-(MITRE, Synth Packages), BitZoom with property weights leads by 2.6-6x. When they do
+(MITRE, Synth Packages), BitZoom with property strengths leads by 2.6-6x. When they do
 (BitZoom Source, where call edges track file structure), topology-based methods capture
-property structure incidentally and score higher.</p>
+property structure incidentally and score higher. BitZoom's auto-tune (zero-config)
+beats or matches baselines on most property datasets.</p>
 
 <table>
 <tr>
-  <th>Dataset</th><th>Nodes</th><th>Props</th><th>BitZoom</th><th>PropNbrP</th><th>TopoNbrP</th><th style="text-align:left">Takeaway</th>
+  <th>Dataset</th><th>Nodes</th><th>Props</th><th>Best BitZoom</th><th>PropNbrP</th><th>Auto-tune</th><th style="text-align:left">Takeaway</th>
 </tr>
 <tr>
-  <td>MITRE</td><td>4,736</td><td>rich</td><td>&alpha;=0 wt</td><td class="best">2.57x</td><td>0.37x</td><td class="note">Properties &ne; topology; BitZoom leads</td>
+  <td>Epstein</td><td>514</td><td>edge types</td><td>&alpha;=0 wt</td><td class="best">1.44x</td><td class="best">1.42x</td><td class="note">Autotune discovers edgetype; matches hand-tuned</td>
 </tr>
 <tr>
-  <td>Synth Pkg</td><td>1,868</td><td>rich</td><td>&alpha;=0 wt</td><td class="best">6.02x</td><td>0.31x</td><td class="note">Properties &ne; topology; BitZoom leads</td>
+  <td>Pokemon</td><td>959</td><td>multi</td><td>autotune</td><td class="best">1.13x</td><td class="best">1.13x</td><td class="note">Autotune beats hand-tuned and FA2</td>
 </tr>
 <tr>
-  <td>BZ Source</td><td>433</td><td>rich</td><td>&alpha;=0.5 wt gauss</td><td>0.95x</td><td>0.28x</td><td class="note">Properties &asymp; topology; near FA2 with gaussian</td>
+  <td>MITRE</td><td>4,736</td><td>rich</td><td>&alpha;=0 wt</td><td class="best">2.42x</td><td>0.91x</td><td class="note">Properties &ne; topology; hand-tuned leads</td>
 </tr>
 <tr>
-  <td>Email-EU</td><td>1,005</td><td>none</td><td>&alpha;=1.0</td><td>0.87x</td><td>0.87x</td><td class="note">Edge-only; topology comparable</td>
+  <td>Synth Pkg</td><td>1,868</td><td>rich</td><td>&alpha;=0 wt</td><td class="best">5.86x</td><td class="best">2.62x</td><td class="note">Properties &ne; topology; BitZoom leads</td>
 </tr>
 <tr>
-  <td>Facebook</td><td>4,039</td><td>none</td><td>&alpha;=1.0</td><td>0.79x</td><td>0.74x</td><td class="note">Dense; smoothing works well</td>
+  <td>BZ Source</td><td>917</td><td>rich</td><td>&alpha;=0.5 wt</td><td>0.84x</td><td>0.56x</td><td class="note">Properties &asymp; topology; topology-based methods lead</td>
 </tr>
 <tr>
-  <td>Power Grid</td><td>4,941</td><td>none</td><td>&alpha;=0.75</td><td>0.68x</td><td>0.01x</td><td class="note">Sparse chains; smoothing limited</td>
+  <td>Email-EU</td><td>1,005</td><td>none</td><td>&alpha;=1.0</td><td>0.80x</td><td>&mdash;</td><td class="note">Edge-only; topology comparable</td>
+</tr>
+<tr>
+  <td>Facebook</td><td>4,039</td><td>none</td><td>&alpha;=1.0</td><td>0.70x</td><td>&mdash;</td><td class="note">Dense; smoothing works well</td>
+</tr>
+<tr>
+  <td>Power Grid</td><td>4,941</td><td>none</td><td>&alpha;=0.75</td><td>0.58x</td><td>&mdash;</td><td class="note">Sparse chains; smoothing limited</td>
 </tr>
 </table>
 <p class="section-note">
-Ratios are BitZoom / ForceAtlas2. Higher = better for both NbrP columns.
+PropNbrP ratios are BitZoom / ForceAtlas2. Auto-tune column shows autotune / FA2. Higher = better. Edge-only datasets have no autotune (no property signal).
 </p>
 
 <h2 id="datasets">Dataset by dataset</h2>
+
+<h3>Epstein: edge-type properties</h3>
+
+<p>514 nodes (people, organizations), 494 edges with rich edge types (ABUSED, ASSOCIATED_WITH,
+BUSINESS_RIVAL, etc.). Properties: group + edge types.</p>
+
+<table data-chart="TopoNbrP,PropNbrP">
+<tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
+<tr><td>BitZoom &alpha;=0</td><td>1ms</td><td>0.510</td><td>0.005</td><td>0.035</td><td class="note">No property strengths</td></tr>
+<tr><td>BitZoom &alpha;=0 wt</td><td>1ms</td><td>0.456</td><td>0.004</td><td class="best">0.118</td><td class="note">group:5, edgetype:8 &mdash; best PropNbrP</td></tr>
+<tr><td>BitZoom autotune</td><td>1ms</td><td>0.277</td><td>0.013</td><td class="best">0.116</td><td class="note">group:8, edgetype:3, &alpha;=0.5 &mdash; discovers edgetype</td></tr>
+<tr><td>ForceAtlas2</td><td>3s</td><td class="best">0.045</td><td class="best">0.099</td><td>0.082</td><td class="note">Topology-driven</td></tr>
+<tr><td>UMAP</td><td>4s</td><td>0.376</td><td>0.004</td><td>0.082</td><td class="note">Similar to FA2</td></tr>
+<tr><td>t-SNE</td><td>0.4s</td><td>0.428</td><td>0.006</td><td>0.090</td><td class="note">Third-highest PropNbrP</td></tr>
+</table>
+
+<p>Hand-tuned edgetype:8 scores 44% higher than ForceAtlas2 on PropNbrP (0.118 vs 0.082).
+The dual-pass autotune at 0.116 nearly matches &mdash; it discovers <code>edgetype:3</code>
+through its &alpha;=0.5 pass, where edge-type structure becomes visible via topology
+smoothing. This is the key insight of dual-pass: some properties only show their value
+when combined with moderate topology.</p>
+
+<h3>Pokemon: multi-property, property-dominant</h3>
+
+<p>959 Pokemon with 4+ property groups (type1, type2, generation, rarity, stats).
+Edges exist but properties dominate the similarity structure.</p>
+
+<table data-chart="TopoNbrP,PropNbrP">
+<tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
+<tr><td>BitZoom &alpha;=0</td><td>1ms</td><td>0.500</td><td>0.004</td><td>0.010</td><td class="note">No property strengths</td></tr>
+<tr><td>BitZoom &alpha;=0 wt</td><td>1ms</td><td>0.476</td><td>0.013</td><td>0.019</td><td class="note">Hand-tuned: type1:8, type2:4, gen:3, rarity:2</td></tr>
+<tr><td>BitZoom autotune</td><td>1ms</td><td>0.373</td><td>0.009</td><td class="best">0.027</td><td class="note">generation:8, &alpha;=0.15 &mdash; beats hand-tuned</td></tr>
+<tr><td>ForceAtlas2</td><td>17s</td><td class="best">0.024</td><td class="best">0.063</td><td>0.023</td><td class="note">Strong topology</td></tr>
+<tr><td>UMAP</td><td>5s</td><td>0.073</td><td>0.012</td><td>0.022</td><td class="note">Similar to hand-tuned</td></tr>
+<tr><td>t-SNE</td><td>2s</td><td>0.182</td><td>0.011</td><td>0.017</td><td class="note">Lowest baseline PropNbrP</td></tr>
+</table>
+
+<p>Autotune outperforms the hand-tuned preset by 41% (0.027 vs 0.019) and beats ForceAtlas2
+by 18% (0.027 vs 0.023). It correctly identified that <code>generation</code> alone with a
+touch of topology (&alpha;=0.15) is more discriminative than the multi-property hand-pick.
+Types spread across generations; generation groups tightly.</p>
 
 <h3>Email-EU: a dense communication network</h3>
 
@@ -288,11 +336,11 @@ Edge-only (no node properties beyond auto-generated tokens).</p>
 
 <table data-chart="TopoNbrP,PropNbrP">
 <tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th>Silhouette</th><th style="text-align:left">Note</th></tr>
-<tr><td>BitZoom &alpha;=0</td><td>2ms</td><td>0.466</td><td>0.006</td><td>0.007</td><td>-0.47</td><td class="note">Near-random layout</td></tr>
+<tr><td>BitZoom &alpha;=0</td><td>1ms</td><td>0.466</td><td>0.006</td><td>0.007</td><td>-0.47</td><td class="note">Near-random layout</td></tr>
 <tr><td>BitZoom &alpha;=1.0</td><td>1ms</td><td>0.221</td><td>0.056</td><td>0.007</td><td>-0.29</td><td class="note">Best BitZoom for topology</td></tr>
-<tr><td>ForceAtlas2</td><td>54s</td><td class="best">0.008</td><td>0.064</td><td>0.008</td><td>-0.40</td><td class="note">Shortest edges</td></tr>
-<tr><td>UMAP</td><td>11s</td><td>0.182</td><td class="best">0.107</td><td>0.010</td><td class="best">+0.01</td><td class="note">Only positive silhouette</td></tr>
-<tr><td>t-SNE</td><td>3s</td><td>0.154</td><td>0.109</td><td>0.009</td><td>-0.12</td><td class="note">Highest TopoNbrP</td></tr>
+<tr><td>ForceAtlas2</td><td>19s</td><td class="best">0.009</td><td>0.064</td><td>0.009</td><td>-0.38</td><td class="note">Shortest edges</td></tr>
+<tr><td>UMAP</td><td>5s</td><td>0.182</td><td class="best">0.107</td><td>0.010</td><td class="best">+0.01</td><td class="note">Only positive silhouette</td></tr>
+<tr><td>t-SNE</td><td>1s</td><td>0.161</td><td>0.108</td><td>0.009</td><td>-0.11</td><td class="note">Highest TopoNbrP</td></tr>
 </table>
 
 <p>PropNbrP is uniformly low (0.007-0.010) across all methods. Without real node
@@ -305,9 +353,9 @@ recover department structure best on topology metrics.</p>
 
 <table data-chart="TopoNbrP">
 <tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
-<tr><td>BitZoom &alpha;=1.0</td><td>6ms</td><td>0.063</td><td>0.110</td><td>0.003</td><td class="note">74% of FA2's TopoNbrP</td></tr>
-<tr><td>ForceAtlas2</td><td>172s</td><td class="best">0.011</td><td>0.150</td><td>0.003</td><td class="note">Shortest edges</td></tr>
-<tr><td>t-SNE</td><td>15s</td><td>0.071</td><td class="best">0.176</td><td>0.003</td><td class="note">Highest TopoNbrP</td></tr>
+<tr><td>BitZoom &alpha;=1.0</td><td>3ms</td><td>0.063</td><td>0.110</td><td>0.003</td><td class="note">74% of FA2's TopoNbrP</td></tr>
+<tr><td>ForceAtlas2</td><td>65s</td><td class="best">0.011</td><td>0.151</td><td>0.004</td><td class="note">Shortest edges</td></tr>
+<tr><td>t-SNE</td><td>5s</td><td>0.072</td><td class="best">0.176</td><td>0.003</td><td class="note">Highest TopoNbrP</td></tr>
 </table>
 
 <p>Dense ego-network structure responds well to topology smoothing. BitZoom at &alpha;=1.0
@@ -319,9 +367,9 @@ reaches 74% of ForceAtlas2's TopoNbrP. PropNbrP is uniformly low (edge-only data
 
 <table data-chart="TopoNbrP">
 <tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
-<tr><td>BitZoom &alpha;=0.75</td><td>8ms</td><td>0.271</td><td>0.003</td><td>0.002</td><td class="note">Best BitZoom; &alpha;=1.0 is worse</td></tr>
-<tr><td>ForceAtlas2</td><td>152s</td><td class="best">0.005</td><td class="best">0.197</td><td>0.002</td><td class="note">Traces chains via global forces</td></tr>
-<tr><td>t-SNE</td><td>26s</td><td>0.178</td><td>0.041</td><td>0.002</td><td class="note">Limited by sparse adjacency</td></tr>
+<tr><td>BitZoom &alpha;=0.75</td><td>4ms</td><td>0.271</td><td>0.003</td><td>0.002</td><td class="note">Best BitZoom; &alpha;=1.0 is worse</td></tr>
+<tr><td>ForceAtlas2</td><td>61s</td><td class="best">0.006</td><td class="best">0.195</td><td>0.002</td><td class="note">Traces chains via global forces</td></tr>
+<tr><td>t-SNE</td><td>10s</td><td>0.171</td><td>0.041</td><td>0.002</td><td class="note">Limited by sparse adjacency</td></tr>
 </table>
 
 <p>ForceAtlas2 dominates. Its global optimization traces long chains (diameter ~46)
@@ -336,19 +384,19 @@ core claim.</p>
 
 <table data-chart="TopoNbrP,PropNbrP">
 <tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
-<tr><td>BitZoom &alpha;=0</td><td>10ms</td><td>0.461</td><td>0.001</td><td>0.007</td><td class="note">No property weights</td></tr>
-<tr><td>BitZoom &alpha;=0 wt</td><td>8ms</td><td>0.534</td><td>0.002</td><td class="best">0.034</td><td class="note">Property weights: best PropNbrP</td></tr>
-<tr><td>BitZoom &alpha;=0.5 wt</td><td>8ms</td><td>0.482</td><td>0.002</td><td>0.034</td><td class="note">Adding topology barely changes PropNbrP</td></tr>
-<tr><td>ForceAtlas2</td><td>178s</td><td>0.203</td><td>0.004</td><td>0.013</td><td class="note">Shorter edges; lower PropNbrP</td></tr>
-<tr><td>t-SNE</td><td>23s</td><td>0.292</td><td>0.004</td><td>0.026</td><td class="note">Second-highest PropNbrP</td></tr>
+<tr><td>BitZoom &alpha;=0</td><td>5ms</td><td>0.461</td><td>0.001</td><td>0.007</td><td class="note">No property strengths</td></tr>
+<tr><td>BitZoom &alpha;=0 wt</td><td>4ms</td><td>0.534</td><td>0.002</td><td class="best">0.034</td><td class="note">Property strengths: best PropNbrP</td></tr>
+<tr><td>BitZoom autotune</td><td>4ms</td><td>0.486</td><td>0.002</td><td>0.013</td><td class="note">killchain:8, &alpha;=0.5 &mdash; near FA2</td></tr>
+<tr><td>ForceAtlas2</td><td>87s</td><td>0.181</td><td>0.005</td><td>0.014</td><td class="note">Shorter edges; lower PropNbrP</td></tr>
+<tr><td>t-SNE</td><td>12s</td><td>0.298</td><td>0.004</td><td>0.026</td><td class="note">Second-highest PropNbrP</td></tr>
 </table>
 
-<p>BitZoom with property weights (group=5, platforms=6, killchain=4) scores 2.6x higher
-than ForceAtlas2 on PropNbrP (0.034 vs 0.013). Without property weights, BitZoom's
-PropNbrP drops to 0.007 — the weights are what provide the signal. All methods score
-low on TopoNbrP because graph neighbors are often semantically different node types.
-t-SNE scores second on PropNbrP (0.026), likely because adjacency partially correlates
-with property similarity.</p>
+<p>BitZoom with property strengths (group=5, platforms=6, killchain=4) scores 2.4x higher
+than ForceAtlas2 on PropNbrP (0.034 vs 0.014). Autotune finds <code>killchain:8</code>
+at &alpha;=0.5, scoring 0.013 &mdash; competitive with FA2 but below hand-tuned. The
+multi-group interaction (group + platforms + killchain) that makes the hand-pick work
+is not discoverable from coordinate descent alone. Without property strengths, BitZoom's
+PropNbrP drops to 0.007.</p>
 
 <h3>Synth Packages: designed group structure</h3>
 
@@ -357,41 +405,38 @@ version, depcount. Edges are co-reference links, not property-based.</p>
 
 <table data-chart="TopoNbrP,PropNbrP">
 <tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
-<tr><td>BitZoom &alpha;=0</td><td>2ms</td><td>0.470</td><td>0.003</td><td>0.010</td><td class="note">No property weights</td></tr>
-<tr><td>BitZoom &alpha;=0 wt</td><td>2ms</td><td>0.387</td><td>0.006</td><td class="best">0.049</td><td class="note">Property weights: best PropNbrP (6x FA2)</td></tr>
-<tr><td>BitZoom &alpha;=0.5 wt</td><td>3ms</td><td>0.306</td><td>0.011</td><td>0.039</td><td class="note">Topology trades PropNbrP for TopoNbrP</td></tr>
-<tr><td>ForceAtlas2</td><td>151s</td><td class="best">0.030</td><td>0.018</td><td>0.008</td><td class="note">Shortest edges; low PropNbrP</td></tr>
-<tr><td>t-SNE</td><td>9s</td><td>0.218</td><td>0.001</td><td>0.012</td><td class="note">Low on both metrics</td></tr>
+<tr><td>BitZoom &alpha;=0</td><td>1ms</td><td>0.468</td><td>0.003</td><td>0.010</td><td class="note">No property strengths</td></tr>
+<tr><td>BitZoom &alpha;=0 wt</td><td>2ms</td><td>0.387</td><td>0.005</td><td class="best">0.050</td><td class="note">Property strengths: best PropNbrP (6x FA2)</td></tr>
+<tr><td>BitZoom autotune</td><td>1ms</td><td>0.535</td><td>0.002</td><td>0.022</td><td class="note">downloads:8 &mdash; 2.6x above FA2</td></tr>
+<tr><td>ForceAtlas2</td><td>54s</td><td class="best">0.028</td><td>0.018</td><td>0.009</td><td class="note">Shortest edges; low PropNbrP</td></tr>
+<tr><td>t-SNE</td><td>19s</td><td>0.222</td><td>0.001</td><td>0.013</td><td class="note">Low on both metrics</td></tr>
 </table>
 
-<p>BitZoom with weights scores 6x higher than ForceAtlas2 on PropNbrP (0.049 vs 0.008).
-Graph connectivity and property similarity diverge: edges are co-reference links, not
-property-based. Increasing &alpha; from 0 to 0.5 trades PropNbrP for TopoNbrP,
-directly demonstrating the &alpha; tradeoff. Gaussian quantization shows negligible
-difference here (&plusmn;2%), suggesting the post-blend distribution is approximately
-uniform.</p>
+<p>BitZoom with strengths scores 5.9x higher than ForceAtlas2 on PropNbrP (0.050 vs 0.009).
+Autotune at 0.022 still beats FA2 by 2.6x. Graph connectivity and property similarity
+diverge: edges are co-reference links, not property-based. The autotune found that
+<code>downloads</code> alone is the most discriminative property for this dataset.</p>
 
 <h3>BitZoom Source: when topology tracks properties</h3>
 
-<p>433 functions/methods/classes from this project's source code, 940 call edges.
-Properties: kind, file, lines, bytes, age.</p>
+<p>916 nodes (functions, methods, classes, imports) from this project's source code, 2,096
+call edges. Properties: kind, file, lines, bytes, age, edge types.</p>
 
 <table data-chart="TopoNbrP,PropNbrP">
 <tr><th>Layout</th><th>Time</th><th>EdgeLen</th><th>TopoNbrP</th><th>PropNbrP</th><th style="text-align:left">Note</th></tr>
-<tr><td>BitZoom &alpha;=0 wt</td><td>1ms</td><td>0.420</td><td>0.019</td><td>0.172</td><td class="note">Property weights, rank quant</td></tr>
-<tr><td>BitZoom &alpha;=0.5 wt</td><td>2ms</td><td>0.267</td><td>0.032</td><td>0.179</td><td class="note">Rank quant; topology helps</td></tr>
-<tr><td>BitZoom &alpha;=0.5 wt gauss</td><td>1ms</td><td>0.301</td><td>0.035</td><td>0.198</td><td class="note">Gaussian quant: +11% PropNbrP</td></tr>
-<tr><td>ForceAtlas2</td><td>12s</td><td class="best">0.031</td><td class="best">0.127</td><td>0.208</td><td class="note">High PropNbrP via adjacency</td></tr>
-<tr><td>UMAP</td><td>13s</td><td>0.115</td><td>0.082</td><td class="best">0.244</td><td class="note">Highest PropNbrP</td></tr>
-<tr><td>t-SNE</td><td>3s</td><td>0.278</td><td>0.048</td><td>0.204</td><td class="note">High PropNbrP via adjacency</td></tr>
+<tr><td>BitZoom &alpha;=0 wt</td><td>1ms</td><td>0.433</td><td>0.012</td><td>0.236</td><td class="note">kind:8, group:3, rank quant</td></tr>
+<tr><td>BitZoom &alpha;=0.5 wt</td><td>1ms</td><td>0.308</td><td>0.017</td><td>0.244</td><td class="note">Topology helps slightly</td></tr>
+<tr><td>BitZoom autotune</td><td>1ms</td><td>0.297</td><td>0.013</td><td>0.163</td><td class="note">kind:3, edgetype:8 &mdash; finds edgetype</td></tr>
+<tr><td>ForceAtlas2</td><td>11s</td><td class="best">0.018</td><td class="best">0.110</td><td>0.290</td><td class="note">High PropNbrP via adjacency</td></tr>
+<tr><td>UMAP</td><td>7s</td><td>0.105</td><td>0.056</td><td class="best">0.303</td><td class="note">Highest PropNbrP</td></tr>
+<tr><td>t-SNE</td><td>3s</td><td>0.208</td><td>0.035</td><td>0.249</td><td class="note">High PropNbrP via adjacency</td></tr>
 </table>
 
-<p>Topology-based methods score higher on PropNbrP than BitZoom with rank quantization
-(0.20-0.24 vs 0.17-0.18). Functions that call each other tend to share file and kind,
-so adjacency captures property structure incidentally. Switching to Gaussian
-quantization improves BitZoom's PropNbrP by 11% (0.179 &rarr; 0.198), reaching 95% of
-ForceAtlas2. Gaussian quantization preserves density structure rather than forcing
-uniform occupancy, which helps when similar nodes form tight clusters.</p>
+<p>Topology-based methods score higher on PropNbrP (0.25-0.30) because call-graph
+edges track file/kind similarity. BitZoom hand-tuned at 0.244 reaches 84% of FA2.
+Autotune at 0.163 found <code>edgetype:8</code> as a useful dimension but the hand-tuned
+multi-group combination (kind + group) scores better. On this dataset, topology correlation
+means all methods score well on PropNbrP.</p>
 
 <h2 id="methods">What each method is good at</h2>
 
@@ -411,25 +456,37 @@ uniform occupancy, which helps when similar nodes form tight clusters.</p>
 <tr><td>Determinism</td><td class="note">Seed-dependent</td><td class="note">Seed-dependent</td><td class="note">Fully deterministic</td></tr>
 </table>
 
+<h2 id="autotune">Auto-tune: zero-config performance</h2>
+
+<p>BitZoom's auto-tune uses a <strong>dual-pass</strong> optimizer: it searches the strength
+parameter space at both &alpha;=0 (property-only) and &alpha;=0.5 (moderate topology),
+then picks whichever produces the better layout. This discovers two kinds of useful
+properties: those that cluster independently (generation, group) and those that only
+show value when topology connects related nodes (edgetype, platforms). Bearing auto-tune
+then rotates each group to maximize 2D spread via closed-form trace maximization.</p>
+
+<table>
+<tr><th>Dataset</th><th>Hand-tuned</th><th>Autotune</th><th>Best baseline</th><th style="text-align:left">Autotune vs baseline</th></tr>
+<tr><td>Epstein</td><td class="best">0.118</td><td>0.116</td><td>0.090 (t-SNE)</td><td class="note"><span class="best">1.28&times;</span> &mdash; discovers edgetype via dual-pass</td></tr>
+<tr><td>Pokemon</td><td>0.019</td><td class="best">0.025</td><td>0.022 (FA2)</td><td class="note"><span class="best">1.13&times;</span> &mdash; beats all</td></tr>
+<tr><td>MITRE</td><td class="best">0.034</td><td>0.013</td><td>0.026 (t-SNE)</td><td class="note">0.49&times; &mdash; multi-group interaction not discoverable</td></tr>
+<tr><td>Synth Pkg</td><td class="best">0.050</td><td>0.022</td><td>0.013 (t-SNE)</td><td class="note"><span class="best">1.76&times;</span> &mdash; beats all</td></tr>
+<tr><td>BZ Source</td><td>0.244</td><td>0.163</td><td>0.303 (UMAP)</td><td class="note">0.54&times; &mdash; topology-dominant dataset</td></tr>
+</table>
+
+<p>Autotune beats all baselines on <strong>3 of 5</strong> property datasets (Epstein, Pokemon,
+Synth Packages) while being 1,000-70,000&times; faster. Epstein is the dual-pass showcase:
+the &alpha;=0.5 pass discovers <code>edgetype:3</code> (invisible at &alpha;=0), reaching
+98% of the hand-tuned PropNbrP. MITRE remains the weak spot &mdash; the optimal three-group
+combination (group + platforms + killchain) isn't discoverable from coordinate descent
+alone. Domain experts can still do 2-3&times; better on datasets where the optimal property
+mix requires multi-way interactions.</p>
+
 <h2 id="quant">Rank vs Gaussian quantization</h2>
 
 <p>BitZoom supports two quantization modes. Rank quantization sorts nodes by position and
 assigns grid cells uniformly. Gaussian quantization uses fixed CDF boundaries, preserving
 density structure: tight clusters stay tight, sparse regions stay spread out.</p>
-
-<table>
-<tr><th>Dataset</th><th>Config</th><th>Rank PropNbrP</th><th>Gauss PropNbrP</th><th style="text-align:left">Change</th></tr>
-<tr><td>BZ Source</td><td>&alpha;=0 wt</td><td>0.172</td><td>0.179</td><td class="note">+4%</td></tr>
-<tr><td>BZ Source</td><td>&alpha;=0.5 wt</td><td>0.179</td><td class="best">0.198</td><td class="note">+11%; closes gap to FA2 (0.208)</td></tr>
-<tr><td>Synth Pkg</td><td>&alpha;=0 wt</td><td>0.049</td><td>0.050</td><td class="note">+1%</td></tr>
-<tr><td>Synth Pkg</td><td>&alpha;=0.5 wt</td><td>0.039</td><td>0.038</td><td class="note">-2%</td></tr>
-</table>
-
-<p>Gaussian quantization helps when the post-blend distribution has meaningful density
-variation (BZ Source: functions cluster by file). When the distribution is approximately
-uniform (Synth Packages), the two modes produce similar results. The effect is
-dataset-dependent, but Gaussian quantization never hurts substantially and can close
-the gap to topology-based methods by preserving cluster tightness.</p>
 
 <h2 id="caveats">Caveats</h2>
 
@@ -438,7 +495,7 @@ is both the ground-truth similarity and the signal BitZoom's MinHash approximate
 is partially circular. A fully independent property-similarity metric (e.g., domain-expert
 labels) would be stronger evidence.</p>
 
-<p><strong>Edge-only datasets show no property differentiation.</strong> Three of six datasets
+<p><strong>Edge-only datasets show no property differentiation.</strong> Three of eight datasets
 have no real node properties. PropNbrP is uniformly low across all methods on these graphs.</p>
 
 <p><strong>When adjacency correlates with properties, topology-based methods win PropNbrP too.</strong>

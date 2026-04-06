@@ -432,13 +432,21 @@
     line-height: 1.6;
   }
 
-  .weight-row {
+  .strength-row {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 3px 0;
+    min-width: 0; /* allow children to shrink within the sidebar width */
   }
-  .weight-row input[type=checkbox] {
+  .strength-row > .strength-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .strength-row input[type=checkbox] {
     -webkit-appearance: none;
     appearance: none;
     width: 12px;
@@ -452,14 +460,14 @@
     position: relative;
     transition: all 0.12s;
   }
-  .weight-row input[type=checkbox]:hover {
+  .strength-row input[type=checkbox]:hover {
     border-color: var(--accent);
   }
-  .weight-row input[type=checkbox]:checked {
+  .strength-row input[type=checkbox]:checked {
     background: var(--accent);
     border-color: var(--accent);
   }
-  .weight-row input[type=checkbox]:checked::after {
+  .strength-row input[type=checkbox]:checked::after {
     content: '';
     position: absolute;
     left: 3px;
@@ -470,7 +478,7 @@
     border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
   }
-  .weight-label {
+  .strength-label {
     font-size: 10px;
     color: var(--text-dim);
     width: 60px;
@@ -478,27 +486,69 @@
     letter-spacing: 0.06em;
     flex-shrink: 0;
   }
-  .weight-slider {
+  .strength-slider {
     -webkit-appearance: none;
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0; /* allow slider to shrink below its intrinsic width so fixed-size siblings (value, dial) stay visible */
     height: 3px;
     background: var(--border);
     border-radius: 2px;
     outline: none;
   }
-  .weight-slider::-webkit-slider-thumb {
+  .strength-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 11px; height: 11px;
     border-radius: 50%;
     background: var(--accent3);
     cursor: pointer;
   }
-  .weight-val {
+  .strength-val {
     font-size: 10px;
     color: var(--accent3);
     width: 14px;
     text-align: right;
     flex-shrink: 0;
+  }
+  /* Bearing dial — per-group rotation control. 0° = up (north), clockwise. */
+  .bearing-dial {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 0.5px solid var(--border);
+    background: var(--bg);
+    opacity: 0.35;
+    position: relative;
+    flex-shrink: 0;
+    cursor: ns-resize; /* vertical drag to rotate (music-software knob convention) */
+    touch-action: none;
+    outline: none;
+    display: inline-block;
+    user-select: none;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+  }
+  .bearing-dial.nonzero {
+    opacity: 0.9;
+    border: 1px solid var(--accent3);
+  }
+  .bearing-dial:hover {
+    opacity: 1;
+    border-color: var(--accent3);
+  }
+  .bearing-dial:focus, .bearing-dial.focused, .bearing-dial.active {
+    opacity: 1;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .bearing-tick {
+    position: absolute;
+    left: 50%;
+    top: 2px;          /* 2px inset from dial top edge */
+    width: 2px;
+    height: 10px;      /* tick runs from top(2px) to center(12px) of the 24px dial */
+    margin-left: -1px; /* center horizontally (width/2) */
+    background: var(--accent);
+    transform-origin: 50% 100%; /* pivot at bottom-center of the tick = dial center */
+    pointer-events: none;
   }
   .preset-row {
     display: flex;
@@ -717,4 +767,59 @@
       box-shadow: 0 -8px 40px rgba(0,0,0,0.6);
     }
     .node-panel.open { transform: translateY(0); }
+  }
+
+  /* Compass floating panel */
+  .compass-panel {
+    position: fixed;
+    z-index: 12;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    overflow: auto;
+    width: 260px;
+    height: 280px;
+    min-width: 180px;
+    min-height: 200px;
+    resize: both;
+  }
+  .compass-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    cursor: move;
+    font-size: 11px;
+    color: var(--text-dim);
+    user-select: none;
+  }
+  .compass-close {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 3px;
+  }
+  .compass-close:hover { border-color: var(--accent2); color: var(--accent2); }
+  .compass-panel bz-compass {
+    display: block;
+    width: 100%;
+    height: calc(100% - 30px); /* fill below titlebar */
+  }
+  @media (max-width: 600px) {
+    .compass-panel {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      top: auto;
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -8px 40px rgba(0,0,0,0.6);
+    }
+    .compass-titlebar { cursor: default; }
+    .compass-panel bz-compass { width: 100%; height: 220px; }
   }

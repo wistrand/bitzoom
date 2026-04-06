@@ -1,5 +1,5 @@
 # id	px	py	gx	gy	proj_group_x	proj_group_y	proj_label_x	proj_label_y	proj_structure_x	proj_structure_y	proj_neighbors_x	proj_neighbors_y	proj_subtype_x	proj_subtype_y	proj_killchain_x	proj_killchain_y	proj_aliases_x	proj_aliases_y	proj_level_x	proj_level_y	proj_platforms_x	proj_platforms_y	proj_edgetype_x	proj_edgetype_y
-# config: weights={"group":5,"platforms":6,"killchain":4} alpha=0 quant=gaussian
+# config: strengths={"group":5,"platforms":6,"killchain":4} alpha=0 quant=gaussian
 # nodes=4736 groups=group,label,structure,neighbors,subtype,killchain,aliases,level,platforms,edgetype
 malware--6a21e3a4-5ffe-4581-af9a-6a54c7536f44	0.3774868383531347	0.7651136491532828	45137	57839	7.363848103001503	16.432576091747983	6.976648344925576	7.279702130704864	13.58380150846518	-6.569075397659687	7.268990093967755	-6.705211784052583	0	0	0	0	0	0	0	0	1.8002733935118789	1.509777215127778	11.53893363001329	3.786531470210205
 attack-pattern--707399d6-ab3e-4963-9315-d9d3818cd6a0	0.9123994365597776	0.48405837845088073	62665	48629	1.1108648773542118	3.638271539710896	-16.503871904700063	9.114371716075759	-4.175106642009182	-18.883693199164174	-9.619384122043598	12.549093944822086	0	0	12.719388194341494	-1.4813019044490696	0	0	0	0	19.41695392380605	8.487800386936469	5.65136969924481	-8.824628045555574

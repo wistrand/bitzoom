@@ -18,7 +18,7 @@ import {
   getNodePropValue, getSupernodeDominantValue, maxCountKey,
 } from './bitzoom-algo.js';
 import { generateGroupColors, COLOR_SCHEMES, COLOR_SCHEME_NAMES } from './bitzoom-colors.js';
-import { autoTuneWeights } from './bitzoom-utils.js';
+import { autoTuneStrengths } from './bitzoom-utils.js';
 import { initGL, renderGL } from './bitzoom-gl-renderer.js';
 
 import { layoutAll, render, worldToScreen, screenToWorld, hitTest } from './bitzoom-renderer.js';
@@ -33,7 +33,7 @@ export class BitZoomCanvas {
    * @param {object} opts.nodeIndexFull - {id: node}
    * @param {object} opts.adjList - {id: [neighborIds]}
    * @param {Array} opts.groupNames - property group names
-   * @param {object} opts.propWeights - {groupName: weight}
+   * @param {object} opts.propStrengths - {groupName: strength}
    * @param {object} opts.propColors - {groupName: {value: '#hex'}}
    * @param {object} opts.groupColors - {groupValue: '#hex'}
    * @param {string} [opts.heatmapMode='off'] - 'off', 'splat', 'density'
@@ -57,7 +57,8 @@ export class BitZoomCanvas {
     this.nodeIndexFull = opts.nodeIndexFull || {};
     this.adjList = opts.adjList || {};
     this.groupNames = opts.groupNames || [];
-    this.propWeights = { ...opts.propWeights } || {};
+    this.propStrengths = { ...opts.propStrengths } || {};
+    this.propBearings = { ...(opts.propBearings || {}) }; // per-group rotation in radians
     this.propColors = opts.propColors || {};
     this.groupColors = opts.groupColors || this.propColors['group'] || {};
     this.groupProjections = {};
@@ -92,7 +93,7 @@ export class BitZoomCanvas {
     this._progressText = null; // overlay text shown during auto-tune
     this.showFps = opts.showFps || false;
     this._colorScheme = opts.colorScheme || 0;
-    this._colorBy = opts.colorBy || null; // null = auto (highest weight group)
+    this._colorBy = opts.colorBy || null; // null = auto (highest strength group)
     this._lightMode = opts.lightMode || false;
     this._useGPU = false; // when true, blend uses GPU compute
     this._gl = null;       // WebGL2 context (null = Canvas 2D mode)
@@ -261,9 +262,9 @@ export class BitZoomCanvas {
   _refreshPropCache() {
     let best = 'label', bestW = 0;
     for (const g of this.groupNames) {
-      if ((this.propWeights[g] || 0) > bestW) { bestW = this.propWeights[g]; best = g; }
+      if ((this.propStrengths[g] || 0) > bestW) { bestW = this.propStrengths[g]; best = g; }
     }
-    // colorBy overrides auto-selection for coloring; layout dominant stays weight-based
+    // colorBy overrides auto-selection for coloring; layout dominant stays strength-based
     const colorProp = (this._colorBy && this.groupNames.includes(this._colorBy)) ? this._colorBy : best;
     this._cachedDominant = colorProp;
     this._cachedLabelProps = this.labelProps.size > 0 ? [...this.labelProps] : [best];
@@ -329,7 +330,7 @@ export class BitZoomCanvas {
     const parts = [];
     for (const p of props) {
       const v = getNodePropValue(n, p, this.adjList);
-      if (v && v !== 'unknown' && v !== n.id) parts.push(v);
+      if (v && v !== 'unknown') parts.push(v);
     }
     return parts.length > 0 ? parts.join(' · ') : n.label || n.id;
   }
@@ -777,22 +778,58 @@ export class BitZoomCanvas {
   async _blend() {
     if (this._useGPU && this.nodes.length > 50000) {
       try {
-        await gpuUnifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
-        this._blendGen++;
-        return;
+        // NOTE: GPU blend does not yet apply bearings (see Phase 1 GPU work in PLAN-bearings.md).
+        // Fall through to CPU path when any bearing is non-zero.
+        const hasBearings = this._hasAnyBearing();
+        if (!hasBearings) {
+          await gpuUnifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
+          this._blendGen++;
+          return;
+        }
       } catch (e) {
         console.warn('[GPU] Blend failed, falling back to CPU:', e.message);
       }
     }
-    unifiedBlend(this.nodes, this.groupNames, this.propWeights, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
+    unifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats, this.propBearings);
     this._blendGen++;
   }
 
-  /** Update property weights and re-blend */
-  setWeights(weights) {
-    Object.assign(this.propWeights, weights);
+  /** True if any group has a non-zero bearing set. Used to decide whether the
+   *  GPU blend path is safe (GPU shader doesn't yet apply rotation). */
+  _hasAnyBearing() {
+    if (!this.propBearings) return false;
+    for (const g in this.propBearings) {
+      if (this.propBearings[g]) return true;
+    }
+    return false;
+  }
+
+  /** Update property strengths and re-blend */
+  setStrengths(strengths) {
+    Object.assign(this.propStrengths, strengths);
     this._refreshPropCache();
     this._blend().then(() => { this.layoutAll(); this.render(); });
+  }
+  /** @deprecated Use setStrengths() */
+  setWeights(w) { this.setStrengths(w); }
+
+  /** Update the bearing (rotation, in radians) for a single group and re-blend.
+   *  Triggers the same quantize + level-invalidation path as a strength change. */
+  setBearing(group, radians) {
+    this.propBearings[group] = radians;
+    this._quantStats = {}; // refreeze Gaussian quantization stats on rotation
+    this.levels = new Array(ZOOM_LEVELS.length).fill(null); // invalidate cached levels
+    this._blend().then(() => { this.layoutAll(); this.render(); });
+  }
+
+  /** Bulk-set bearings (e.g. from dataset preset or URL hash restore) without
+   *  per-group re-blending. Merges into current state; keys absent from `obj`
+   *  are untouched. Caller is responsible for triggering a subsequent blend. */
+  bulkSetBearings(obj) {
+    if (!obj) return;
+    Object.assign(this.propBearings, obj);
+    this._quantStats = {};
+    this.levels = new Array(ZOOM_LEVELS.length).fill(null);
   }
 
   /** Update topology alpha and re-blend */
@@ -1018,6 +1055,7 @@ export class BitZoomCanvas {
     const help = document.createElement('div');
     help.id = helpId;
     help.className = 'visually-hidden';
+    help.style.cssText = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0';
     help.textContent = 'Arrows: jump to nearest node in direction. Shift+Arrows: navigate connected neighbors. N/Shift+N: walk connections by weight. Comma/period: change level. Plus/minus: zoom. Escape: deselect. Home: select largest node. F: FPS. L: legend. C: color scheme. A: accessibility debug.';
     canvas.parentNode.insertBefore(help, canvas.nextSibling);
     canvas.setAttribute('aria-describedby', helpId);
@@ -1495,11 +1533,11 @@ export class BitZoomCanvas {
 import { runPipeline, computeProjections } from './bitzoom-pipeline.js';
 import { initGPU, computeProjectionsGPU, gpuUnifiedBlend } from './bitzoom-gpu.js';
 
-// Shared tail: weights, colors, blend, construct view.
+// Shared tail: strengths, colors, blend, construct view.
 function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, hasEdgeTypes, opts) {
-  const propWeights = {};
-  for (const g of groupNames) propWeights[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
-  Object.assign(propWeights, opts.weights || {});
+  const propStrengths = {};
+  for (const g of groupNames) propStrengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+  Object.assign(propStrengths, opts.strengths || opts.weights || {});
 
   const propColors = {};
   const propValues = {};
@@ -1528,7 +1566,7 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
 
   const view = new BitZoomCanvas(canvas, {
     nodes, edges, nodeIndexFull, adjList,
-    groupNames, propWeights, propColors,
+    groupNames, propStrengths, propColors,
     groupColors: propColors['group'],
     hasEdgeTypes,
     smoothAlpha,
@@ -1559,9 +1597,9 @@ function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, has
           : info.phase === 'done' ? 'done' : 'refining';
         view.showProgress(`Auto-tuning: ${phase} (${pct}%)`);
       };
-      const result = await autoTuneWeights(view.nodes, view.groupNames, view.adjList, view.nodeIndexFull, tuneOpts);
-      if (tuneOpts.weights !== false && !opts.weights) {
-        for (const g of view.groupNames) view.propWeights[g] = result.weights[g] ?? 0;
+      const result = await autoTuneStrengths(view.nodes, view.groupNames, view.adjList, view.nodeIndexFull, tuneOpts);
+      if ((tuneOpts.strengths ?? tuneOpts.weights) !== false && !opts.strengths && !opts.weights) {
+        for (const g of view.groupNames) view.propStrengths[g] = result.strengths[g] ?? 0;
       }
       if (tuneOpts.alpha !== false && opts.smoothAlpha == null) view.smoothAlpha = result.alpha;
       if (tuneOpts.quant !== false && !opts.quantMode) view.quantMode = result.quantMode;

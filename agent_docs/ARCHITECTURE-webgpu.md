@@ -176,7 +176,7 @@ loadGraphGPU (GPU projection if gaussian) → _finalizeLoad → GPU blend
 
 ## Auto-tune integration
 
-**Status:** `autoTuneWeights` accepts a `blendFn` option (defaults to CPU `unifiedBlend`).
+**Status:** `autoTuneStrengths` accepts a `blendFn` option (defaults to CPU `unifiedBlend`).
 `blendAndScore` ([bitzoom-utils.js](../docs/bitzoom-utils.js):125) calls `blendFn` for each
 evaluation. The viewer does not pass a custom `blendFn`, so auto-tune always uses CPU blend.
 

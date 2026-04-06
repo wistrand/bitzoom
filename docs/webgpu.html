@@ -640,7 +640,7 @@ const { projBuf, groupNames } = await computeProjectionsGPU(
 
 // Drop-in for CPU unifiedBlend &mdash; same signature:
 await gpuUnifiedBlend(
-  nodes, groupNames, propWeights, smoothAlpha,
+  nodes, groupNames, propStrengths, smoothAlpha,
   adjList, nodeIndexFull, passes, quantMode, quantStats
 );
 // Modifies nodes[i].px, .py, .gx, .gy in place</code></pre>

@@ -4,8 +4,9 @@
 #
 Layout                          Time(s)  EdgeLen(mean)  EdgeLen(med)  TopoNbrP  PropNbrP
 ----------------------------------------------------------------------------------------
-BitZoom:mitre-a000                0.010         0.4612        0.4303    0.0013    0.0068
-BitZoom:mitre-a000-weighted       0.008         0.5335        0.5097    0.0015    0.0339
-BitZoom:mitre-a050-weighted       0.008         0.4821        0.4569    0.0016    0.0335
-Force-Directed                  177.867         0.2032        0.1836    0.0041    0.0132
-t-SNE                            23.083         0.2924        0.2882    0.0037    0.0259
+BitZoom:mitre-a000                0.005         0.4612        0.4303    0.0013    0.0068
+BitZoom:mitre-a000-weighted       0.004         0.5335        0.5097    0.0015    0.0339
+BitZoom:mitre-a050-weighted       0.004         0.4821        0.4569    0.0016    0.0335
+BitZoom:mitre-autotune            0.004         0.4860        0.4781    0.0019    0.0128
+Force-Directed                   87.403         0.1814        0.1657    0.0049    0.0140
+t-SNE                            12.403         0.2975        0.2953    0.0035    0.0260

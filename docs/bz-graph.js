@@ -128,6 +128,7 @@ class BzGraph extends HTMLElement {
     this._canvas.addEventListener('keydown', e => {
       if (e.key === 'a') this.classList.toggle('a11y-debug');
     });
+    this.dispatchEvent(new Event('ready'));
   }
 
   _buildOpts() {
@@ -142,13 +143,13 @@ class BzGraph extends HTMLElement {
         `<tr><td>${esc(r.label)}</td><td>${esc(r.group)}</td><td>${r.connections}</td></tr>`
       ).join('');
     };
-    // Weights from attribute: weights="group:5,kind:8"
-    const weightsAttr = this.getAttribute('weights');
-    if (weightsAttr) {
-      opts.weights = {};
-      for (const pair of weightsAttr.split(',')) {
+    // Strengths from attribute: strengths="group:5,kind:8" (also accepts deprecated weights="...")
+    const strengthsAttr = this.getAttribute('strengths') || this.getAttribute('weights');
+    if (strengthsAttr) {
+      opts.strengths = {};
+      for (const pair of strengthsAttr.split(',')) {
         const [k, v] = pair.split(':');
-        if (k && v) opts.weights[k.trim()] = parseFloat(v.trim()) || 0;
+        if (k && v) opts.strengths[k.trim()] = parseFloat(v.trim()) || 0;
       }
     }
     // Label props from attribute: label-props="label,group"

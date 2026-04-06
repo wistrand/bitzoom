@@ -16,7 +16,7 @@ BitZoom is a deterministic layout and hierarchical aggregation viewer for large 
 
 ```sh
 deno task serve       # dev server at http://localhost:8000
-deno task test        # run pipeline tests (68 tests)
+deno task test        # run pipeline tests (177 tests)
 deno task stix2snap   # STIX 2.1 JSON → SNAP converter
 deno task csv2snap    # OpenCTI CSV → SNAP converter
 deno task src2snap    # source code → SNAP call graph
@@ -27,27 +27,29 @@ deno task src2snap    # source code → SNAP call graph
 ```
 docs/                    Web app (ES modules, no build step)
   index.html               Landing page (308 lines)
-  viewer.html              Viewer HTML shell (109 lines)
+  viewer.html              Viewer HTML shell (145 lines)
   about.html               How It Works page (1562 lines)
-  howto.html               Developer Guide (932 lines)
+  howto.html               Developer Guide (996 lines)
   example.html             Minimal example — two graphs, linked from developer guide (53 lines)
+  bz-graph-demo.html       Web component demo — <bz-graph> + <bz-compass> examples (83 lines)
   bitzoom.css              Styles (673 lines)
-  bitzoom-algo.js          Pure algorithm functions and constants (~520 lines)
+  bitzoom-algo.js          Pure algorithm functions and constants (~568 lines)
   bitzoom-pipeline.js      SNAP parsers, buildGraph, runPipeline(GPU), runPipelineFromObjects(GPU) (455 lines)
   bitzoom-parsers.js       Format adapters — CSV, D3 JSON, JGF, GraphML, GEXF, Cytoscape; parseAny dispatcher (965 lines)
   stix2snap.js             STIX 2.1 bundle parser (parseSTIX, browser-compatible)
-  bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1108 lines)
-  bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1235 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, all event handling (1688 lines)
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, drop zones, auto-tune-on-load (2055 lines)
-  bitzoom-utils.js         Auto-tune optimizer — portable async, memoization, refinement phase (469 lines)
-  bitzoom-svg.js           SVG export — exportSVG(bz, opts), createSVGView() for headless (601 lines)
+  bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1111 lines)
+  bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1249 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, all event handling (1726 lines)
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, drop zones, compass, auto-tune-on-load (2446 lines)
+  bitzoom-utils.js         Auto-tune optimizer — dual-pass search, bearing autotune, portable async, memoization (629 lines)
+  bitzoom-svg.js           SVG export — exportSVG(bz, opts), createSVGView() for headless (622 lines)
   bitzoom-colors.js        Color schemes (vivid, viridis, plasma, etc.)
   bitzoom-gpu.js           WebGPU compute acceleration (671 lines)
   bitzoom-worker.js        Web Worker coordinator (142 lines)
   bitzoom-proj-worker.js   Web Worker projection (95 lines)
-  bz-graph.js              <bz-graph> web component
-  bitzoom.js               Public API entrypoint (re-exports createBitZoomView, exportSVG, createSVGView, autoTuneWeights, parseAny, etc.)
+  bz-graph.js              <bz-graph> web component (194 lines)
+  bz-compass.js            <bz-compass> web component — radial strength/bearing control (888 lines)
+  bitzoom.js               Public API entrypoint (re-exports createBitZoomView, exportSVG, createSVGView, autoTuneStrengths, parseAny, etc.)
   webgl-test.html          Side-by-side Canvas 2D vs WebGL2 comparison page (246 lines)
 
 docs/dist/                 Bundled distribution
@@ -55,7 +57,7 @@ docs/dist/                 Bundled distribution
 
 docs/data/                 SNAP datasets + D3/JGF/GEXF/GraphML/Cytoscape/CSV samples, STIX bundles (.gz where large)
 benchmarks/                Layout comparison suite (export, compare, Docker runner)
-tests/pipeline_test.ts     172 tests: algo unit, pipeline, numeric, undefined, E2E, SVG, parsers, format dispatch
+tests/pipeline_test.ts     177 tests: algo unit, pipeline, numeric, undefined, E2E, SVG, parsers, format dispatch, bearings
 scripts/
   serve.ts                 Deno HTTP server (no-cache headers)
   stix2snap.ts             STIX 2.1 → SNAP converter (extracts platforms, kill chains)
@@ -124,10 +126,12 @@ Drop any of these files onto the canvas or loader panel, or load them via URL �
 - **ES modules** — `import`/`export` everywhere. Module workers. `<script type="module">` in each HTML page.
 - **No code duplication** — GC-optimized MinHash/projection (`computeMinHashInto`, `_sig`, `projectInto`, typed-array `HASH_PARAMS_A/B`) in [bitzoom-algo.js](docs/bitzoom-algo.js), imported by pipeline and workers.
 - **Composition** — `BitZoom` owns a `BitZoomCanvas` (`this.view`) for all graph state, rendering, and interaction primitives. `BitZoom` adds UI, workers, data loading, detail panel, URL hash state. `BitZoomCanvas` is standalone (no DOM beyond `<canvas>`), with `createBitZoomView()` factory and `onRender`/`autoTune`/`autoGPU`/`webgl`/`colorBy` options for embedding. Canvas always owns its event handlers; the viewer extends behavior via callbacks (`onSelect`, `onDeselect`, `onLevelChange`, `onZoomToHit`, `onSwitchLevel`, `onKeydown`) and options (`clickDelay`, `keyboardTarget`).
-- **colorBy** — `BitZoomCanvas.colorBy` property overrides which property group controls node colors (default: auto = highest-weight group). In the viewer, click a group name label to set colorBy (underline indicates active); click again to return to auto. `<bz-graph>` supports `color-by` attribute.
+- **colorBy** — `BitZoomCanvas.colorBy` property overrides which property group controls node colors (default: auto = highest-strength group). In the viewer, click a group name label to set colorBy (underline indicates active); click again to return to auto. `<bz-graph>` supports `color-by` attribute.
 - **SVG export** — `exportSVG(bz, opts)` in [bitzoom-svg.js](docs/bitzoom-svg.js) renders the current graph view as an SVG string. `createSVGView(nodes, edges, opts)` builds a headless view from plain pipeline data (no DOM needed). In the viewer, press **S** to download an SVG file.
 - **WebGL2 rendering** — optional GPU-accelerated layer for grid, edges, heatmap, and circles via 7 shader programs in [bitzoom-gl-renderer.js](docs/bitzoom-gl-renderer.js). Text stays on Canvas 2D overlay. Dual canvas architecture: wrapper div with GL canvas behind, original canvas transparent on top. Toggle via `webgl: true` option or GL button in viewer toolbar. Falls back silently if WebGL2 unavailable (`isWebGL2Available()` probe).
-- **Auto-tune** — `autoTuneWeights` in [bitzoom-utils.js](docs/bitzoom-utils.js) optimizes weights/alpha/quant by maximizing **spread × clumpiness × group-purity** at an adaptive grid level. Four phases: preset scan → coordinate descent (3 rounds) → local refinement (±deltas around best discrete point) → aesthetic fallback (force one categorical weight non-zero if descent zeros out everything). Async with portable yield (browser `requestAnimationFrame`, Deno/Node `setTimeout(0)` fallback). Memoized by `(weights, alpha)` tuple, trial blends use 2 topology passes (final blend uses 5). Module-level Float64Array buffers in `unifiedBlend` eliminate GC pressure across repeated calls. Supports `AbortSignal` and timeout. Viewer auto-runs on fresh loads without preset settings via `_autoTuneFresh()`; shared `_tuneAbort` controller means the Stop button works for both manual and auto-on-load runs. See [agent_docs/ARCHITECTURE-auto-tune.md](agent_docs/ARCHITECTURE-auto-tune.md).
+- **Auto-tune** — `autoTuneStrengths` in [bitzoom-utils.js](docs/bitzoom-utils.js) optimizes strengths/alpha/quant by maximizing **spread × clumpiness × group-purity** at an adaptive grid level. Dual-pass search: runs preset → descent → refine at both α=0 (property-only) and α=0.5 (moderate topology) to discover strength configurations that synergize with topology. α capped at 0.75 for property datasets to prevent CV inflation. After strengths, `autoTuneBearings` runs closed-form trace maximization to optimize per-group rotations. Async with portable yield, memoized, supports `AbortSignal` and timeout. Viewer auto-runs on fresh loads without preset settings via `_autoTuneFresh()`. Beats ForceAtlas2/t-SNE/UMAP on 3 of 5 property datasets at 1000-70000× faster. See [agent_docs/ARCHITECTURE-auto-tune.md](agent_docs/ARCHITECTURE-auto-tune.md).
+- **Bearings** — per-group rotation θ applied during blend, exposing the hidden degree of freedom in PRNG-seeded projections. `setBearing(group, radians)` on the canvas. Sidebar dials (music-software knob UX) and compass component for 2D manipulation. See [agent_docs/ARCHITECTURE-bearings.md](agent_docs/ARCHITECTURE-bearings.md).
+- **Compass** — `<bz-compass>` web component: radial 2D control for strengths + bearings. Declarative binding via `for` attribute to `<bz-graph>`. Floating draggable panel in the viewer (R key). SVG export. See [agent_docs/ARCHITECTURE-compass.md](agent_docs/ARCHITECTURE-compass.md).
 - **Unified format import** — `parseAny(text, filenameHint?)` in [bitzoom-parsers.js](docs/bitzoom-parsers.js) detects format from content + filename and dispatches to CSV/D3/JGF/GraphML/GEXF/Cytoscape/STIX parsers. All return `{nodes: Map, edges: Array|null, extraPropNames: string[]}` consumable by `runPipelineFromObjects`. Viewer uses `isObjectFormat`/`FILE_ACCEPT_ATTR` exports — no hardcoded format lists in UI code. Nodes-only graphs (CSV without edges, `.nodes` file alone) produce valid property-only layouts. See [agent_docs/ARCHITECTURE-data-import.md](agent_docs/ARCHITECTURE-data-import.md).
 - **Canvas drop zone** — files dropped onto the canvas (mid-session) immediately load via `parseAny` → `runPipelineFromObjects`. Two sequential SNAP drops (edges + nodes within 600ms) debounce and load as a pair; any non-SNAP drop replaces the current view immediately.
 - **Determinism** — seeded Gaussian projection + bit-prefix quantization give same-input-same-pixels forever. Load-bearing for URL-hash state, bookmarks, and `replaceState`-based shared views. No force-directed relaxation, no randomized t-SNE/UMAP iterations.
@@ -149,19 +153,22 @@ Drop any of these files onto the canvas or loader panel, or load them via URL �
 ## Important Invariants
 
 - Per-node projections computed once at load, never change.
-- Weight changes trigger blend + quantize only (no re-projection).
+- Strength changes trigger blend + quantize only (no re-projection).
 - Bit-prefix containment: level L cell is always a sub-cell of level L-1.
 - Renderer never mutates BitZoom state (except `n.x`/`n.y` in layoutAll).
-- `_refreshPropCache()` must be called when weights or label selection change.
+- `_refreshPropCache()` must be called when strengths or label selection change.
 - `getLevel()` calls `layoutAll()` when building a new level.
 - `switchLevel()` adjusts zoom to preserve renderZoom across level changes.
-- Empty/undefined property values emit 0 tokens → NaN sentinel → neutral [0,0] projection. Adaptive weight floor (`WEIGHT_FLOOR_RATIO=0.10`, `WEIGHT_FLOOR_MIN=0.10`) ensures zero-weight high-entropy groups always contribute 10% spreading, preventing low-entropy collapse. No special all-zero case: the floor produces equal blend naturally with smooth weight transitions.
-- Gaussian quantization boundaries (μ,σ) freeze from the dataset-tuned weight snapshot (reset in `_applyDatasetSettings`) — stable across subsequent weight/alpha changes but can misfit if the distribution shifts significantly.
+- Empty/undefined property values emit 0 tokens → NaN sentinel → neutral [0,0] projection. Adaptive strength floor (`STRENGTH_FLOOR_RATIO=0.10`, `STRENGTH_FLOOR_MIN=0.10`) ensures zero-strength high-entropy groups always contribute 10% spreading, preventing low-entropy collapse. No special all-zero case: the floor produces equal blend naturally with smooth strength transitions.
+- Gaussian quantization boundaries (μ,σ) freeze from the dataset-tuned strength snapshot (reset in `_applyDatasetSettings`) — stable across subsequent strength/alpha changes but can misfit if the distribution shifts significantly.
 - Heatmap density maxW is cached per level/zoom config, lerped on change — stable across pan.
 - `unifiedBlend` uses module-level Float64Array buffers grown on demand. Not reentrant — safe because blend calls are sequential.
 - Fresh-load state reset in `_applyWorkerResult`: pan, zoom, colorBy, nav state, selection, current dataset id all cleared. User preferences (color scheme, GPU mode, WebGL toggle, showFps/Legend, theme) preserved.
 - Initial level picked by `pickInitialLevel` in `_finalizeLoad` AFTER `gx/gy` is populated by blend + quantize. Walks coarse→fine, returns first level with 25-400 distinct cells and ≥1 multi-member cell. Dataset preset `initialLevel` and URL hash `l=` still override.
 - `buildGraph` unions ids from `parsed.nodeIds` AND `nodesMap.keys()` — nodes-only inputs and orphaned metadata rows are preserved (fixes pre-refactor silent drop).
+- Bearings are blend-time only — no re-projection needed. GPU compute blend falls back to CPU when bearings are set.
+- URL hash uses `st=` for strengths, `b=` for bearings (degrees), `s=` for selected node.
+- `<bz-compass>` declarative binding via `for` attribute listens for `ready` event on `<bz-graph>`, not polling.
 
 
 ## Code Style

@@ -38,21 +38,21 @@ The projection does not preserve pairwise distances — Johnson-Lindenstrauss re
 
 ## Unified blend *(runs on any parameter change)*
 
-Let W = Σ_g w_g be the sum of property weights. Define the blended position as:
+Let W = Σ_g w_g be the sum of property strengths. Define the blended position as:
 
 ```
 px_i = (1 − α) · (Σ_g w_g · p_g(i) / W)  +  α · avg_{j∈N(i)}(px_j)
 ```
 
-and analogously for py_i. Here α ∈ [0,1] is the topology weight. At α=0 position is determined entirely by property similarity. At α=1 it is determined entirely by the neighbor average. The property term is a convex combination of fixed group anchors; in continuous space, weight changes move each node affinely as a blend of those fixed anchors.
+and analogously for py_i. Here α ∈ [0,1] is the topology weight. At α=0 position is determined entirely by property similarity. At α=1 it is determined entirely by the neighbor average. The property term is a convex combination of fixed group anchors; in continuous space, strength changes move each node affinely as a blend of those fixed anchors.
 
 For degree-zero nodes the neighbor average is undefined; the topology term is omitted and position is determined by the property term alone.
 
-Weights use an adaptive floor to prevent low-entropy collapse and ensure smooth transitions. Each group's effective weight is max(w_g, floor) where floor = max(maxWeight × 0.10, 0.10). This guarantees that zero-weight high-entropy groups still contribute 10% spreading, preventing nodes with identical low-entropy properties from collapsing to the same position. When all input weights are zero, the absolute minimum floor produces an equal blend with no discontinuity — sliding a weight from zero upward produces continuous position changes.
+Strengths use an adaptive floor to prevent low-entropy collapse and ensure smooth transitions. Each group's effective strength is max(w_g, floor) where floor = max(maxStrength × 0.10, 0.10). This guarantees that zero-strength high-entropy groups still contribute 10% spreading, preventing nodes with identical low-entropy properties from collapsing to the same position. When all input strengths are zero, the absolute minimum floor produces an equal blend with no discontinuity — sliding a strength from zero upward produces continuous position changes.
 
 Run synchronously for k passes, each using the previous pass's positions as the neighbor signal. This is closely related to degree-normalised graph smoothing. At high α with many passes, well-connected components collapse toward their degree-weighted centroid — the standard oversmoothing failure mode of iterative graph smoothing.
 
-After quantization the mapping is piecewise constant. Small weight changes produce either no cell movement or discrete steps, never catastrophic global reorganisation.
+After quantization the mapping is piecewise constant. Small strength changes produce either no cell movement or discrete steps, never catastrophic global reorganisation.
 
 ---
 
@@ -96,7 +96,7 @@ Nodes sharing a cell at level L form a supernode. Cross-cell edges become weight
 
 ## Open validation questions
 
-The system requires empirical evaluation against: semantic neighbourhood preservation metrics; stability under weight changes and node insertion; oversmoothing onset as a function of α, passes, and graph structure; and task-based user evaluation for property graph exploration compared against force-directed, spectral, and embedding-based baselines.
+The system requires empirical evaluation against: semantic neighbourhood preservation metrics; stability under strength changes and node insertion; oversmoothing onset as a function of α, passes, and graph structure; and task-based user evaluation for property graph exploration compared against force-directed, spectral, and embedding-based baselines.
 
 ---
 

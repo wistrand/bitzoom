@@ -1,14 +1,15 @@
 // Benchmark: simulates the viewer's actual workload without DOM.
 // Generates synthetic datasets at various scales and measures every stage
 // the viewer executes: parse → project → blend → quantize → level build →
-// weight change → level switch → hit test simulation.
+// strength change → level switch → hit test simulation.
 
 import { runPipeline } from '../docs/bitzoom-pipeline.js';
 import {
   MINHASH_K, ZOOM_LEVELS, GRID_SIZE, GRID_BITS,
   unifiedBlend, buildLevelNodes, buildLevelEdges, buildLevel,
-  cellIdAtLevel, generateGroupColors,
+  cellIdAtLevel,
 } from '../docs/bitzoom-algo.js';
+import { generateGroupColors } from '../docs/bitzoom-colors.js';
 
 function fmt(ms) { return ms < 1 ? `${(ms * 1000).toFixed(0)}µs` : `${ms.toFixed(1)}ms`; }
 
@@ -145,12 +146,12 @@ for (const sc of SCALES) {
   console.log(`  Hydrate: ${fmt(performance.now() - t2)}`);
 
   // Initial blend (α=0, gaussian)
-  const weights = {};
-  for (const g of result.groupNames) weights[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+  const strengths = {};
+  for (const g of result.groupNames) strengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
   const quantStats = {};
 
   const t3 = performance.now();
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
   const tBlend = performance.now() - t3;
   console.log(`  Blend (α=0, gaussian): ${fmt(tBlend)}`);
 
@@ -171,24 +172,24 @@ for (const sc of SCALES) {
     console.log(`  buildLevel L${level}: nodes=${fmt(tNodes)} edges=${fmt(tEdges)} → ${lvl.supernodes.length} sn, ${lvl.snEdges.length} se`);
   }
 
-  // Weight change simulation (what happens when user moves a slider)
+  // Strength change simulation (what happens when user moves a slider)
   const t5 = performance.now();
-  weights['group'] = 1;
-  weights[sc.extras[0]] = 8;
-  unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
+  strengths['group'] = 1;
+  strengths[sc.extras[0]] = 8;
+  unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'gaussian', quantStats);
   const tReblend = performance.now() - t5;
-  console.log(`  Weight change (reblend): ${fmt(tReblend)}`);
+  console.log(`  Strength change (reblend): ${fmt(tReblend)}`);
 
   // Topology smoothing (what happens when user increases α)
   const t6 = performance.now();
-  unifiedBlend(nodes, result.groupNames, weights, 0.5, adjList, nodeIndex, 5, 'gaussian', quantStats);
+  unifiedBlend(nodes, result.groupNames, strengths, 0.5, adjList, nodeIndex, 5, 'gaussian', quantStats);
   const tTopo = performance.now() - t6;
   console.log(`  Topo blend (α=0.5): ${fmt(tTopo)}`);
 
-  // Level switch: build a new level after weight change
+  // Level switch: build a new level after strength change
   const t7 = performance.now();
   const freshLv = buildLevel(ZOOM_LEVELS[3], nodes, result.edges, nodeIndex, n => n.group, n => n.label || n.id, () => '#888');
-  console.log(`  Level rebuild after weights: ${fmt(performance.now() - t7)} → ${freshLv.supernodes.length} sn`);
+  console.log(`  Level rebuild after strengths: ${fmt(performance.now() - t7)} → ${freshLv.supernodes.length} sn`);
 
   // Spatial hit test simulation (10K lookups)
   const cullLevel = ZOOM_LEVELS[5];
@@ -219,5 +220,5 @@ for (const sc of SCALES) {
 
   // Summary
   const total = tPipeline + tBlend;
-  console.log(`  ── Load total: ${fmt(total)} | Per weight change: ${fmt(tReblend)}`);
+  console.log(`  ── Load total: ${fmt(total)} | Per strength change: ${fmt(tReblend)}`);
 }

@@ -596,6 +596,27 @@ export function exportSVG(bz, opts = {}) {
     }
   }
 
+  // Compass inset — positioned/sized to match on-screen panel
+  if (opts.compass && opts.compass.widget && typeof opts.compass.widget.toSVG === 'function') {
+    const { widget, x, y, w, h } = opts.compass;
+    const size = Math.min(w, h);
+    const compassBg = light ? 'rgba(255,255,255,0.85)' : 'rgba(10,10,15,0.75)';
+    parts.push(`<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})">`);
+    parts.push(`<rect width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${compassBg}"/>`);
+    // Center the square compass within the (possibly non-square) panel area
+    const ox = (w - size) / 2, oy = (h - size) / 2;
+    parts.push(`<g transform="translate(${ox.toFixed(1)},${oy.toFixed(1)})">`);
+    parts.push(widget.toSVG({
+      size,
+      bg: light ? '#ffffff' : '#12122a',
+      fg: light ? '#333340' : '#dde',
+      border: light ? 'rgba(100,100,140,0.3)' : '#334',
+      accent: '#5af',
+    }));
+    parts.push('</g>');
+    parts.push('</g>');
+  }
+
   parts.push('</svg>');
   return parts.join('\n');
 }

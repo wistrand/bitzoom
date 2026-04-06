@@ -25,9 +25,9 @@ const adjList = Object.fromEntries(nodes.map(n => [n.id, []]));
 for (const e of result.edges) {
   if (adjList[e.src] && adjList[e.dst]) { adjList[e.src].push(e.dst); adjList[e.dst].push(e.src); }
 }
-const weights = {};
-for (const g of result.groupNames) weights[g] = g === 'group' ? 3 : 0;
-unifiedBlend(nodes, result.groupNames, weights, 0, adjList, nodeIndex, 5, 'gaussian');
+const strengths = {};
+for (const g of result.groupNames) strengths[g] = g === 'group' ? 3 : 0;
+unifiedBlend(nodes, result.groupNames, strengths, 0, adjList, nodeIndex, 5, 'gaussian');
 
 const N = nodes.length;
 const E = result.edges.length;

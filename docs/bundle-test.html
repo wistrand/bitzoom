@@ -21,7 +21,7 @@
 <p>Single bundled JS file, no module imports needed.</p>
 <bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
           level="2" heatmap="density" edge-mode="curves" legend
-          weights="group:8" label-props="group">
+          strengths="group:8" label-props="group">
 </bz-graph>
 
 <h2>&lt;bz-graph&gt; inline JSON</h2>
@@ -46,13 +46,13 @@
 <h2>WebGL rendering</h2>
 <bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
           level="3" heatmap="density" edge-mode="curves" legend webgl
-          weights="group:5,edgetype:8" label-props="label">
+          strengths="group:5,edgetype:8" label-props="label">
 </bz-graph>
 
 <h2>WebGPU compute (forced)</h2>
 <bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
           level="3" heatmap="density" edge-mode="curves" legend use-gpu
-          weights="group:5,edgetype:8" label-props="label">
+          strengths="group:5,edgetype:8" label-props="label">
 </bz-graph>
 
 <h2>createBitZoomView from bundle</h2>
@@ -62,7 +62,7 @@
 <h2>Light mode + viridis</h2>
 <bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
           level="2" heatmap="density" edge-mode="curves" legend
-          light-mode color-scheme="1" weights="group:8"
+          light-mode color-scheme="1" strengths="group:8"
           style="--bz-bg:#e8e8f0;border-color:#c0c0d0">
 </bz-graph>
 
@@ -75,7 +75,7 @@ const [edges, nodes] = await Promise.all([
 ]);
 createBitZoomView(document.getElementById('c1'), edges, nodes, {
   initialLevel: 3, edgeMode: 'curves', heatmapMode: 'density', showLegend: true,
-  weights: { group: 5, edgetype: 8 }, labelProps: ['label'],
+  strengths: { group: 5, edgetype: 8 }, labelProps: ['label'],
 });
 </script>
 </body>

@@ -2,7 +2,7 @@
 // Takes pre-hashed token values (uint32) and computes signatures + 2D projections.
 // Falls back gracefully: callers should check `await initGPU()` before using.
 
-import { MINHASH_K, LARGE_PRIME, HASH_PARAMS_A, HASH_PARAMS_B, mulberry32, hashToken, buildGaussianProjection, WEIGHT_FLOOR_RATIO, WEIGHT_FLOOR_MIN, normalizeAndQuantize, gaussianQuantize } from './bitzoom-algo.js';
+import { MINHASH_K, LARGE_PRIME, HASH_PARAMS_A, HASH_PARAMS_B, mulberry32, hashToken, buildGaussianProjection, STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN, normalizeAndQuantize, gaussianQuantize } from './bitzoom-algo.js';
 import { tokenizeLabel, tokenizeNumeric, degreeBucket } from './bitzoom-pipeline.js';
 
 let device = null;
@@ -480,26 +480,26 @@ async function ensureBlendPipeline() {
  *
  * @param {object[]} nodes - node array with .projections, .id, .degree
  * @param {string[]} groupNames
- * @param {object} propWeights - { groupName: weight }
+ * @param {object} propStrengths - { groupName: strength }
  * @param {number} smoothAlpha - topology weight 0..1
  * @param {object} adjList - { nodeId: [neighborId, ...] }
  * @param {object} nodeIndexFull - { nodeId: node }
  * @param {number} passes
  * @returns {Promise<{px: Float32Array, py: Float32Array}>} blended positions
  */
-export async function gpuBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes) {
+export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes) {
   await ensureBlendPipeline();
 
   const N = nodes.length;
   const alpha = Math.max(0, Math.min(1, smoothAlpha));
 
-  // Compute effective weights (same logic as CPU)
+  // Compute effective strengths (same logic as CPU)
   let maxW = 0;
-  for (const g of groupNames) { const raw = propWeights[g] || 0; if (raw > maxW) maxW = raw; }
-  const floor = Math.max(maxW * WEIGHT_FLOOR_RATIO, WEIGHT_FLOOR_MIN);
+  for (const g of groupNames) { const raw = propStrengths[g] || 0; if (raw > maxW) maxW = raw; }
+  const floor = Math.max(maxW * STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN);
   let propTotal = 0;
   const effW = {};
-  for (const g of groupNames) { effW[g] = Math.max(propWeights[g] || 0, floor); propTotal += effW[g]; }
+  for (const g of groupNames) { effW[g] = Math.max(propStrengths[g] || 0, floor); propTotal += effW[g]; }
 
   // Compute property anchors
   const propPxArr = new Float32Array(N);
@@ -652,8 +652,8 @@ export async function gpuBlend(nodes, groupNames, propWeights, smoothAlpha, adjL
  * GPU-accelerated drop-in replacement for unifiedBlend.
  * Same signature: modifies nodes[i].px, .py, .gx, .gy in place.
  */
-export async function gpuUnifiedBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats) {
-  const result = await gpuBlend(nodes, groupNames, propWeights, smoothAlpha, adjList, nodeIndexFull, passes);
+export async function gpuUnifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats) {
+  const result = await gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes);
 
   // Apply blended positions to nodes
   for (let i = 0; i < nodes.length; i++) {
