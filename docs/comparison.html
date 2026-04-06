@@ -167,10 +167,10 @@
   <a href="#why">Why compare?</a>
   <a href="#guide">Decision guide</a>
   <a href="#metrics">What we measured</a>
-  <a href="#summary">The short version</a>
-  <a href="#datasets">Dataset by dataset</a>
-  <a href="#methods">Method comparison</a>
-  <a href="#quant">Quantization</a>
+  <a href="#summary">Summary</a>
+  <a href="#datasets">Datasets</a>
+  <a href="#autotune">Auto-tune</a>
+  <a href="#methods">Methods</a>
   <a href="#caveats">Caveats</a>
 </nav>
 
@@ -186,22 +186,18 @@
 </div>
 
 <h1>Layout <span>Comparison</span></h1>
-<p class="subtitle">How does BitZoom's layout compare to established graph layout algorithms?
-<br><a href="https://github.com/wistrand/bitzoom/blob/main/benchmarks/results/REPORT.md">Full report</a> with methodology, all configurations, and limitations.</p>
+<p class="subtitle">BitZoom vs ForceAtlas2, UMAP, and t-SNE on 8 graph datasets.
+<br><a href="https://github.com/wistrand/bitzoom/blob/main/benchmarks/results/REPORT.md">Full report</a> with methodology and all configurations.</p>
 
-<h2 id="why">Why compare?</h2>
+<p>BitZoom positions nodes by <strong>property similarity</strong>, using topology as a
+secondary signal. This comparison measures both topology preservation (do connected
+nodes end up nearby?) and property-similarity preservation (do nodes with similar
+attributes end up nearby?) across 8 datasets against ForceAtlas2, UMAP, and t-SNE.</p>
 
-<p>Graph layout is a solved problem in many contexts. Force-directed algorithms like
-ForceAtlas2 have decades of refinement. Dimensionality reduction methods like UMAP
-and t-SNE produce excellent 2D embeddings. BitZoom takes a different approach:
-it positions nodes by property similarity first, uses topology as a secondary signal,
-and produces a hierarchical zoom structure from stored coordinates.</p>
-
-<p>The natural question is what you gain and what you give up. This comparison measures
-both <strong>topology preservation</strong> (do connected nodes end up nearby?) and
-<strong>property-similarity preservation</strong> (do nodes with similar attributes end
-up nearby?). Topology metrics favor force-directed methods; property metrics evaluate
-BitZoom's core design goal.</p>
+<p>The results: on datasets where property structure diverges from graph connectivity,
+BitZoom leads on property grouping by 2-6&times;. When adjacency correlates with properties,
+topology-based methods capture property structure incidentally. BitZoom's auto-tune
+produces competitive layouts without manual configuration, at millisecond speed.</p>
 
 <h2 id="guide">Which method should I use?</h2>
 
@@ -243,6 +239,10 @@ BitZoom's core design goal.</p>
 </ul>
 
 <p>We use k=10 neighbors as a balance between local structure fidelity and global layout quality.</p>
+
+<div class="callout">
+<strong>Not all methods run on all datasets.</strong> UMAP requires computing pairwise Jaccard on dense n&times;n adjacency matrices. At 4K+ nodes this takes too long, so UMAP is only included for smaller datasets (Epstein, Pokemon, Email-EU, BZ Source). ForceAtlas2 and t-SNE run on all datasets but take 3&ndash;87 seconds vs BitZoom's 1&ndash;5 milliseconds. Where a method is absent from a table, it was too slow to include.
+</div>
 
 <h2 id="summary">The short version</h2>
 
