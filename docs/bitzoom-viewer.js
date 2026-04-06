@@ -12,7 +12,7 @@ import { exportSVG } from './bitzoom-svg.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
 import { computeNodeSig, runPipelineGPU, runPipelineFromObjects, runPipelineFromObjectsGPU, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
-import { parseAny, detectFormat, isObjectFormat, FILE_ACCEPT_ATTR } from './bitzoom-parsers.js';
+import { parseAny, detectFormat, isObjectFormat, FILE_ACCEPT_ATTR, readFileText, classifyFiles } from './bitzoom-parsers.js';
 
 // HTML-escape user-derived strings to prevent XSS from crafted SNAP files.
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -68,6 +68,17 @@ let DATASETS = [];
 class BitZoom {
     constructor() {
         const canvas = document.getElementById('canvas');
+
+        // Sync all UI from canvas state on every state change. The canvas is the
+        // single source of truth for propStrengths/propBearings — UI just reflects it.
+        // statechange fires at the START of _blend(), before the expensive work,
+        // so sliders/dials/compass update immediately during drag.
+        canvas.addEventListener('statechange', () => {
+            if (this.view && this.dataLoaded) {
+                this._syncControls();
+                this._syncCompass();
+            }
+        });
 
         // Sync the file input accept attribute from the parsers' capability list
         // so adding a new supported format doesn't require an HTML edit.
@@ -772,9 +783,7 @@ class BitZoom {
             document.getElementById('nudgeSlider').value = v.smoothAlpha;
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
         }
-        this._syncStrengthUI();
-        this._syncCompass();
-        this._syncLabelCheckboxes();
+        // label checkboxes synced via statechange → _syncControls
         v._quantStats = {}; // re-snapshot boundaries from dataset-tuned strengths
         v._refreshPropCache();
         await this.rebuildProjections();
@@ -785,13 +794,6 @@ class BitZoom {
         }
     }
 
-    _syncLabelCheckboxes() {
-        const v = this.view;
-        for (const key of v.groupNames) {
-            const cb = document.getElementById(`lbl-${key}`);
-            if (cb) cb.checked = v.labelProps.has(key);
-        }
-    }
 
     _buildDynamicUI() {
         const v = this.view;
@@ -806,162 +808,23 @@ class BitZoom {
             presetRow.appendChild(btn);
         }
 
-        const sliderContainer = document.getElementById('strengthSliders');
-        sliderContainer.innerHTML = '';
-        for (const key of v.groupNames) {
-            const row = document.createElement('div');
-            row.className = 'strength-row';
-            const initialDeg = Math.round(((v.propBearings?.[key] || 0) * 180 / Math.PI) % 360);
-            row.innerHTML = `
-        <input type="checkbox" id="lbl-${esc(key)}" title="Include in label">
-        <span class="strength-label">${esc(key)}</span>
-        <input class="strength-slider" type="range" id="s-${key}" min="0" max="10" step="0.1" value="${v.propStrengths[key]}">
-        <span class="strength-val" id="sv-${key}">${Math.round(v.propStrengths[key] * 10) / 10}</span>
-        <div class="bearing-dial${initialDeg ? ' nonzero' : ''}" id="bd-${esc(key)}" tabindex="0" role="slider"
-             aria-label="Bearing for ${esc(key)}" aria-valuemin="0" aria-valuemax="359" aria-valuenow="${initialDeg}"
-             aria-valuetext="${initialDeg} degrees"
-             title="Bearing: ${initialDeg}° — drag to rotate, Shift+drag snaps to 45°">
-          <div class="bearing-tick" style="transform:rotate(${initialDeg}deg)"></div>
-        </div>`;
-            sliderContainer.appendChild(row);
-            row.querySelector('.strength-slider').addEventListener('input', e => {
-                v.propStrengths[key] = parseFloat(e.target.value);
-                document.getElementById(`sv-${key}`).textContent = Math.round(v.propStrengths[key] * 10) / 10;
-                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-                this._syncCompass();
-                this._scheduleRebuild();
+        // Populate <bz-controls> from canvas state
+        const controls = document.getElementById('strengthControls');
+        if (controls) {
+            const groups = v.groupNames.map(g => {
+                const cmap = v.propColors && v.propColors[g];
+                const color = cmap ? Object.values(cmap)[0] || '#888' : '#888';
+                return { name: g, color, strength: v.propStrengths[g] || 0, bearing: v.propBearings[g] || 0 };
             });
-            row.querySelector('input[type=checkbox]').addEventListener('change', e => {
-                if (e.target.checked) v.labelProps.add(key);
-                else v.labelProps.delete(key);
-                v._refreshPropCache();
-                v.render();
-            });
-            // Click group name to set colorBy
-            row.querySelector('.strength-label').addEventListener('click', () => {
-                v.colorBy = (v.colorBy === key) ? null : key;
-                this._updateColorByUI();
-            });
-            // Bearing dial — pointer drag + keyboard arrows
-            const dialEl = row.querySelector('.bearing-dial');
-            if (dialEl) {
-                this._wireBearingDial(dialEl, key);
-            } else {
-                console.warn('[bearings] dial element missing for group', key);
-            }
+            controls.groups = groups;
+            controls.labelProps = v.labelProps;
+            controls.colorBy = v.colorBy;
         }
-        this._updateColorByUI();
-        this._syncCompass();
-    }
-
-    /** Wire pointer + keyboard events on a single bearing dial element.
-     *  Drag behavior mirrors music-software knobs: vertical mouse delta drives
-     *  the value (drag up to increase, drag down to decrease), regardless of
-     *  pointer position relative to the dial. Absolute pointer angle is not
-     *  used — only the accumulated delta from drag start. Shift = fine mode
-     *  (4× slower). Ctrl/Cmd click = reset to 0°. Double-click = reset to 0°. */
-    _wireBearingDial(dial, groupKey) {
-        const v = this.view;
-        const tick = dial.querySelector('.bearing-tick');
-        const setDeg = (deg) => {
-            // Normalize to [0, 360), round to integer for UI stability.
-            // Snap to 0° when within ±5° of north (dead zone prevents jitter near reset).
-            let d = Math.round(deg) % 360;
-            if (d < 0) d += 360;
-            if (d <= 5 || d >= 355) d = 0;
-            tick.style.transform = `rotate(${d}deg)`;
-            dial.classList.toggle('nonzero', d !== 0);
-            dial.setAttribute('aria-valuenow', String(d));
-            dial.setAttribute('aria-valuetext', `${d} degrees`);
-            dial.title = `Bearing: ${d}° — drag up/down to rotate · Shift for fine · double-click to reset`;
-            v.setBearing(groupKey, d * Math.PI / 180);
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            this._syncCompass();
-        };
-
-        // Vertical drag — standard music software knob behavior.
-        // PIXELS_PER_FULL_ROTATION = how many vertical pixels to drag for 360°.
-        // 200 px matches typical DAW sensitivity; Shift divides by 4 for fine control.
-        const PIXELS_PER_FULL_ROTATION = 200;
-        let dragging = false;
-        let startY = 0;
-        let startDeg = 0;
-        dial.addEventListener('pointerdown', e => {
-            // Ctrl/Cmd click resets to 0
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                setDeg(0);
-                return;
-            }
-            e.preventDefault();
-            dial.focus();
-            dragging = true;
-            startY = e.clientY;
-            startDeg = parseInt(dial.getAttribute('aria-valuenow') || '0', 10);
-            dial.setPointerCapture(e.pointerId);
-            dial.classList.add('active');
-        });
-        dial.addEventListener('pointermove', e => {
-            if (!dragging) return;
-            // Drag UP increases value, drag DOWN decreases. Vertical delta only.
-            const dy = startY - e.clientY;
-            const sensitivity = e.shiftKey ? PIXELS_PER_FULL_ROTATION * 4 : PIXELS_PER_FULL_ROTATION;
-            setDeg(startDeg + (dy / sensitivity) * 360);
-        });
-        const endDrag = (e) => {
-            if (!dragging) return;
-            dragging = false;
-            try { dial.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
-            dial.classList.remove('active');
-        };
-        dial.addEventListener('pointerup', endDrag);
-        dial.addEventListener('pointercancel', endDrag);
-
-        // Double-click resets to 0° (common music software convention)
-        dial.addEventListener('dblclick', e => {
-            e.preventDefault();
-            setDeg(0);
-        });
-
-        // Keyboard accessibility: arrows nudge by 15°, Shift+arrows by 45°.
-        // Stop propagation on consumed keys so the canvas's window-level keydown
-        // handler doesn't also trigger node navigation.
-        dial.addEventListener('keydown', e => {
-            const current = parseInt(dial.getAttribute('aria-valuenow') || '0', 10);
-            const step = e.shiftKey ? 45 : 15;
-            let consumed = false;
-            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-                setDeg(current + step); consumed = true;
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-                setDeg(current - step); consumed = true;
-            } else if (e.key === 'PageUp') {
-                setDeg(current + 45); consumed = true;
-            } else if (e.key === 'PageDown') {
-                setDeg(current - 45); consumed = true;
-            } else if (e.key === 'Home' || e.key === '0') {
-                setDeg(0); consumed = true;
-            } else if (e.key === 'End') {
-                setDeg(359); consumed = true;
-            }
-            if (consumed) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        });
-
-        dial.addEventListener('focus', () => dial.classList.add('focused'));
-        dial.addEventListener('blur', () => dial.classList.remove('focused'));
     }
 
     _updateColorByUI() {
-        const v = this.view;
-        document.querySelectorAll('.strength-label').forEach(el => {
-            const g = el.textContent;
-            const isColorBy = v.colorBy === g;
-            el.style.textDecoration = isColorBy ? 'underline' : 'none';
-            el.style.cursor = 'pointer';
-            el.title = isColorBy ? 'Click to reset to auto color' : `Color by ${g}`;
-        });
+        const controls = document.getElementById('strengthControls');
+        if (controls) controls.colorBy = this.view.colorBy;
     }
 
     _scheduleRebuild() {
@@ -969,13 +832,20 @@ class BitZoom {
         this.rebuildTimer = requestAnimationFrame(async () => { this.rebuildTimer = null; await this.rebuildProjections(); this._updateColorByUI(); });
     }
 
-    _syncStrengthUI() {
+    _syncControls() {
         const v = this.view;
-        for (const [key, val] of Object.entries(v.propStrengths)) {
-            const sl = document.getElementById(`s-${key}`);
-            const vl = document.getElementById(`sv-${key}`);
-            if (sl) { sl.value = val; vl.textContent = Math.round(val * 10) / 10; }
+        const controls = document.getElementById('strengthControls');
+        if (!controls || !v.groupNames) return;
+        const groups = v.groupNames.map(g => ({
+            name: g, strength: v.propStrengths[g] || 0, bearing: v.propBearings[g] || 0,
+        }));
+        if (controls.groups.length === groups.length) {
+            controls.updateAll(groups);
+        } else {
+            controls.groups = groups;
         }
+        controls.labelProps = v.labelProps;
+        controls.colorBy = v.colorBy;
     }
 
     _compassSVGOpts() {
@@ -1013,32 +883,19 @@ class BitZoom {
                 bearing: v.propBearings[g] || 0,
             };
         });
-        widget.groups = groups;
-    }
-
-    _syncBearingUI() {
-        const v = this.view;
-        for (const g of v.groupNames) {
-            const dial = document.getElementById(`bd-${g}`);
-            if (!dial) continue;
-            const rad = v.propBearings[g] || 0;
-            const d = Math.round((rad * 180 / Math.PI) % 360 + 360) % 360;
-            const tick = dial.querySelector('.bearing-tick');
-            if (tick) tick.style.transform = `rotate(${d}deg)`;
-            dial.setAttribute('aria-valuenow', String(d));
-            dial.setAttribute('aria-valuetext', `${d} degrees`);
-            dial.classList.toggle('nonzero', d !== 0);
-            dial.title = `Bearing: ${d}° — drag up/down to rotate · Shift for fine · double-click to reset`;
+        if (widget.groups.length === groups.length) {
+            widget.updateAll(groups);
+        } else {
+            widget.groups = groups; // group count changed (new dataset) — full rebuild
         }
     }
+
 
     _applyPreset(name) {
         const v = this.view;
         const p = this.presets[name];
         if (!p) return;
         Object.assign(v.propStrengths, p);
-        this._syncStrengthUI();
-        this._syncCompass();
         document.querySelectorAll('.preset-btn').forEach(b => {
             b.classList.toggle('active', b.dataset.preset === name);
         });
@@ -1716,19 +1573,19 @@ class BitZoom {
                 for (const p of result.labelProps) {
                     if (v.groupNames.includes(p)) v.labelProps.add(p);
                 }
-                this._syncLabelCheckboxes();
+                // label checkboxes synced via statechange → _syncControls
             }
             // Auto-tune bearings: closed-form trace maximization.
             const bearings = autoTuneBearings(v.nodes, v.groupNames, result.strengths);
             v.propBearings = bearings;
-            this._syncBearingUI();
-            this._syncCompass();
-            this._syncStrengthUI();
             document.getElementById('nudgeSlider').value = v.smoothAlpha;
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
             this._updateQuantBtn();
             v._progressText = null;
             await this.rebuildProjections();
+            // Re-pick level for the new blend distribution
+            const lvl = pickInitialLevel(v.nodes, ZOOM_LEVELS, RAW_LEVEL);
+            if (lvl !== v.currentLevel) this.switchLevel(lvl);
             this._updateOverview();
             autoBtn.textContent = 'Auto';
             autoBtn.style.background = '';
@@ -1973,20 +1830,7 @@ class BitZoom {
             const { name, strength, bearing } = e.detail;
             v.propStrengths[name] = strength;
             v.propBearings[name] = bearing;
-            // Update sidebar controls
-            const sl = document.getElementById(`s-${name}`);
-            const vl = document.getElementById(`sv-${name}`);
-            if (sl) { sl.value = strength; vl.textContent = Math.round(strength * 10) / 10; }
-            const dial = document.getElementById(`bd-${name}`);
-            if (dial) {
-                const d = Math.round((bearing * 180 / Math.PI) % 360 + 360) % 360;
-                const tick = dial.querySelector('.bearing-tick');
-                if (tick) tick.style.transform = `rotate(${d}deg)`;
-                dial.setAttribute('aria-valuenow', String(d));
-                dial.setAttribute('aria-valuetext', `${d} degrees`);
-                dial.classList.toggle('nonzero', d !== 0);
-            }
-            // rAF-gated rebuild — one blend per frame, no timer delay
+            // rAF-gated rebuild — blend event will sync sidebar sliders/dials
             if (!_compassRafPending) {
                 _compassRafPending = true;
                 requestAnimationFrame(async () => {
@@ -2020,6 +1864,40 @@ class BitZoom {
                 cBtn.title = running ? 'Stop auto-tune' : 'Auto-tune strengths and bearings';
             }
         });
+
+        // Strength controls (<bz-controls> component in sidebar)
+        const strengthControls = document.getElementById('strengthControls');
+        if (strengthControls) {
+            strengthControls.addEventListener('input', (e) => {
+                const { name, strength, bearing } = e.detail;
+                v.propStrengths[name] = strength;
+                v.propBearings[name] = bearing;
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                this._scheduleRebuild();
+            });
+            strengthControls.addEventListener('change', (e) => {
+                if (e.detail) {
+                    const { name, strength, bearing } = e.detail;
+                    v.propStrengths[name] = strength;
+                    v.propBearings[name] = bearing;
+                    this._scheduleRebuild();
+                }
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            });
+            strengthControls.addEventListener('colorby', (e) => {
+                v.colorBy = (v.colorBy === e.detail.name) ? null : e.detail.name;
+                this._updateColorByUI();
+                strengthControls.colorBy = v.colorBy;
+            });
+            strengthControls.addEventListener('autotune', () => {
+                document.getElementById('autoTuneBtn')?.click();
+            });
+            strengthControls.addEventListener('labelchange', (e) => {
+                v.labelProps = new Set(e.detail.labelProps);
+                v._refreshPropCache();
+                v.render();
+            });
+        }
 
         // Sidebar
         document.getElementById('sidebarToggle').addEventListener('click', () => this._toggleSidebar(), sig);
@@ -2238,45 +2116,23 @@ class BitZoom {
         }
     }
 
-    /** Route an iterable of dropped/selected files into the pending slots.
-     *  SNAP .edges/.nodes files need explicit role routing because they share
-     *  the same internal pipeline but play different roles. Everything else is
-     *  dispatched by content via _handleFileSelect → detectFormat. */
+    /** Route dropped/selected files into the pending slots via shared classifyFiles. */
     async _stageDroppedFiles(files) {
-        for (const f of files) {
-            const n = f.name.toLowerCase();
-            if (n.endsWith('.edges') || n.endsWith('.edges.gz')) {
-                await this._handleFileSelect(f, 'edges');
-            } else if (n.endsWith('.nodes') || n.endsWith('.nodes.gz') || n.endsWith('.labels') || n.endsWith('.labels.gz')) {
-                await this._handleFileSelect(f, 'labels');
-            } else {
-                await this._handleFileSelect(f);
-            }
+        const { edgesText, nodesText, parsed, fileName } = await classifyFiles(files);
+        if (parsed) {
+            this.pendingParsed = parsed;
+            this.pendingEdgesText = null;
+            this.pendingNodesText = null;
+            this._pendingFileName = fileName;
+        } else {
+            if (edgesText) { this.pendingEdgesText = edgesText; this.pendingParsed = null; }
+            if (nodesText) { this.pendingNodesText = nodesText; this.pendingParsed = null; }
+            if (fileName) this._pendingFileName = fileName;
         }
     }
 
     /** Read file contents as text, transparently decompressing .gz files. */
-    async _readFileText(file) {
-        if (file.name.endsWith('.gz')) {
-            const buf = await file.arrayBuffer();
-            const ds = new DecompressionStream('gzip');
-            const reader = ds.readable.getReader();
-            const writer = ds.writable.getWriter();
-            writer.write(new Uint8Array(buf));
-            writer.close();
-            const chunks = [];
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-            }
-            const merged = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
-            let off = 0;
-            for (const c of chunks) { merged.set(c, off); off += c.length; }
-            return new TextDecoder().decode(merged);
-        }
-        return await file.text();
-    }
+    async _readFileText(file) { return readFileText(file); }
 
     /** Handle a dropped/selected file. Detects format from content + filename.
      *  SNAP files stage into pendingEdgesText/pendingNodesText for the text worker pipeline.

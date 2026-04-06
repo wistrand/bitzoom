@@ -279,11 +279,10 @@ Called inside `_applyTuneResult` after `autoTuneStrengths` completes:
 autoTuneStrengths(...)  →  result.strengths
 autoTuneBearings(nodes, groupNames, result.strengths)  →  bearings {}
 v.propBearings = bearings
-_syncBearingUI()      →  updates dial tick, aria, nonzero class
-rebuildProjections()  →  re-blends with new bearings
+rebuildProjections()  →  _blend() → statechange event → UI sync
 ```
 
-Runs for both the manual Auto button and the auto-tune-on-load path. The bearing dials in the sidebar update to reflect the computed angles and remain manually adjustable afterward.
+Runs for both the manual Auto button and the auto-tune-on-load path. The `statechange` event triggers `_syncControls()` and `_syncCompass()` which update the `<bz-controls>` sliders/dials and `<bz-compass>` handles.
 
 ### Dial snap-to-zero
 

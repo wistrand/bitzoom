@@ -776,6 +776,9 @@ export class BitZoomCanvas {
 
   /** Run blend (GPU for large datasets when useGPU, else CPU) */
   async _blend() {
+    // Notify listeners that state has changed BEFORE the expensive blend.
+    // UI can sync sliders/dials/compass immediately from propStrengths/propBearings.
+    this.canvas.dispatchEvent(new Event('statechange'));
     if (this._useGPU && this.nodes.length > 50000) {
       try {
         // NOTE: GPU blend does not yet apply bearings (see Phase 1 GPU work in PLAN-bearings.md).
@@ -784,6 +787,7 @@ export class BitZoomCanvas {
         if (!hasBearings) {
           await gpuUnifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
           this._blendGen++;
+          this.canvas.dispatchEvent(new Event('blend'));
           return;
         }
       } catch (e) {
@@ -792,6 +796,7 @@ export class BitZoomCanvas {
     }
     unifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats, this.propBearings);
     this._blendGen++;
+    this.canvas.dispatchEvent(new Event('blend'));
   }
 
   /** True if any group has a non-zero bearing set. Used to decide whether the
@@ -891,6 +896,7 @@ export class BitZoomCanvas {
     // Mouse
     canvas.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
+      canvas.focus();
       this.mouseDown = true; this.mouseMoved = false;
       this.mouseStart = { x: e.clientX, y: e.clientY };
     }, sig);

@@ -27,28 +27,30 @@ deno task src2snap    # source code → SNAP call graph
 ```
 docs/                    Web app (ES modules, no build step)
   index.html               Landing page (308 lines)
-  viewer.html              Viewer HTML shell (145 lines)
+  index.html               Landing page with live demo (313 lines)
+  viewer.html              Viewer HTML shell (146 lines)
   about.html               How It Works page (1562 lines)
   howto.html               Developer Guide (996 lines)
   example.html             Minimal example — two graphs, linked from developer guide (53 lines)
-  bz-graph-demo.html       Web component demo — <bz-graph> + <bz-compass> examples (83 lines)
+  bz-graph-demo.html       Web component demo — <bz-graph> + <bz-compass> + <bz-controls> examples (110 lines)
   bitzoom.css              Styles (673 lines)
   bitzoom-algo.js          Pure algorithm functions and constants (~568 lines)
   bitzoom-pipeline.js      SNAP parsers, buildGraph, runPipeline(GPU), runPipelineFromObjects(GPU) (455 lines)
-  bitzoom-parsers.js       Format adapters — CSV, D3 JSON, JGF, GraphML, GEXF, Cytoscape; parseAny dispatcher (965 lines)
+  bitzoom-parsers.js       Format adapters — CSV, D3 JSON, JGF, GraphML, GEXF, Cytoscape; parseAny dispatcher, readFileText, classifyFiles (1023 lines)
   stix2snap.js             STIX 2.1 bundle parser (parseSTIX, browser-compatible)
   bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1111 lines)
   bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1249 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, all event handling (1726 lines)
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, drop zones, compass, auto-tune-on-load (2446 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, statechange/blend events (1732 lines)
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, <bz-controls> sidebar, compass panel, auto-tune-on-load (2302 lines)
   bitzoom-utils.js         Auto-tune optimizer — dual-pass search, bearing autotune, portable async, memoization (629 lines)
   bitzoom-svg.js           SVG export — exportSVG(bz, opts), createSVGView() for headless (622 lines)
   bitzoom-colors.js        Color schemes (vivid, viridis, plasma, etc.)
   bitzoom-gpu.js           WebGPU compute acceleration (671 lines)
   bitzoom-worker.js        Web Worker coordinator (142 lines)
   bitzoom-proj-worker.js   Web Worker projection (95 lines)
-  bz-graph.js              <bz-graph> web component (194 lines)
-  bz-compass.js            <bz-compass> web component — radial strength/bearing control (888 lines)
+  bz-graph.js              <bz-graph> web component — data loading, drop zone, built-in compass/controls panels (433 lines)
+  bz-compass.js            <bz-compass> web component — radial strength/bearing control (887 lines)
+  bz-controls.js           <bz-controls> web component — strength sliders + bearing dials + label checkboxes (362 lines)
   bitzoom.js               Public API entrypoint (re-exports createBitZoomView, exportSVG, createSVGView, autoTuneStrengths, parseAny, etc.)
   webgl-test.html          Side-by-side Canvas 2D vs WebGL2 comparison page (246 lines)
 
@@ -118,6 +120,7 @@ Drop any of these files onto the canvas or loader panel, or load them via URL �
 | karate.graphml            | GraphML    | 34    | Faction attribute                     |
 | graphml-sample.xml        | GraphML    | 6     | Prefuse canonical example             |
 | penguins.csv              | CSV        | 344   | Palmer Penguins with species/sex      |
+| titanic.csv               | CSV        | 891   | Titanic passengers — class, sex, age  |
 | ics-attack.json.gz        | STIX 2.1   | 464   | MITRE ATT&CK for ICS                  |
 | mobile-attack.json.gz     | STIX 2.1   | 738   | MITRE ATT&CK for Mobile               |
 

@@ -107,29 +107,20 @@ In the viewer ([bitzoom-viewer.js](../docs/bitzoom-viewer.js)), the compass live
 
 ### Sync architecture (viewer)
 
-Bidirectional sync between compass ↔ sidebar controls ↔ canvas state:
+The canvas dispatches a `statechange` event at the start of every `_blend()` call. A single listener syncs all UI:
 
 ```
-Compass <bz-compass>
-  ↓ input/change events
-Viewer (onCompassInput)
-  ↓ v.propStrengths[g] = strength
-  ↓ v.propBearings[g] = bearing
-  ↓ updates sidebar slider + dial
-  ↓ rAF-gated re-blend
-
-Sidebar slider/dial change
-  ↓ existing handlers
-  ↓ _syncCompass() → widget.groups = [...]
-
-Auto-tune / preset / dataset load
-  ↓ _applyTuneResult / _applyPreset / _applyDatasetSettings
-  ↓ _syncCompass()
+Any state change (slider drag, compass drag, autotune, preset, dataset load)
+  ↓ modifies v.propStrengths / v.propBearings
+  ↓ triggers _blend()
+  ↓ statechange event fires (before blend work)
+  ↓ listener calls _syncControls() + _syncCompass()
+  ↓ <bz-controls> and <bz-compass> update via updateAll()
 ```
 
-`_syncCompass()` pushes current `propStrengths` + `propBearings` + group colors to the compass. Called from all code paths that change strengths or bearings.
+Input flows the other direction too — compass and controls fire `input`/`change` events which set canvas state and schedule a rebuild. The `statechange` from the resulting blend syncs all other UI components.
 
-The A button in the compass triggers `autoTuneBtn.click()` in the viewer, reusing the existing tune start/stop toggle. Button text syncs to "■" while tuning.
+The A button in the compass triggers `autoTuneBtn.click()` in the viewer, reusing the existing tune start/stop toggle.
 
 ## SVG export
 

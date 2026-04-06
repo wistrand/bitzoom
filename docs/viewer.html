@@ -105,7 +105,7 @@
   <div>
     <div class="panel-title" role="heading" aria-level="2">Cluster by</div>
     <div class="preset-row" id="presetRow" role="group" aria-label="Strength presets"></div>
-    <div id="strengthSliders" role="group" aria-label="Property strength sliders"></div>
+    <bz-controls id="strengthControls" checkboxes></bz-controls>
   </div>
     <div class="algo-info" id="algo-info">
       Click a node or supernode to inspect it. Zoom levels L0–L3 show increasingly fine MinHash bucket partitions.
@@ -140,6 +140,7 @@
 <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" aria-expanded="false">≡</button>
 <script type="module" src="bz-compass.js"></script>
+<script type="module" src="bz-controls.js"></script>
 <script type="module" src="bitzoom-viewer.js"></script>
 </body>
 </html>

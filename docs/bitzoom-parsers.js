@@ -963,3 +963,61 @@ export function parseAny(text, filenameHint) {
       throw new Error('Unknown format: could not detect input type');
   }
 }
+
+// ─── File utilities (shared by bz-graph and viewer) ─────────────────────────
+
+/** Read a File object as text, transparently decompressing .gz files. */
+export async function readFileText(file) {
+  if (file.name.endsWith('.gz')) {
+    const buf = await file.arrayBuffer();
+    const ds = new DecompressionStream('gzip');
+    const writer = ds.writable.getWriter();
+    writer.write(new Uint8Array(buf));
+    writer.close();
+    const reader = ds.readable.getReader();
+    const chunks = [];
+    while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+    const merged = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
+    let off = 0;
+    for (const c of chunks) { merged.set(c, off); off += c.length; }
+    return new TextDecoder().decode(merged);
+  }
+  return await file.text();
+}
+
+/** Classify an array of dropped/selected Files by format.
+ *  Returns { edgesText, nodesText, parsed, fileName }.
+ *  - SNAP .edges/.nodes go to edgesText/nodesText (text pipeline)
+ *  - CSV/JSON/GraphML/GEXF/STIX go through parseAny → parsed (object pipeline)
+ */
+export async function classifyFiles(files) {
+  let edgesText = null, nodesText = null, parsed = null, fileName = null;
+  for (const f of files) {
+    const text = await readFileText(f);
+    const name = f.name;
+    const format = detectFormat(text, name);
+    const baseName = name
+      .replace(/\.(csv|tsv|json|edges|nodes|labels|txt|graphml|gexf|xml|gz)$/gi, '')
+      .replace(/\.(csv|tsv|json|edges|nodes|labels|txt|graphml|gexf|xml)$/gi, '');
+
+    if (format === 'snap-edges' || (format === 'snap' && name.toLowerCase().match(/\.edges/))) {
+      edgesText = text;
+      fileName = baseName;
+    } else if (format === 'snap-nodes' || name.toLowerCase().match(/\.(nodes|labels)/)) {
+      nodesText = text;
+    } else if (isObjectFormat(format)) {
+      try {
+        parsed = parseAny(text, name);
+        fileName = baseName;
+      } catch (e) {
+        console.warn(`[classifyFiles] Failed to parse ${name}: ${e.message}`);
+      }
+    } else if (format === 'snap') {
+      edgesText = text;
+      fileName = baseName;
+    } else {
+      console.warn(`[classifyFiles] Unknown format for ${name}`);
+    }
+  }
+  return { edgesText, nodesText, parsed, fileName };
+}

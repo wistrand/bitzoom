@@ -2,7 +2,7 @@
 
 A deterministic layout and hierarchical aggregation viewer for large property graphs. Nodes are positioned by property similarity using MinHash signatures and Gaussian projection, with stable zoom levels derived from stored uint16 grid coordinates via bit shifts.
 
-![Datasets](https://img.shields.io/badge/datasets-14-blue) ![Tests](https://img.shields.io/badge/tests-177%20passing-green)
+![Datasets](https://img.shields.io/badge/datasets-22-blue) ![Tests](https://img.shields.io/badge/tests-177%20passing-green)
 
 **[Viewer](https://wistrand.github.io/bitzoom/viewer.html)** · [Website](https://wistrand.github.io/bitzoom/) · [Developer Guide](https://wistrand.github.io/bitzoom/howto.html) · [Layout Comparison](https://wistrand.github.io/bitzoom/comparison.html)
 

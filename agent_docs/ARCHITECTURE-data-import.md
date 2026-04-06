@@ -75,8 +75,8 @@ The viewer integrates parsers via `parseAny` and the capability-classification h
 
 | Method | Purpose |
 |---|---|
-| `_readFileText(file)` | Gzip-aware file reader used by all load paths (loader panel, canvas drop, STIX). |
-| `_stageDroppedFiles(files)` | Routes dropped files. SNAP `.edges`/`.nodes` get explicit role routing (two-file workflow); everything else dispatches through `_handleFileSelect` → `detectFormat`. |
+| `_readFileText(file)` | Delegates to shared `readFileText()` from [bitzoom-parsers.js](../docs/bitzoom-parsers.js). Gzip-aware file reader used by all load paths. |
+| `_stageDroppedFiles(files)` | Delegates to shared `classifyFiles()` from [bitzoom-parsers.js](../docs/bitzoom-parsers.js). Reads files, detects formats, routes SNAP to `pendingEdgesText`/`pendingNodesText` and object formats to `pendingParsed`. |
 | `_handleFileSelect(file, hintType?)` | Reads file, calls `detectFormat`. Dispatches via `isSpecialFormat`/snap checks/`isObjectFormat`. Populates one of `pendingEdgesText`/`pendingNodesText`/`pendingParsed`. |
 | `loadFromParsed(parsed)` | Executes the object pipeline: calls `runPipelineFromObjects(GPU)` based on current GPU mode, feeds result into `_applyWorkerResult`. Stores `_lastParsed` for rebuild paths. |
 | `_executeCanvasLoad()` | Shared finalizer for canvas-drop loads (both SNAP pair and non-SNAP single-file). Calls the right pipeline, fires `_finalizeLoad(null)`. |

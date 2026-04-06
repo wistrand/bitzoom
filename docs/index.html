@@ -220,7 +220,7 @@
   <div class="props">
     <div class="prop">
       <div class="prop-title">Semantic layout</div>
-      <div class="prop-desc">Nodes positioned by what they are, with tunable topology influence.</div>
+      <div class="prop-desc">Nodes positioned by what they are, with tunable topology influence. Works with edges, nodes-only, or plain CSV.</div>
     </div>
     <div class="prop">
       <div class="prop-title">Instant zoom</div>
@@ -242,9 +242,14 @@
 </div>
 
 
+<style>
+  bz-graph:not(:defined) { visibility: hidden; }
+  #demo-graph { height: 420px; border-radius: 0 0 8px 8px; }
+</style>
+
 <div class="demo-wrap">
   <div class="demo-bar">
-    <span>Live demo. Scroll to zoom. Drag to pan. Click to select.</span>
+    <span>Live demo. Scroll to zoom. Drag to pan. r/R for compass/controls. Drop any file &mdash; CSV, JSON, GraphML, GEXF, SNAP, STIX.</span>
     <div style="display:flex;gap:8px;align-items:center">
       <label for="demo-dataset" class="sr-only">Dataset</label>
       <select id="demo-dataset" aria-label="Dataset">
@@ -255,53 +260,53 @@
       </select>
     </div>
   </div>
-  <canvas id="demo-canvas" style="width:100%;height:420px;display:block;background:var(--bg)"></canvas>
+  <bz-graph id="demo-graph" drop-zone
+            edges="data/epstein.edges" nodes="data/epstein.nodes"
+            level="3" heatmap="density" edge-mode="curves"
+            strengths="group:8,edgetype:4" label-props="label">
+  </bz-graph>
 </div>
 
-
 <script type="module">
-import { createBitZoomView } from './bitzoom.js';
+import './bz-graph.js';
 
 const PRESETS = {
-  'epstein':        { initialLevel: 3, strengths: { group: 8, edgetype: 4 }, labelProps: ['label'] },
-  'karate':{ initialLevel: 3 },
-  'bitzoom-source': { initialLevel: 4, strengths: { kind: 8, group: 3 }, labelProps: ['file', 'kind'] },
-  'mitre-attack':   { initialLevel: 4, strengths: { group: 5, platforms: 6, killchain: 4 }, labelProps: ['label'], quantMode: 'rank', edgeMode: 'none' },
+  'epstein':        { edges: 'data/epstein.edges', nodes: 'data/epstein.nodes', level: '3', strengths: 'group:8,edgetype:4', labelProps: 'label' },
+  'karate':         { edges: 'data/karate.edges', nodes: 'data/karate.nodes', level: '3', strengths: '', labelProps: '' },
+  'bitzoom-source': { edges: 'data/bitzoom-source.edges', nodes: 'data/bitzoom-source.nodes', level: '4', strengths: 'kind:8,group:3', labelProps: 'file,kind' },
+  'mitre-attack':   { edges: 'data/mitre-attack.edges', nodes: 'data/mitre-attack.nodes', level: '4', strengths: 'group:5,platforms:6,killchain:4', labelProps: 'label', edgeMode: 'none', quant: 'rank' },
 };
-
-let view = null;
-
-async function loadDemo(name) {
-  const [edgesRes, nodesRes] = await Promise.all([
-    fetch(`data/${name}.edges`),
-    fetch(`data/${name}.nodes`).catch(() => null),
-  ]);
-  const edgesText = await edgesRes.text();
-  let nodesText = null;
-  if (nodesRes && nodesRes.ok) nodesText = await nodesRes.text();
-
-  if (view) view.destroy();
-  const preset = PRESETS[name] || {};
-  view = createBitZoomView(document.getElementById('demo-canvas'), edgesText, nodesText, {
-    initialLevel: preset.initialLevel || 3,
-    edgeMode: preset.edgeMode || 'lines',
-    heatmapMode: 'density',
-    showLegend: true,
-    showResetBtn: true,
-    strengths: preset.strengths || {},
-    labelProps: preset.labelProps || [],
-    quantMode: preset.quantMode,
-  });
-}
 
 // Handle hash redirect: if URL has viewer params, redirect to viewer
 if (location.hash && location.hash.includes('d=')) {
   location.href = 'viewer.html' + location.hash;
-} else {
-  loadDemo('epstein');
 }
 
-document.getElementById('demo-dataset').addEventListener('change', e => loadDemo(e.target.value));
+function replaceGraph(attrs) {
+  const wrap = document.querySelector('.demo-wrap');
+  const old = document.getElementById('demo-graph');
+  if (old) old.remove();
+  const g = document.createElement('bz-graph');
+  g.id = 'demo-graph';
+  g.style.height = '420px';
+  g.style.borderRadius = '0 0 8px 8px';
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v) g.setAttribute(k, v);
+  }
+  wrap.appendChild(g);
+}
+
+document.getElementById('demo-dataset').addEventListener('change', e => {
+  const p = PRESETS[e.target.value];
+  if (!p) return;
+  replaceGraph({
+    edges: p.edges, nodes: p.nodes, level: p.level || '3',
+    heatmap: 'density', 'edge-mode': p.edgeMode || 'lines',
+    strengths: p.strengths, 'label-props': p.labelProps, quant: p.quant,
+  });
+});
+
+
 </script>
 
 </body>

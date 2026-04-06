@@ -120,9 +120,9 @@ class BzCompass extends HTMLElement {
       this._boundReadyHandler = null;
       this._boundTarget = null;
     }
-    if (this._boundView && this._boundOrigRender) {
-      this._boundView.render = this._boundOrigRender;
-      this._boundOrigRender = null;
+    if (this._boundView && this._boundBlendHandler) {
+      this._boundView.canvas.removeEventListener('statechange', this._boundBlendHandler);
+      this._boundBlendHandler = null;
     }
     if (this._onBoundInput) { this.removeEventListener('input', this._onBoundInput); this._onBoundInput = null; }
     if (this._onBoundAutotune) { this.removeEventListener('autotune', this._onBoundAutotune); this._onBoundAutotune = null; }
@@ -297,10 +297,10 @@ class BzCompass extends HTMLElement {
   // ─── Auto-bind to <bz-graph> via `for` attribute ─────────────────────────
 
   _bindToGraph(id) {
-    // Clean up previous binding — restore original render if patched
-    if (this._boundView && this._boundOrigRender) {
-      this._boundView.render = this._boundOrigRender;
-      this._boundOrigRender = null;
+    // Clean up previous binding
+    if (this._boundView && this._boundBlendHandler) {
+      this._boundView.canvas.removeEventListener('statechange', this._boundBlendHandler);
+      this._boundBlendHandler = null;
     }
     if (this._boundView) {
       this._boundView = null;
@@ -366,16 +366,9 @@ class BzCompass extends HTMLElement {
         if (btn) { btn.textContent = 'A'; btn.title = 'Auto-tune strengths and bearings'; }
       });
 
-      // Pull view changes → compass on each render
-      this._boundOrigRender = view.render.bind(view);
-      let lastSyncGen = -1;
-      view.render = (...args) => {
-        this._boundOrigRender(...args);
-        if (view._blendGen !== lastSyncGen) {
-          lastSyncGen = view._blendGen;
-          this._syncFromView();
-        }
-      };
+      // Pull view changes → compass after each statechange
+      this._boundBlendHandler = () => this._syncFromView();
+      view.canvas.addEventListener('statechange', this._boundBlendHandler);
     };
 
     // If the view is already ready, bind immediately; otherwise wait for 'ready' event
@@ -409,7 +402,13 @@ class BzCompass extends HTMLElement {
         const o = this._groups[i];
         return o && o.name === g.name && o.strength === g.strength && o.bearing === g.bearing && o.color === g.color;
       });
-    if (!same) this.groups = groups;
+    if (!same) {
+      if (this._groups.length === groups.length) {
+        this.updateAll(groups);
+      } else {
+        this.groups = groups;
+      }
+    }
   }
 
   // ─── Geometry helpers ────��───────────────────────────────────────────────────

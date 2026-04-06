@@ -43,5 +43,6 @@
   { "id": "ransomware", "name": "Ransomware",       "edges": "data/ransomware.edges.gz",      "nodes": "data/ransomware.nodes.gz",      "desc": "27K nodes, gangs+victims",
     "settings": { "strengths": { "group": 8, "topsector": 5, "topcountry": 4, "raas": 3, "victims": 2 }, "initialLevel": 4, "labelProps": ["label", "group"] } },
   { "id": "amazon",     "name": "Amazon",           "edges": "data/amazon-copurchase.edges.gz", "nodes": "data/amazon-copurchase.nodes.gz", "desc": "367K co-purchase",
-    "settings": { "strengths": { "group": 3 }, "smoothAlpha": 1.0, "initialLevel": 5, "labelProps": ["label", "group"] } }
+    "settings": { "strengths": { "group": 3 }, "smoothAlpha": 1.0, "initialLevel": 5, "labelProps": ["label", "group"] } },
+  { "id": "titanic",    "name": "Titanic",          "edges": "data/titanic.csv",                                                       "desc": "891 passengers (CSV)" }
 ]
