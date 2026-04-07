@@ -201,7 +201,7 @@ Two entry points, sharing code:
 
 1. **Manual: "Auto" button in the toolbar.** Click to start, click again to abort and apply best-so-far. Progress displayed as overlay on the canvas. After completion, weight sliders, alpha slider, quant button, and label checkboxes sync to reflect the tuned values. Click handler wrapped in try/catch so unexpected errors restore the button state and clear `_tuneAbort` rather than leaving a stuck "Stop" button.
 
-2. **Automatic: `_autoTuneFresh()` on load** — fired from `_finalizeLoad` when the dataset has no preset `settings` AND the URL hash doesn't carry explicit strengths (`params.st`). Shares the same abort controller and apply path as the manual button (`this._tuneAbort`, `this._applyTuneResult`). Users loading a curated preset (epstein, pokemon, mitre-attack) skip auto-tune entirely; users dropping a raw CSV get a meaningful first frame. After `autoTuneStrengths` completes, `autoTuneBearings` runs to optimize per-group rotations.
+2. **Automatic: `_autoTuneFresh()` on load** — fired from `_finalizeLoad` when the dataset has no preset `settings` AND the URL hash doesn't carry explicit strengths (`params.st`). Shares the same abort controller and apply path as the manual button (`this._tuneAbort`, `this._applyTuneResult`). Users loading a curated preset (epstein, pokemon, mitre-attack) skip auto-tune entirely; users dropping a raw CSV get a meaningful first frame. After `autoTuneStrengths` completes, `autoTuneBearings` runs to optimize per-group rotations. GPU/CPU mode switches (`_reloadCPU`, `_applyGPUToCurrentData`) do NOT trigger auto-tune — they re-project and re-blend with current settings only.
 
 ## Performance
 

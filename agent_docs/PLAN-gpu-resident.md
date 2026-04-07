@@ -91,11 +91,13 @@ Changes:
 
 ## Implementation status
 
-**Implemented then reverted.** Phases A, B, and C were fully implemented and profiled. The findings below show that the GPU compute dispatch itself — not readback — is the bottleneck on integrated GPUs. The phases were reverted because net savings were marginal (~120ms from skipping unpack, but the 241ms GPU kernel is irreducible). Interactive drag responsiveness was instead solved via **adaptive fast mode**: spatial subsampling (>50K nodes), adaptive blend passes (0-2), and edge suppression during drag. See `rebuildProjections(fast)` in `bitzoom-viewer.js`.
+**Phases A-C: implemented then reverted.** Net savings were marginal at the time.
 
-Key findings from profiling on Amazon (367K nodes, 988K edges, Intel integrated GPU):
+**Optimization round 2 (implemented):** Profiling infrastructure, interleaved anchor buffer, bind group cache, CSR adjacency cache. These changes reduced Amazon warm-blend from ~290ms to ~51ms in Deno tests. See details below.
 
-### Profiled breakdown (2 topology passes)
+Interactive drag responsiveness solved via **adaptive fast mode**: spatial subsampling (>50K nodes), adaptive blend passes (0-2), and edge suppression during drag. See `rebuildProjections(fast)` in `bitzoom-viewer.js`.
+
+### Phase A-C findings (historical, 2 topology passes)
 
 | Component | Time |
 |-----------|-----:|
@@ -105,105 +107,95 @@ Key findings from profiling on Amazon (367K nodes, 988K edges, Intel integrated 
 | Float32 readback (eliminated by Phase C) | ~15ms |
 | Node unpack loop (367K × 4 writes) | 108ms |
 
-### Key finding: GPU compute dispatch is the bottleneck
+The 241ms was measured before buffer caching and `_blending` guard. See revised analysis below.
 
-The `device.queue.submit` call blocks until GPU compute finishes. The readback (`mapAsync`) adds only ~15ms on top — not the 180ms originally estimated. The 241ms is dominated by the GPU topology smoothing kernel itself on integrated graphics.
+### Bugs discovered during Phase A-C
 
-Phase C's fast path (skip float32 readback, cached μ/σ) saves ~15ms readback + eliminates the need for the 108ms unpack loop if the renderer reads from the packed array directly. Net: ~120ms saved on the unpack, minimal saving on readback.
+- **Concurrent blend stalls**: Multiple `_blend()` calls overlapped when rAF fired while `mapAsync` was pending. Fixed with `_blending` guard in `BitZoomCanvas._blend()`.
+- **Shadow DOM event leak**: Native `input` events from `<input type="range">` inside `<bz-controls>` shadow DOM bubble without `e.detail`. Fixed with `if (!e.detail) return`.
 
-### Actual performance
+### Optimization round 2: profiling + caching (implemented)
 
-| Config | Time | FPS |
-|--------|-----:|----:|
-| CPU 2-pass | 460ms | 2.2 |
-| GPU full path (first blend) | 423ms | 2.4 |
-| GPU fast path (cached μ/σ) | 248ms | 4.0 |
-| GPU fast path theoretical (skip unpack) | ~140ms | ~7 |
+Fine-grained profiling added to `gpuBlend` (`setGpuBlendProfiling(true)`) with per-phase timing: anchor compute, CSR build, buffer upload, bind group creation, GPU dispatch, GPU fence (`onSubmittedWorkDone`), map (DMA readback), deinterleave.
 
-### Concurrency bug discovered
+**Optimizations applied:**
+1. **Interleaved anchor buffer** — single `propAnchors` replaces `propPx`+`propPy`. One `writeBuffer` instead of two, better GPU cache locality. WGSL shader updated (6 bindings instead of 7).
+2. **Bind group cache** — `bgAtoB`/`bgBtoA` stored in blend cache, only recreated on dataset change.
+3. **CSR adjacency cache** — `adjOffsetsArr`/`adjTargetsArr` cached; skipped when N unchanged. Eliminates the 170-250ms CSR rebuild that dominated warm blends.
 
-Multiple `_blend()` calls can overlap when the rAF gate fires a new blend while the previous `mapAsync` is still pending, causing "Buffer mapping is already pending" errors. Fixed with a `_blending` guard flag in `BitZoomCanvas._blend()`.
+### Deno test results (Amazon, 367K nodes, 988K edges, 5 passes, Intel iGPU)
 
-### Shadow DOM event leak
+| Component | Cold | Warm |
+|-----------|-----:|-----:|
+| Anchor compute | 32ms | 30ms |
+| CSR build | 246ms | **0ms** |
+| Buffer upload | 7ms | 4ms |
+| Bind group create | 0.1ms | **0ms** |
+| GPU dispatch | 4ms | 2ms |
+| GPU fence | 15ms | 14ms |
+| Map (DMA) | 17ms | 16ms |
+| Deinterleave | 1ms | 1ms |
+| **Total** | **309ms** | **53ms** |
 
-Native `input` events from `<input type="range">` inside `<bz-controls>` shadow DOM bubble up to the host without `e.detail`, crashing the viewer's input handler. Fixed with `if (!e.detail) return` guard.
+### Browser results (Amazon, Firefox, Intel iGPU, Canvas 2D rendering)
 
-### Original conclusion (now revised)
+Browser `mapAsync` is significantly slower than Deno due to driver overhead:
 
-Original assessment: 16fps at 367K not achievable, GPU compute kernel takes 241ms, irreducible. Phases reverted, replaced with adaptive fast mode (subsampling + adaptive passes + edge suppression).
+| Component | Typical | GPU stall | Best case |
+|-----------|--------:|----------:|----------:|
+| Anchor compute | 20-40ms | 20-40ms | 20ms |
+| CSR build | **0ms** | **0ms** | **0ms** |
+| GPU fence | 40-90ms | 451-482ms | 19ms |
+| Map (DMA) | **~104ms** | 15-28ms | **104ms** |
+| **Total** | 160-260ms | 490-540ms | 130ms |
 
-### Revised analysis: the 241ms is likely inflated
+**Key finding: browser `mapAsync` has a ~104ms floor** regardless of GPU kernel time. When the fence wait is long (GPU backed up), map is fast (work already done). When fence is fast, map is slow. The fence+map sum is roughly constant at ~130-170ms in typical cases, with spikes to 500ms during GPU contention. This 104ms floor does not exist in Deno (15ms) — it's browser WebGPU driver overhead (likely an extra DMA synchronization step).
 
-The profiling was done during a period of known bugs:
-- **No buffer cache** — 8 buffers created per blend, 1-5ms each on iGPU = 8-40ms overhead
-- **No `_blending` guard** — concurrent `mapAsync` calls serialized the pipeline
-- **Bind groups recreated every blend** — 2 `createBindGroup` calls per blend (still the case)
+**The GPU kernel itself is fast**: fence time of 14-19ms in Deno, 19-90ms typical in browser (5 passes over 367K nodes). This confirms the GPU architect's prediction of 5-20ms for the kernel alone.
 
-Back-of-envelope: 2 topology passes over 367K nodes, 988K edges = ~32MB memory traffic. Intel iGPU bandwidth ~30-50 GB/s → theoretical kernel time ~1ms. Even with cache misses from random neighbor access, 5-20ms is expected, not 241ms. The 241ms likely includes driver overhead from buffer allocation and pipeline stalls that the buffer cache and `_blending` guard eliminated.
+### Practical implications
 
-**The profiling was never re-run after these fixes.**
+| Scale | GPU blend (browser) | CPU fast mode | Winner |
+|-------|--------------------:|--------------:|--------|
+| <50K nodes | ~130ms | ~22ms (full 5-pass) | CPU — fast mode not needed |
+| 50-200K | ~150ms | ~22ms (subsample) | CPU fast mode for drag, GPU for release |
+| 367K (Amazon) | 160-540ms | ~22ms (subsample) | CPU fast mode for drag, GPU for release |
 
-### Current GPU blend implementation issues
+The 104ms `mapAsync` floor makes GPU blend non-competitive for interactive drag at any scale in current browsers. GPU blend is best used for the final full-quality blend on mouse release.
 
-Verified against `bitzoom-gpu.js`:
-
-1. **Separate `propPx`/`propPy` buffers** (lines 503-504). Two storage buffers, two `writeBuffer` calls. The shader already uses interleaved `posIn[j * 2u]` for neighbor reads. Interleaving anchors would halve upload API calls and improve cache locality.
-
-2. **Single read buffer with sync stall** (line 510). One `MAP_READ` buffer, `mapAsync` every blend = full pipeline flush. A ring of 2-3 read buffers would let the GPU work ahead while the CPU reads a completed buffer. The `_blending` guard prevents overlap, so the CPU blocks every time.
-
-3. **Bind groups recreated every blend** (lines 631-654). Two `createBindGroup` calls per blend. Buffers are cached but bind groups aren't — wasted driver allocation. Should be cached alongside buffers.
-
-4. **Non-coalesced neighbor access** (lines 445-449). `adjTargets[e]` → random node index → `posIn[j * 2u]` = random cache-line read. This is the textbook L2-thrashing pattern on integrated GPUs. Partially mitigable by sorting nodes by degree (high-degree hubs first) so heavy gather operations hit warm cache lines.
-
-### Recommended next steps (if revisiting GPU performance)
-
-**Low effort, high impact:**
-
-| # | Change | Effort | Expected impact |
-|---|--------|--------|----------------|
-| 1 | Re-profile with buffer cache + `_blending` guard | 10 min | Establishes true baseline (predicted 80-120ms) |
-| 2 | Interleave `propPx`/`propPy` into single buffer | ~30 lines | Halves anchor upload, better GPU cache |
-| 3 | Cache bind groups alongside buffers | ~20 lines | Eliminates 2 `createBindGroup` per blend |
+### Recommended next steps
 | 4 | Read buffer ring (2-deep) | ~40 lines | Eliminates `mapAsync` stall, 1-frame latency |
 
 **Medium effort:**
 
 | # | Change | Effort | Expected impact |
 |---|--------|--------|----------------|
-| 5 | `GPUQuerySet` timestamp profiling | ~50 lines | Isolates kernel time vs dispatch vs sync |
-| 6 | Degree-sorted CSR | ~50 lines | Better cache locality for scatter-gather |
-| 7 | CSR-Adaptive (two pipelines) | ~150 lines | Warp-level reduction for hub nodes; needs `subgroups` (Chrome 128+) |
-
-**Long term:**
+**Remaining optimizations (not yet implemented):**
 
 | # | Change | Effort | Expected impact |
 |---|--------|--------|----------------|
-| 8 | Single WebGPU render + compute pipeline | ~1200 lines (rewrite GL renderer) | Zero readback, zero interop; eliminates WebGL↔WebGPU split |
+| 5 | `GPUQuerySet` timestamp profiling | ~50 lines | Hardware-level kernel timing, more precise than `onSubmittedWorkDone` |
+| 6 | Degree-sorted CSR | ~50 lines | Better cache locality for scatter-gather |
+| 7 | CSR-Adaptive (two pipelines) | ~150 lines | Warp-level reduction for hub nodes; needs `subgroups` (Chrome 128+) |
+| 8 | GPU anchor computation | ~100 lines | Move 20-40ms CPU anchor loop to GPU compute shader |
+| 9 | Single WebGPU render + compute pipeline | ~1200 lines | Zero readback; eliminates the 104ms `mapAsync` floor entirely |
 
-Items 1-4 could plausibly bring the GPU path to 60-100ms on the same Intel iGPU, making it competitive with CPU at 50K+ nodes and potentially eliminating the need for fast-mode subsampling on moderate datasets (50K-200K).
+Item 9 is the only way to eliminate the browser `mapAsync` bottleneck. All other optimizations are bounded by the ~104ms DMA floor.
 
 ### Current shipping solution
 
-Adaptive fast mode is the correct shipping approach today:
+Adaptive fast mode for interactive drag (correct approach given browser WebGPU overhead):
 - Spatial subsampling (>50K nodes): 16×16 grid, degree-weighted, ~20-50K sample
 - Adaptive blend passes: 0-2, budget system with ceiling lock
 - Edge suppression: `_skipEdgeBuild` stays true for entire drag session
 - Full 5-pass blend + layout + edge build on mouse release
 - Below 50K: always full blend, no fast mode
-
-## Dependencies
-
-- Phase A requires WebGPU compute (already available)
-- Phase B requires Phase A
-- Phase C requires Phase A, uses μ/σ recomputed each blend
-- All phases require `device` and `blendPipeline` from existing [bitzoom-gpu.js](../docs/bitzoom-gpu.js)
+- GPU blend used for final quality blend on release, not interactive drag
 
 ## Risks
 
 | Risk | Mitigation |
 |------|-----------|
-| GL renderer buffer split adds complexity | Position-only updates are a clean separation; attribute updates are infrequent |
-| Rank quantization needs GPU radix sort | Keep CPU fallback; gaussian is default and more common |
-| Hit testing needs CPU positions | Read back on click only (single node lookup, not full array) |
+| Browser `mapAsync` overhead (~104ms floor) | CPU fast mode for interactive drag; GPU only on release |
 | Not all browsers support WebGPU | Existing CPU + WebGL2 paths remain as fallback |
 | `subgroups` not universally available | CSR-Adaptive (#7) is optional; basic kernel works without it |

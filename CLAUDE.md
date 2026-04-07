@@ -40,12 +40,12 @@ docs/                    Web app (ES modules, no build step)
   stix2snap.js             STIX 2.1 bundle parser (parseSTIX, browser-compatible)
   bitzoom-renderer.js      Canvas 2D rendering, heatmaps, hit testing, FPS counter (1111 lines)
   bitzoom-gl-renderer.js   WebGL2 rendering — shaders, instanced draw, GPU heatmap (1249 lines)
-  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, statechange/blend events (1732 lines)
-  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, <bz-controls> sidebar, compass panel, auto-tune-on-load (2302 lines)
+  bitzoom-canvas.js        Standalone embeddable component — canvas, interaction, rendering, statechange/blend events (1774 lines)
+  bitzoom-viewer.js        BitZoom app (composes BitZoomCanvas) — UI, workers, data loading, <bz-controls> sidebar, compass panel, auto-tune-on-load (2391 lines)
   bitzoom-utils.js         Auto-tune optimizer — dual-pass search, bearing autotune, portable async, memoization (629 lines)
   bitzoom-svg.js           SVG export — exportSVG(bz, opts), createSVGView() for headless (622 lines)
   bitzoom-colors.js        Color schemes (vivid, viridis, plasma, etc.)
-  bitzoom-gpu.js           WebGPU compute acceleration (671 lines)
+  bitzoom-gpu.js           WebGPU compute acceleration (763 lines)
   bitzoom-worker.js        Web Worker coordinator (142 lines)
   bitzoom-proj-worker.js   Web Worker projection (95 lines)
   bz-graph.js              <bz-graph> web component — data loading, drop zone, built-in compass/controls panels (433 lines)
@@ -145,7 +145,7 @@ Drop any of these files onto the canvas or loader panel, or load them via URL �
 - **Adaptive rendering** — edge sampling scales with visible nodes; labels/counts hide at high density, appear on zoom-in; node opacity scales with importance. Label truncation length quantized to 4px `cellPx` steps to prevent jitter during smooth zoom.
 - **Zoom target highlight** — during scroll-wheel zoom-in, the zoom target (`zoomTargetId`) gets the same highlight treatment as hovered nodes (full label, glow, full opacity). Target selection prefers `hitTest` (cursor over circle/label) with `_nearestItem` fallback. On level change, tracks the dominant member of the old supernode to the new level. Cleared on zoom-out.
 - **5-layer render order** — edges → heatmap → highlighted edges → circles → labels. WebGL2 renders geometry layers (grid through circles); Canvas 2D overlay handles text (labels, legend, reset button).
-- **GPU tri-state** — viewer GPU button cycles Auto → GPU → CPU. Auto (default) uses adaptive thresholds: GPU projection when N×G > 2000, GPU blend when N > 50K. GPU forces all operations to GPU; CPU forces all to CPU.
+- **GPU tri-state** — viewer GPU button cycles Auto → GPU → CPU. Auto (default) uses adaptive thresholds: GPU projection when N×G > 2000, GPU blend when N > 50K. GPU forces all operations to GPU; CPU forces all to CPU. Mode switches re-project with the target pipeline but preserve current strengths/bearings/alpha/level/zoom — no auto-tune trigger, no settings reset.
 - **Async initial blend** — `createBitZoomView()` returns synchronously; initial blend kicks off async (GPU probe → blend → render). Callers get a ready view immediately; first render completes in background.
 - **FPS counter** — toggle with F key or click top-left corner. Shows max fps (from render time), ms, and mode (CPU/GPU/Auto). During fast mode shows `fast[Np]` suffix.
 - **Fast mode** — interactive drag on large datasets (>50K nodes) uses adaptive blend passes (0-2, budget system with ceiling lock) and spatial subsampling (16×16 grid from gx/gy, degree-weighted, ~20-50K sample). Edges suppressed via `_skipEdgeBuild` flag (stays true for entire drag session). Full 5-pass blend + layout + edge build on release. Below 50K nodes, drag always uses full blend.

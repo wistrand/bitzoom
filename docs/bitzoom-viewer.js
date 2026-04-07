@@ -6,12 +6,12 @@ import {
 } from './bitzoom-algo.js';
 import { generateGroupColors } from './bitzoom-colors.js';
 import { autoTuneStrengths, autoTuneBearings } from './bitzoom-utils.js';
-import { initGPU, computeProjectionsGPU } from './bitzoom-gpu.js';
+import { initGPU, computeProjectionsGPU, setGpuBlendProfiling } from './bitzoom-gpu.js';
 import { isWebGL2Available } from './bitzoom-gl-renderer.js';
 import { exportSVG } from './bitzoom-svg.js';
 
 import { BitZoomCanvas } from './bitzoom-canvas.js';
-import { computeNodeSig, runPipelineGPU, runPipelineFromObjects, runPipelineFromObjectsGPU, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
+import { computeNodeSig, runPipeline, runPipelineGPU, runPipelineFromObjects, runPipelineFromObjectsGPU, parseEdgesFile, parseNodesFile, buildGraph, computeProjections } from './bitzoom-pipeline.js';
 import { parseAny, detectFormat, isObjectFormat, FILE_ACCEPT_ATTR, readFileText, classifyFiles } from './bitzoom-parsers.js';
 
 // HTML-escape user-derived strings to prevent XSS from crafted SNAP files.
@@ -1438,18 +1438,34 @@ class BitZoom {
         }
     }
 
-    /** Full reload with CPU pipeline and dataset settings. */
+    /** Re-pipeline current data with CPU projections, preserving user settings.
+     *  Mirrors _applyGPUToCurrentData but uses CPU projection path. */
     async _reloadCPU() {
-        console.log('[CPU] Reloading with CPU pipeline...');
-        if (this._lastParsed) {
-            await this.loadFromParsed(this._lastParsed);
-        } else if (this._lastEdgesText) {
-            await this.loadGraph(this._lastEdgesText, this._lastNodesText);
-        } else {
-            return;
+        if (!this._lastEdgesText && !this._lastParsed) return;
+        const v = this.view;
+        console.log('[CPU] Re-projecting current data, proj=CPU');
+        v.showProgress('Re-projecting (CPU)...');
+        try {
+            const result = this._lastParsed
+                ? runPipelineFromObjects(this._lastParsed.nodes, this._lastParsed.edges, this._lastParsed.extraPropNames)
+                : runPipeline(this._lastEdgesText, this._lastNodesText);
+            const G = result.groupNames.length;
+            for (let i = 0; i < v.nodes.length; i++) {
+                for (let g = 0; g < G; g++) {
+                    const off = (i * G + g) * 2;
+                    const p = v.nodes[i].projections[result.groupNames[g]];
+                    if (p) { p[0] = result.projBuf[off]; p[1] = result.projBuf[off + 1]; }
+                }
+            }
+            v._quantStats = {};
+            v._progressText = null;
+            await this.rebuildProjections();
+            this._updateOverview();
+        } catch (err) {
+            v._progressText = null;
+            v.render();
+            this._showError('CPU Pipeline Error', err.message);
         }
-        const ds = this._currentDatasetId ? DATASETS.find(d => d.id === this._currentDatasetId) : null;
-        this._finalizeLoad(ds);
     }
 
     async loadDataset(dataset) {
@@ -2312,10 +2328,11 @@ window.bz = bz;
   bz._gpuMode = 'auto';
   try {
     const gpuOk = await initGPU();
+    if (gpuOk) setGpuBlendProfiling(true);
     const gpuBtn = document.getElementById('gpuBtn');
     if (gpuOk) {
       bz.view.useGPU = true;
-      console.log('[GPU] WebGPU available — auto mode');
+      console.log('[GPU] WebGPU available — auto mode, blend profiling enabled');
       if (gpuBtn) { gpuBtn.textContent = 'Auto'; gpuBtn.style.background = 'var(--accent)'; gpuBtn.style.color = '#fff'; }
     } else {
       console.log('[GPU] WebGPU not available — CPU only');
