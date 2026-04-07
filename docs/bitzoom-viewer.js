@@ -906,7 +906,9 @@ class BitZoom {
         const groups = v.groupNames.map(g => ({
             name: g, strength: v.propStrengths[g] || 0, bearing: v.propBearings[g] || 0,
         }));
-        if (controls.groups.length === groups.length) {
+        const namesMatch = controls.groups.length === groups.length &&
+            controls.groups.every((g, i) => g.name === groups[i].name);
+        if (namesMatch) {
             controls.updateAll(groups);
         } else {
             controls.groups = groups;
@@ -950,10 +952,13 @@ class BitZoom {
                 bearing: v.propBearings[g] || 0,
             };
         });
-        if (widget.groups.length === groups.length) {
+        // Full rebuild if group count or names changed (different dataset)
+        const namesMatch = widget.groups.length === groups.length &&
+            widget.groups.every((g, i) => g.name === groups[i].name);
+        if (namesMatch) {
             widget.updateAll(groups);
         } else {
-            widget.groups = groups; // group count changed (new dataset) — full rebuild
+            widget.groups = groups;
         }
     }
 

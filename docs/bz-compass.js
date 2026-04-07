@@ -548,8 +548,8 @@ class BzCompass extends HTMLElement {
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Label (auto-abbreviate to fit)
-      const lx = cx + (R + LABEL_PAD * dpr) * Math.cos(a);
+      // Label (auto-abbreviate to fit, nudge to stay within canvas)
+      let lx = cx + (R + LABEL_PAD * dpr) * Math.cos(a);
       const ly = cy + (R + LABEL_PAD * dpr) * Math.sin(a);
       ctx.fillStyle = fg;
       ctx.globalAlpha = 0.7;
@@ -562,6 +562,15 @@ class BzCompass extends HTMLElement {
         name = name.slice(0, -1);
       }
       if (name !== this._groups[i].name) name += '…';
+      // Nudge label inward if it would clip the canvas edge
+      const tw = ctx.measureText(name).width;
+      const margin = 2 * dpr;
+      if (ctx.textAlign === 'left' && lx + tw > w - margin) lx = w - margin - tw;
+      else if (ctx.textAlign === 'right' && lx - tw < margin) lx = margin + tw;
+      else if (ctx.textAlign === 'center') {
+        if (lx - tw / 2 < margin) lx = margin + tw / 2;
+        else if (lx + tw / 2 > w - margin) lx = w - margin - tw / 2;
+      }
       ctx.fillText(name, lx, ly);
       ctx.globalAlpha = 1;
     }
