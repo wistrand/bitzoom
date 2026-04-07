@@ -333,7 +333,7 @@ class BzCompass extends HTMLElement {
             _rebuildPending = false;
             view._quantStats = {};
             view.levels = new Array(view.levels.length).fill(null);
-            view._blend().then(() => { view.layoutAll(); view.render(); });
+            view._blend(true).then(() => { view.layoutAll(); view.render(); });
           });
         }
       });

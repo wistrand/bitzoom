@@ -140,6 +140,12 @@ class BitZoom {
 
     // ─── URL hash state ────────────────────────────────────────────────────────
 
+    // ─── URL hash: compact positional format ──────────────────────────────────
+    // Settings use group-order positional arrays (groupNames order is stable per
+    // dataset). Format: st=5,0,8,0  b=28.6,0,0,0  lp=0,2  cb=1
+    // All settings are serialized together — if any is present, all are present.
+    // This eliminates partial-state bugs entirely.
+
     _serializeHash() {
         const v = this.view;
         const parts = [];
@@ -155,27 +161,31 @@ class BitZoom {
         parts.push(`y=${v.pan.y.toFixed(0)}`);
         parts.push(`bl=${v.baseLevel}`);
         if (v.selectedId) parts.push(`s=${encodeURIComponent(v.selectedId)}`);
-        // Strengths (per-group, non-default only)
-        if (v.propStrengths) {
-            const strengthEntries = [];
-            for (const g of v.groupNames) {
-                const s = v.propStrengths[g];
-                if (s) strengthEntries.push(`${encodeURIComponent(g)}:${Math.round(s * 10) / 10}`);
-            }
-            if (strengthEntries.length) parts.push(`st=${strengthEntries.join(',')}`);
-        }
-        // Bearings (per-group rotation in degrees, integer-rounded). Only serialize
-        // non-zero entries to keep the hash compact; absent entries default to 0.
-        if (v.propBearings) {
-            const bearingEntries = [];
-            for (const g of v.groupNames) {
-                const rad = v.propBearings[g];
-                if (rad) {
-                    const deg = Math.round((rad * 180 / Math.PI) % 360);
-                    if (deg !== 0) bearingEntries.push(`${encodeURIComponent(g)}:${deg}`);
+        // All settings as a block — positional arrays keyed by groupNames order
+        if (v.groupNames && v.groupNames.length) {
+            const G = v.groupNames.length;
+            // Strengths: positional, 3 decimals
+            const st = new Array(G);
+            for (let i = 0; i < G; i++) st[i] = Math.round((v.propStrengths[v.groupNames[i]] || 0) * 1000) / 1000;
+            parts.push(`st=${st.join(',')}`);
+            // Bearings: positional, degrees, 2 decimals (0.01° ≈ 0.00017 rad)
+            const bd = new Array(G);
+            for (let i = 0; i < G; i++) bd[i] = Math.round(((v.propBearings[v.groupNames[i]] || 0) * 180 / Math.PI) * 100) / 100;
+            parts.push(`b=${bd.join(',')}`);
+            // Alpha: 3 decimals
+            parts.push(`a=${Math.round(v.smoothAlpha * 1000) / 1000}`);
+            // Color-by: group index, -1 = auto
+            const cbIdx = v.colorBy ? v.groupNames.indexOf(v.colorBy) : -1;
+            parts.push(`cb=${cbIdx}`);
+            // Label props: comma-separated group indices
+            if (v.labelProps && v.labelProps.size) {
+                const lpIdx = [];
+                for (const p of v.labelProps) {
+                    const idx = v.groupNames.indexOf(p);
+                    if (idx >= 0) lpIdx.push(idx);
                 }
+                parts.push(`lp=${lpIdx.join(',')}`);
             }
-            if (bearingEntries.length) parts.push(`b=${bearingEntries.join(',')}`);
         }
         return parts.join('&');
     }
@@ -196,15 +206,19 @@ class BitZoom {
         if (!hash) return null;
         const params = {};
         for (const part of hash.split('&')) {
-            const [k, val] = part.split('=');
-            if (k && val !== undefined) params[k] = decodeURIComponent(val);
+            const eq = part.indexOf('=');
+            if (eq > 0) params[part.slice(0, eq)] = decodeURIComponent(part.slice(eq + 1));
         }
         return params;
     }
 
+    /** Apply all hash state. When settings (st) are present, ALL settings are
+     *  restored authoritatively and a full blend + layout + render is performed.
+     *  Returns a promise so callers can await the blend. */
     _applyHashState(params) {
         if (!params || !this.dataLoaded) return;
         const v = this.view;
+        // View state
         if (params.l !== undefined) v.currentLevel = parseInt(params.l) || 0;
         if (params.bl !== undefined) v.baseLevel = parseInt(params.bl) || 0;
         if (params.z !== undefined) v.zoom = parseFloat(params.z) || 1;
@@ -215,58 +229,111 @@ class BitZoom {
             const n = v.nodeIndexFull[params.s];
             if (n) this._showDetail({ type: 'node', item: n });
         }
-        // Strengths: `st=group:5,kind:8`
-        if (params.st) {
-            for (const entry of params.st.split(',')) {
-                const [g, val] = entry.split(':');
-                if (g && val !== undefined) {
-                    const key = decodeURIComponent(g);
-                    if (v.groupNames.includes(key)) {
-                        v.propStrengths[key] = parseFloat(val) || 0;
-                    }
-                }
+        // Settings block: if `st` is present, all settings are authoritative.
+        // Positional arrays must match the dataset's group count — reject stale hashes.
+        const hasSettings = params.st !== undefined;
+        if (hasSettings) {
+            const G = v.groupNames.length;
+            const stVals = params.st.split(',').map(s => parseFloat(s) || 0);
+            const bVals = params.b ? params.b.split(',').map(s => parseFloat(s) || 0) : [];
+            if (stVals.length !== G || (bVals.length && bVals.length !== G)) {
+                console.warn(`[hash] settings length mismatch: st=${stVals.length} b=${bVals.length} groups=${G} — ignoring settings`);
+                this._updateStepperUI();
+                v.layoutAll();
+                v.render();
+                return;
             }
-        }
-        // Bearings: `b=group:90,platform:45` — degrees, absent = 0
-        let bearingsChanged = false;
-        if (params.b) {
+            // Strengths: positional array
+            for (let i = 0; i < G; i++) v.propStrengths[v.groupNames[i]] = stVals[i] || 0;
+            // Bearings: positional array, degrees → radians
             const obj = {};
-            for (const entry of params.b.split(',')) {
-                const [g, deg] = entry.split(':');
-                if (g && deg !== undefined) {
-                    const key = decodeURIComponent(g);
-                    if (v.groupNames.includes(key)) {
-                        obj[key] = (parseFloat(deg) || 0) * Math.PI / 180;
-                    }
+            for (let i = 0; i < G; i++) obj[v.groupNames[i]] = (bVals[i] || 0) * Math.PI / 180;
+            v.bulkSetBearings(obj);
+            // Alpha
+            v.smoothAlpha = params.a !== undefined ? (parseFloat(params.a) || 0) : 0;
+            document.getElementById('nudgeSlider').value = v.smoothAlpha;
+            document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
+            // Color-by: group index, -1 or absent = auto
+            const cbIdx = params.cb !== undefined ? parseInt(params.cb) : -1;
+            v.colorBy = (cbIdx >= 0 && cbIdx < G) ? v.groupNames[cbIdx] : null;
+            // Label props: group indices
+            v.labelProps.clear();
+            if (params.lp) {
+                for (const s of params.lp.split(',')) {
+                    const idx = parseInt(s);
+                    if (idx >= 0 && idx < G) v.labelProps.add(v.groupNames[idx]);
                 }
             }
-            if (Object.keys(obj).length) {
-                v.bulkSetBearings(obj);
-                bearingsChanged = true;
-            }
+            // Full rebuild: blend + layout + render
+            v._refreshPropCache();
+            this._updateStepperUI();
+            this._updateColorByUI();
+            return v._blend().then(() => {
+                v.layoutAll();
+                this._updateAlgoInfo();
+                this._updateOverview();
+                this._syncControls();
+                v.render();
+            });
         }
+        // No settings — just view state (pan/zoom/level)
         this._updateStepperUI();
-        // If bearings were restored, trigger a re-blend so the layout reflects them.
-        // Otherwise just a layout + render (no projection change).
-        if (bearingsChanged) {
-            v._blend().then(() => { v.layoutAll(); this._updateAlgoInfo(); this._updateOverview(); v.render(); });
-        } else {
-            v.layoutAll();
-            this._updateAlgoInfo();
-            this._updateOverview();
-            v.render();
-        }
+        v.layoutAll();
+        v.render();
     }
 
     // ─── Algorithm wrappers ────────────────────────────────────────────────────
 
-    async rebuildProjections() {
+    async rebuildProjections(fast = false) {
         const v = this.view;
-        v._refreshPropCache();
-        v.levels = new Array(ZOOM_LEVELS.length).fill(null);
-        await v._blend();
-        v.layoutAll();
-        v.render();
+        v._quantStats = {}; // refreeze Gaussian boundaries from new distribution
+        v._refreshPropCache(); // also invalidates levels
+
+        // Blend ALL nodes — valid topology even at α > 0.
+        // Only use fast (adaptive passes) for large datasets where blend is expensive.
+        const useFast = fast && v.nodes.length > 50000;
+        await v._blend(useFast);
+
+        if (useFast) {
+            // Level build is the bottleneck (~330ms at 367K). Subsample for
+            // level build + render only — the blend already ran on all nodes
+            // so gx/gy are correct. Fewer nodes → fewer supernodes → fast frame.
+            if (!v._sampleNodes) {
+                const targetN = Math.max(20000, Math.min(50000, v.nodes.length));
+                // Spatial grid sampling from current gx/gy: 16×16 grid,
+                // degree-weighted within each cell, min 1 per occupied cell.
+                const shift = 16 - 4;
+                const cells = new Map();
+                for (const n of v.nodes) {
+                    const key = ((n.gx >> shift) << 4) | (n.gy >> shift);
+                    if (!cells.has(key)) cells.set(key, []);
+                    cells.get(key).push(n);
+                }
+                for (const arr of cells.values()) arr.sort((a, b) => b.degree - a.degree);
+                v._sampleNodes = [];
+                for (const [, arr] of cells) {
+                    const take = Math.max(1, Math.round(arr.length * targetN / v.nodes.length));
+                    for (let i = 0; i < Math.min(take, arr.length); i++) v._sampleNodes.push(arr[i]);
+                }
+            }
+            // Swap nodes for level build + render only; skip edges entirely.
+            // Suppress edge build scheduling during getLevel by setting a flag.
+            const fullNodes = v.nodes;
+            const savedEdgeMode = v.edgeMode;
+            v.nodes = v._sampleNodes;
+            v.edgeMode = 'none';
+            v._skipEdgeBuild = true; // stays true until full rebuild on release
+            v.layoutAll();
+            v.render();
+            // Cancel any edge build that snuck through
+            if (v._edgeBuildRaf) { cancelAnimationFrame(v._edgeBuildRaf); v._edgeBuildRaf = null; }
+            v.edgeMode = savedEdgeMode;
+            v.nodes = fullNodes;
+        } else {
+            v.layoutAll();
+            v.render();
+            if (!fast) { v._sampleNodes = null; v._skipEdgeBuild = false; }
+        }
     }
 
     // ─── Navigation ─────────────────────────────────────────────────────────────
@@ -829,7 +896,7 @@ class BitZoom {
 
     _scheduleRebuild() {
         if (this.rebuildTimer) return;
-        this.rebuildTimer = requestAnimationFrame(async () => { this.rebuildTimer = null; await this.rebuildProjections(); this._updateColorByUI(); });
+        this.rebuildTimer = requestAnimationFrame(async () => { this.rebuildTimer = null; await this.rebuildProjections(true); this._updateColorByUI(); });
     }
 
     _syncControls() {
@@ -1217,14 +1284,10 @@ class BitZoom {
         this._currentNodesUrl = null;
 
         document.getElementById('node-panel').classList.remove('open');
-        document.getElementById('loader-screen').classList.add('hidden');
-        document.getElementById('sidebar').style.display = '';
-        const canvasEl = document.getElementById('canvas');
-        canvasEl.style.display = 'block';
-        if (canvasEl.parentElement && canvasEl.parentElement !== document.body) {
-            canvasEl.parentElement.style.display = ''; // show GL wrapper
-        }
-        document.getElementById('loadNewBtn').style.display = '';
+        // Keep loader screen visible and sidebar hidden until _finalizeLoad
+        // completes blend + render. Prevents flash of sidebar-without-canvas
+        // and unblended nodes at (0,0).
+        document.getElementById('sidebar').style.display = 'none';
         history.replaceState(null, '', location.pathname);
 
         // Initial level is picked in _finalizeLoad AFTER blending/quantization
@@ -1266,14 +1329,31 @@ class BitZoom {
             // Restore hash state: use saved initial params on first load, live hash after
             const params = this._initialHashParams || this._restoreFromHash();
             this._initialHashParams = null; // consumed
-            // Skip auto-tune if the user brought explicit strengths (`w=`) or
-            // bearings (`b=`) in the URL hash — they have a specific view they
-            // want to reproduce exactly.
-            const hasHashStrengths = params && params.d === dataset?.id && (params.st || params.b);
-            if (params && params.d === dataset?.id) {
-                this._applyHashState(params);
+            // Does the hash match the loaded dataset? Curated: d=id. URL: edges=url.
+            const hashMatchesDataset = params && (
+                (params.d && params.d === dataset?.id) ||
+                (params.edges && params.edges === this._currentEdgesUrl)
+            );
+            // Skip auto-tune if the hash carries settings (st= implies all
+            // settings are present) — user has a specific view to reproduce.
+            const hasHashSettings = hashMatchesDataset && params.st !== undefined;
+            if (hashMatchesDataset) {
+                await this._applyHashState(params);
                 v.render();
             }
+            // Reveal everything together after blend + layout are done.
+            // The loader screen covered the canvas area; now swap in one
+            // repaint: hide loader, show canvas + sidebar + load button.
+            document.getElementById('loader-screen').classList.add('hidden');
+            document.getElementById('sidebar').style.display = '';
+            const canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+            if (canvasEl.parentElement && canvasEl.parentElement !== document.body) {
+                canvasEl.parentElement.style.display = ''; // show GL wrapper
+            }
+            document.getElementById('loadNewBtn').style.display = '';
+            v.resize();
+            v.render();
             this._finalizing = false;
             this._updateStepperUI();
             this._updateOverview();
@@ -1283,7 +1363,7 @@ class BitZoom {
 
             // Auto-tune on fresh loads: no preset settings, no URL-hash strengths.
             // Gives the first frame meaningful defaults instead of a flat blend.
-            if (this._autoTuneOnLoad !== false && !dataset?.settings && !hasHashStrengths && v.nodes && v.nodes.length > 0) {
+            if (this._autoTuneOnLoad !== false && !dataset?.settings && !hasHashSettings && v.nodes && v.nodes.length > 0) {
                 await this._autoTuneFresh();
             }
         });
@@ -1825,28 +1905,21 @@ class BitZoom {
 
         // Compass ↔ canvas sync
         const compassWidget = document.getElementById('compassWidget');
-        let _compassRafPending = false;
         const onCompassInput = (e) => {
+            if (!e.detail) return;
             const { name, strength, bearing } = e.detail;
             v.propStrengths[name] = strength;
             v.propBearings[name] = bearing;
-            // rAF-gated rebuild — blend event will sync sidebar sliders/dials
-            if (!_compassRafPending) {
-                _compassRafPending = true;
-                requestAnimationFrame(async () => {
-                    _compassRafPending = false;
-                    v._quantStats = {};
-                    v.levels = new Array(ZOOM_LEVELS.length).fill(null);
-                    await v._blend();
-                    v.layoutAll();
-                    v.render();
-                });
-            }
+            this._scheduleRebuild();
         };
         compassWidget.addEventListener('input', onCompassInput);
         compassWidget.addEventListener('change', (e) => {
-            onCompassInput(e);
+            if (e.detail) {
+                v.propStrengths[e.detail.name] = e.detail.strength;
+                v.propBearings[e.detail.name] = e.detail.bearing;
+            }
             document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            this.rebuildProjections(false); // full quality on drag end
         });
         compassWidget.addEventListener('colorby', (e) => {
             v.colorBy = (v.colorBy === e.detail.name) ? null : e.detail.name;
@@ -1869,6 +1942,7 @@ class BitZoom {
         const strengthControls = document.getElementById('strengthControls');
         if (strengthControls) {
             strengthControls.addEventListener('input', (e) => {
+                if (!e.detail) return; // ignore native input events bubbling from shadow DOM
                 const { name, strength, bearing } = e.detail;
                 v.propStrengths[name] = strength;
                 v.propBearings[name] = bearing;
@@ -1880,9 +1954,10 @@ class BitZoom {
                     const { name, strength, bearing } = e.detail;
                     v.propStrengths[name] = strength;
                     v.propBearings[name] = bearing;
-                    this._scheduleRebuild();
                 }
                 document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                // Full-quality rebuild on drag end (change fires on pointerup)
+                this.rebuildProjections(false);
             });
             strengthControls.addEventListener('colorby', (e) => {
                 v.colorBy = (v.colorBy === e.detail.name) ? null : e.detail.name;
@@ -1926,15 +2001,7 @@ class BitZoom {
             if (!this.dataLoaded) return;
             v.smoothAlpha = parseFloat(e.target.value);
             document.getElementById('nudgeVal').textContent = v.smoothAlpha.toFixed(2);
-            if (!this.smoothDebounceTimer) {
-                this.smoothDebounceTimer = requestAnimationFrame(async () => {
-                    this.smoothDebounceTimer = null;
-                    v.levels = new Array(ZOOM_LEVELS.length).fill(null);
-                    await v._blend();
-                    v.layoutAll();
-                    v.render();
-                });
-            }
+            this._scheduleRebuild();
         }, sig);
 
         // Load button + file inputs + drop zone
@@ -2284,7 +2351,14 @@ window.bz = bz;
 window.addEventListener('hashchange', () => {
     if (!bz.dataLoaded || bz._finalizing) return; // ignore hash changes during loading/finalization
     const params = bz._restoreFromHash();
-    if (params?.edges) {
+    // Check if hash matches the currently loaded dataset (curated or URL)
+    const sameDataset = params && (
+        (params.d && params.d === bz._currentDatasetId) ||
+        (params.edges && params.edges === bz._currentEdgesUrl)
+    );
+    if (sameDataset) {
+        bz._applyHashState(params);
+    } else if (params?.edges) {
         const edgesUrl = params.edges;
         let nodesUrl = params.nodes || null;
         if (!nodesUrl) {
@@ -2293,8 +2367,6 @@ window.addEventListener('hashchange', () => {
         }
         const name = edgesUrl.split('/').pop()?.replace(/\.edges(\.gz)?$/, '') || 'Remote';
         bz.loadDataset({ id: '__url__', name, edges: edgesUrl, nodes: nodesUrl, desc: 'URL' });
-    } else if (params && params.d === bz._currentDatasetId) {
-        bz._applyHashState(params);
     } else if (params?.d) {
         const ds = DATASETS.find(d => d.id === params.d);
         if (ds) bz.loadDataset(ds);

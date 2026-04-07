@@ -147,11 +147,12 @@ Drop any of these files onto the canvas or loader panel, or load them via URL �
 - **5-layer render order** — edges → heatmap → highlighted edges → circles → labels. WebGL2 renders geometry layers (grid through circles); Canvas 2D overlay handles text (labels, legend, reset button).
 - **GPU tri-state** — viewer GPU button cycles Auto → GPU → CPU. Auto (default) uses adaptive thresholds: GPU projection when N×G > 2000, GPU blend when N > 50K. GPU forces all operations to GPU; CPU forces all to CPU.
 - **Async initial blend** — `createBitZoomView()` returns synchronously; initial blend kicks off async (GPU probe → blend → render). Callers get a ready view immediately; first render completes in background.
-- **FPS counter** — toggle with F key or click top-left corner. Shows fps/ms/mode (CPU/GPU/Auto).
+- **FPS counter** — toggle with F key or click top-left corner. Shows max fps (from render time), ms, and mode (CPU/GPU/Auto). During fast mode shows `fast[Np]` suffix.
+- **Fast mode** — interactive drag on large datasets (>50K nodes) uses adaptive blend passes (0-2, budget system with ceiling lock) and spatial subsampling (16×16 grid from gx/gy, degree-weighted, ~20-50K sample). Edges suppressed via `_skipEdgeBuild` flag (stays true for entire drag session). Full 5-pass blend + layout + edge build on release. Below 50K nodes, drag always uses full blend.
 - **Mobile improvements** — `touch-action: none` on canvas prevents browser gestures, compact toolbar layout, hidden hint section on small screens.
 - **Cancel button** — load screen shows a cancel button when data is already loaded, allowing return to the current view without reloading.
-- **GL wrapper visibility** — viewer hides the GL wrapper div alongside the canvas when showing the loader screen, restores it on cancel or load completion.
-- **URL hash state** — dataset + zoom + pan + level + selection. `replaceState` on render.
+- **GL wrapper visibility** — viewer hides the GL wrapper div alongside the canvas when showing the loader screen, restores it on cancel or load completion. Sidebar starts `display:none` in HTML; canvas, sidebar, and load button revealed atomically by `_finalizeLoad` after blend + layout complete, preventing flash of unblended nodes or sidebar-without-canvas.
+- **URL hash state** — compact positional format. View: `d`, `l`, `z`, `x`, `y`, `bl`, `s`. Settings (all-or-nothing block): `st=5,0,8` (strengths, 3 decimals), `b=28.6,0,0` (bearings in degrees, 2 decimals), `a=0.5` (alpha, 3 decimals), `cb=1` (colorBy group index, -1=auto), `lp=0,2` (label prop indices). Positional arrays indexed by `groupNames` order; lengths sanity-checked on restore. Matches curated datasets (`d=id`) and URL-loaded datasets (`edges=url`). `replaceState` on render.
 
 ## Important Invariants
 
@@ -163,14 +164,14 @@ Drop any of these files onto the canvas or loader panel, or load them via URL �
 - `getLevel()` calls `layoutAll()` when building a new level.
 - `switchLevel()` adjusts zoom to preserve renderZoom across level changes.
 - Empty/undefined property values emit 0 tokens → NaN sentinel → neutral [0,0] projection. Adaptive strength floor (`STRENGTH_FLOOR_RATIO=0.10`, `STRENGTH_FLOOR_MIN=0.10`) ensures zero-strength high-entropy groups always contribute 10% spreading, preventing low-entropy collapse. No special all-zero case: the floor produces equal blend naturally with smooth strength transitions.
-- Gaussian quantization boundaries (μ,σ) freeze from the dataset-tuned strength snapshot (reset in `_applyDatasetSettings`) — stable across subsequent strength/alpha changes but can misfit if the distribution shifts significantly.
+- Gaussian quantization boundaries (μ,σ) recompute on every blend-triggering change (strengths, bearings, alpha) via `_quantStats = {}`. This makes layouts path-independent: the same final settings always produce the same grid positions, enabling reliable URL hash restore.
 - Heatmap density maxW is cached per level/zoom config, lerped on change — stable across pan.
 - `unifiedBlend` uses module-level Float64Array buffers grown on demand. Not reentrant — safe because blend calls are sequential.
 - Fresh-load state reset in `_applyWorkerResult`: pan, zoom, colorBy, nav state, selection, current dataset id all cleared. User preferences (color scheme, GPU mode, WebGL toggle, showFps/Legend, theme) preserved.
 - Initial level picked by `pickInitialLevel` in `_finalizeLoad` AFTER `gx/gy` is populated by blend + quantize. Walks coarse→fine, returns first level with 25-400 distinct cells and ≥1 multi-member cell. Dataset preset `initialLevel` and URL hash `l=` still override.
 - `buildGraph` unions ids from `parsed.nodeIds` AND `nodesMap.keys()` — nodes-only inputs and orphaned metadata rows are preserved (fixes pre-refactor silent drop).
 - Bearings are blend-time only — no re-projection needed. GPU compute blend falls back to CPU when bearings are set.
-- URL hash uses `st=` for strengths, `b=` for bearings (degrees), `s=` for selected node.
+- URL hash settings are positional arrays indexed by `groupNames` order — no group names in the hash. All settings serialized as a block; presence of `st=` implies all settings are present.
 - `<bz-compass>` declarative binding via `for` attribute listens for `ready` event on `<bz-graph>`, not polling.
 
 

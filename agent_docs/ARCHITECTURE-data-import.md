@@ -81,7 +81,7 @@ The viewer integrates parsers via `parseAny` and the capability-classification h
 | `loadFromParsed(parsed)` | Executes the object pipeline: calls `runPipelineFromObjects(GPU)` based on current GPU mode, feeds result into `_applyWorkerResult`. Stores `_lastParsed` for rebuild paths. |
 | `_executeCanvasLoad()` | Shared finalizer for canvas-drop loads (both SNAP pair and non-SNAP single-file). Calls the right pipeline, fires `_finalizeLoad(null)`. |
 | `loadDataset(dataset)` | URL-preset load. Fetches primary URL (`dataset.stix || dataset.edges`), detects format, uses `isObjectFormat` to route — any object-pipeline format goes through `parseAny`+`loadFromParsed`; SNAP path fetches the companion `.nodes` URL. |
-| `_finalizeLoad(dataset)` | Post-load sequence: apply dataset settings or initial blend, **pick initial level from actual cell distribution** (`pickInitialLevel`), restore URL hash state, update stepper/overview/algo UI, schedule hash update, then auto-tune if conditions met. |
+| `_finalizeLoad(dataset)` | Post-load sequence: apply dataset settings or initial blend, **pick initial level from actual cell distribution** (`pickInitialLevel`), restore URL hash state (await re-blend if settings changed), reveal canvas + sidebar together (prevents flash), update stepper/overview/algo UI, schedule hash update, then auto-tune if conditions met. Hash matches both curated (`d=id`) and URL-loaded (`edges=url`) datasets. |
 | `_autoTuneFresh()` | Runs `autoTuneStrengths` on fresh loads without preset settings or hash strengths. Uses the shared `this._tuneAbort` controller so the Stop button works identically for manual and on-load invocations. Applies result via `this._applyTuneResult` (shared with manual Auto button). |
 | `pickInitialLevel(nodes, zoomLevels, rawLevel)` | Data-aware initial-level selector. Inspects actual `gx/gy` cell distribution at each level, returns the coarsest level where distinct cells ≥ 25, ≤ 400, and at least one multi-member cell exists. Falls through to RAW for datasets too small to aggregate. Called from `_finalizeLoad` AFTER blending populates coordinates. |
 
@@ -237,7 +237,8 @@ The heuristic covers the happy path (~95% of real inputs) but has known blind sp
 - Pending state: cleared in drop handlers before staging
 
 Preserved (user preferences):
-- `_colorScheme`, `useWebGL`, `_gpuMode`, `showFps`, `showLegend`, theme class, sidebar state
+- `_colorScheme`, `useWebGL`, `_gpuMode`, `showFps`, `showLegend`, theme class
+- Sidebar starts `display:none` in HTML; revealed by `_finalizeLoad` after blend completes
 
 ## Testing
 

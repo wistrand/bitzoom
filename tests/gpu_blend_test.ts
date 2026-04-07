@@ -4,7 +4,7 @@
 import { assert } from 'https://deno.land/std@0.208.0/assert/assert.ts';
 import { initGPU, gpuBlend } from '../docs/bitzoom-gpu.js';
 import { runPipeline } from '../docs/bitzoom-pipeline.js';
-import { unifiedBlend, MINHASH_K, buildGaussianProjection } from '../docs/bitzoom-algo.js';
+import { unifiedBlend, MINHASH_K, buildGaussianProjection, STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN } from '../docs/bitzoom-algo.js';
 
 Deno.test('GPU blend init', async () => {
   assert(await initGPU(), 'GPU should be available');
@@ -149,3 +149,4 @@ Deno.test('GPU vs CPU blend: Email-EU edge-only alpha=0.75', async () => {
   const { maxDelta } = await compareBlend('Email-EU', 'docs/data/email-eu.edges', null, 0.75);
   assert(maxDelta < 0.01, `Max delta ${maxDelta} should be < 0.01`);
 });
+
