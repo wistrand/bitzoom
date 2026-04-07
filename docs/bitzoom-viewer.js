@@ -2249,9 +2249,12 @@ class BitZoom {
                 if (gpuPath) await this.loadGraphGPU(this.pendingEdgesText, this.pendingNodesText, null);
                 else await this.loadGraph(this.pendingEdgesText, this.pendingNodesText);
             }
+            // Build a synthetic dataset descriptor from parsed metadata (if present)
+            const meta = this.pendingParsed?.metadata;
             const nameEl = document.getElementById('datasetName');
-            if (nameEl) nameEl.textContent = this._pendingFileName || 'Custom';
-            this._finalizeLoad(null);
+            if (nameEl) nameEl.textContent = meta?.name || this._pendingFileName || 'Custom';
+            const ds = meta?.settings ? { settings: meta.settings } : null;
+            this._finalizeLoad(ds);
         } catch (err) {
             this._showError('Load Error', err.message || 'Failed to load dropped file');
         }

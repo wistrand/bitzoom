@@ -308,7 +308,11 @@ export function parseD3(data) {
     edges.push(edge);
   }
 
-  return { nodes, edges, extraPropNames: [...extraPropSet] };
+  // Top-level metadata: source, description, credits, BitZoom settings, etc.
+  // Passed through to the viewer for display and optional preset application.
+  const metadata = data.metadata || null;
+
+  return { nodes, edges, extraPropNames: [...extraPropSet], metadata };
 }
 
 /**
