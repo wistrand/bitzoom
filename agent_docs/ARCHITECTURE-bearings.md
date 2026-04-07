@@ -32,7 +32,7 @@ Cost: `cos/sin` looked up once per group per blend, 2 mul + 1 add per (node, gro
 
 ### URL hash persistence
 
-Serialized as `b=group:90,platform:45` — degrees, integer-rounded, non-zero only. Parsed in `_applyHashState`, triggers re-blend if changed.
+Serialized as a positional array in degrees (2 decimal places): `b=28.65,0,0,0` — indexed by `groupNames` order, always present alongside `st=` as an all-or-nothing settings block. Parsed in `_applyHashState`; when settings are present, all are restored atomically with a full blend + layout + render.
 
 ### Dataset presets
 
@@ -68,7 +68,7 @@ See [ARCHITECTURE-auto-tune.md](ARCHITECTURE-auto-tune.md) for full details.
 ## Invariants
 
 - Bearings are purely a blend-time operation — no re-projection needed.
-- `_quantStats` is cleared on bearing change (same path as strength change).
+- `_quantStats` is cleared on every blend-triggering change (strengths, bearings, alpha) — layouts are path-independent.
 - GPU compute blend falls back to CPU when bearings are set.
 - Bearing auto-tune does NOT run during the tuner's search — only after the final strengths are chosen.
-- URL hash `b=` is independent of `st=` — either can be present or absent.
+- URL hash uses positional arrays: `b=28.6,0,0` (degrees, group order). Always serialized with `st=` as an all-or-nothing settings block.

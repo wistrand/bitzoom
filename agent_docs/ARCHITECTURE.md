@@ -101,7 +101,7 @@ Pure functions, no DOM. Single source of truth for MinHash/projection.
 - **Constants**: `MINHASH_K=128`, `GRID_BITS=16`, `GRID_SIZE=65536`, `ZOOM_LEVELS[1..14]`, `RAW_LEVEL=14`, `LEVEL_LABELS`
 - **MinHash** (GC-optimized): `HASH_PARAMS_A/B` (Int32Array), `computeMinHashInto` → reusable `_sig` Float64Array (NaN sentinel for empty tokens), `computeMinHash` (allocating wrapper). Universal hash via Mersenne fast-mod (`hashSlot` + `mersMod`) — split 16-bit halves to stay within safe integer range.
 - **Projection** (GC-optimized): `projectInto(sig, ROT, buf, offset)` → writes to buffer, `projectWith` (convenience wrapper returning `[px, py]`). NaN sentinel check: `sig[0] !== sig[0]`.
-- **Blend**: `unifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats)`
+- **Blend**: `unifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats, propBearings)`
 - **Quantization**: `normalizeAndQuantize(nodes)` (rank-based, O(n log n)), `gaussianQuantize(nodes, stats)` (Φ(z) via precomputed lookup table, O(n)). Default: Gaussian. Reasonable fit when blended coordinates are roughly bell-shaped; an approximation, not a guarantee.
 - **Grid**: `cellIdAtLevel(gx, gy, level)`
 - **Level building**: `buildLevelNodes` (phase 1: bucket nodes into supernodes, O(n)) + `buildLevelEdges` (phase 2: aggregate edges, O(|E|), numeric key packing for levels 1-13, string keys for level 14) + `buildLevel` (combined wrapper). Caches `cachedColor`/`cachedLabel` on supernodes.
@@ -208,9 +208,9 @@ Standalone embeddable canvas component. No external DOM dependencies beyond a `<
 
 **Multi-select**: Ctrl+click toggles `view.selectedIds`. Edges highlight for all selected nodes.
 
-**Data loading**: module workers with transferable Float64Array. `DATASETS[]` presets. Hash state restore on load.
+**Data loading**: module workers with transferable Float64Array. `DATASETS[]` presets. Hash state restore on load. Loader screen stays visible until blend + layout + render complete — sidebar and canvas revealed together to prevent flash of unblended (0,0) positions or sidebar-without-canvas.
 
-**URL hash**: `d=name&l=level&z=zoom&x=pan&y=pan&bl=base&s=selected`. Updates via `replaceState` on each render (via `onRender` callback).
+**URL hash**: compact positional format. View: `d`, `l`, `z`, `x`, `y`, `bl`, `s`. Settings (all-or-nothing): `st=5,0,8` (strengths by group order), `b=28.6,0,0` (bearings in degrees, 2 decimals), `a=0.5` (alpha, 3 decimals), `cb=1` (colorBy index, -1=auto), `lp=0,2` (label prop indices). Strengths at 3 decimal precision. Updates via `replaceState` on each render (via `onRender` callback). On restore, positional array lengths sanity-checked against `groupNames.length`; stale hashes silently ignored. All settings applied atomically with full blend + layout + render. Matches both curated datasets (`d=name`) and URL-loaded datasets (`edges=url`).
 
 **UI**: dynamic weight sliders, preset buttons, label checkboxes, size-by toggle (members/edges), quantization mode toggle (gaussian/rank), heatmap mode cycle (off/splat/density), edge mode cycle (curves/lines/none), GL toggle button (WebGL2 on/off, shows "N/A" when unavailable), GPU tri-state button (Auto → GPU → CPU, cycles on click), FPS counter (F key or click top-left), detail panel (slide-in overlay with grouped linked nodes), single-click delayed 250ms for dblclick disambiguation. Cancel button on load screen (visible when data already loaded) returns to current view. GL wrapper div hidden/shown with loader screen. Mobile: compact toolbar, hidden hint section. Press **S** to download SVG export.
 
@@ -327,7 +327,7 @@ when N×G > 2000 (default true).
 - Jaccard on discretised tokens is crude for continuous/ordinal properties.
 - 2D projection doesn't preserve distances — provides ordering signal, not metric embedding.
 - Rank quantization (when selected) destroys density information; Gaussian quantization tends to preserve it better but assumes approximately normal marginals.
-- Gaussian quantization uses fixed boundaries (μ,σ frozen from dataset-tuned strengths, reset in `_applyDatasetSettings`) — subsequent strength changes can shift the distribution far from stored boundaries, pushing nodes to grid extremes.
+- Gaussian quantization boundaries (μ,σ) recompute on every blend-triggering change (strengths, bearings, alpha). This makes layouts path-independent — same final settings always produce the same grid positions — enabling reliable URL hash restore.
 - Low-entropy and undefined-value collapse mitigated by adaptive strength floor (`STRENGTH_FLOOR_RATIO = 0.10`, `STRENGTH_FLOOR_MIN = 0.10`). Empty fields → neutral [0,0] projection; low-entropy properties → few distinct projections. The floor ensures zero-strength high-entropy groups always contribute 10% spreading. At 10% with 3 zero-strength groups, the dominant group controls ~83% of layout. No special all-zero case: the floor produces equal blend naturally, with smooth transitions as strengths change.
 - Supernode centroids use post-quantization display coordinates, not the original continuous blended coordinates. The nonlinear quantization transform (rank or Φ) means centroids in quantized space differ from centroids in blended space. The discrepancy is typically small at fine zoom levels and can be more noticeable at coarse levels (L1-L3).
 - Strength stability is piecewise constant after quantization.

@@ -279,7 +279,7 @@ class BzGraph extends HTMLElement {
           const v = this._view;
           v._quantStats = {};
           v.levels = new Array(v.levels.length).fill(null);
-          v._blend().then(() => { v.layoutAll(); v.render(); });
+          v._blend(true).then(() => { v.layoutAll(); v.render(); });
         });
       }
     };
@@ -346,7 +346,7 @@ class BzGraph extends HTMLElement {
           const v = this._view;
           v._quantStats = {};
           v.levels = new Array(v.levels.length).fill(null);
-          v._blend().then(() => { v.layoutAll(); v.render(); });
+          v._blend(true).then(() => { v.layoutAll(); v.render(); });
         });
       }
     };

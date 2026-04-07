@@ -487,7 +487,33 @@ async function ensureBlendPipeline() {
  * @param {number} passes
  * @returns {Promise<{px: Float32Array, py: Float32Array}>} blended positions
  */
-export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes) {
+// Cached GPU buffers — reused across blend calls for the same dataset.
+// Invalidated when N or edge count changes (new dataset load).
+let _blendCache = null;
+
+function getBlendCache(N, totalEdges) {
+  if (_blendCache && _blendCache.N === N && _blendCache.totalEdges === totalEdges) return _blendCache;
+  // Destroy old cache
+  if (_blendCache) {
+    for (const buf of Object.values(_blendCache.bufs)) buf.destroy();
+  }
+  const S = GPUBufferUsage.STORAGE;
+  const posSize = Math.max(256, N * 2 * 4);
+  const bufs = {
+    propPx: device.createBuffer({ size: Math.max(256, N * 4), usage: S | GPUBufferUsage.COPY_DST }),
+    propPy: device.createBuffer({ size: Math.max(256, N * 4), usage: S | GPUBufferUsage.COPY_DST }),
+    adjOffsets: device.createBuffer({ size: Math.max(256, (N + 1) * 4), usage: S | GPUBufferUsage.COPY_DST }),
+    adjTargets: device.createBuffer({ size: Math.max(256, Math.max(1, totalEdges) * 4), usage: S | GPUBufferUsage.COPY_DST }),
+    posA: device.createBuffer({ size: posSize, usage: S | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }),
+    posB: device.createBuffer({ size: posSize, usage: S | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }),
+    params: device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+    read: device.createBuffer({ size: Math.max(256, N * 2 * 4), usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+  };
+  _blendCache = { N, totalEdges, bufs, adjUploaded: false };
+  return _blendCache;
+}
+
+export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, propBearings = null) {
   await ensureBlendPipeline();
 
   const N = nodes.length;
@@ -501,15 +527,43 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
   const effW = {};
   for (const g of groupNames) { effW[g] = Math.max(propStrengths[g] || 0, floor); propTotal += effW[g]; }
 
-  // Compute property anchors
+  // Precompute per-group cos/sin for bearings
+  const G = groupNames.length;
+  let cosBearing = null, sinBearing = null, hasAnyBearing = false;
+  if (propBearings) {
+    for (const g of groupNames) { if (propBearings[g]) { hasAnyBearing = true; break; } }
+    if (hasAnyBearing) {
+      cosBearing = new Float64Array(G);
+      sinBearing = new Float64Array(G);
+      for (let gi = 0; gi < G; gi++) {
+        const theta = propBearings[groupNames[gi]] || 0;
+        cosBearing[gi] = Math.cos(theta);
+        sinBearing[gi] = Math.sin(theta);
+      }
+    }
+  }
+
+  // Compute property anchors (with optional bearing rotation)
   const propPxArr = new Float32Array(N);
   const propPyArr = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const nd = nodes[i];
     let px = 0, py = 0;
-    for (const g of groupNames) {
-      const p = nd.projections[g];
-      if (p) { px += p[0] * effW[g]; py += p[1] * effW[g]; }
+    if (hasAnyBearing) {
+      for (let gi = 0; gi < G; gi++) {
+        const g = groupNames[gi];
+        const p = nd.projections[g];
+        if (p) {
+          const gx = p[0], gy = p[1];
+          px += (gx * cosBearing[gi] - gy * sinBearing[gi]) * effW[g];
+          py += (gx * sinBearing[gi] + gy * cosBearing[gi]) * effW[g];
+        }
+      }
+    } else {
+      for (const g of groupNames) {
+        const p = nd.projections[g];
+        if (p) { px += p[0] * effW[g]; py += p[1] * effW[g]; }
+      }
     }
     propPxArr[i] = px / propTotal;
     propPyArr[i] = py / propTotal;
@@ -542,101 +596,80 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
     }
   }
 
+  // Get or create cached buffers (reused across blends for same dataset)
+  const cache = getBlendCache(N, totalEdges);
+  const b = cache.bufs;
+
+  // Upload property anchors (change every blend)
+  device.queue.writeBuffer(b.propPx, 0, propPxArr);
+  device.queue.writeBuffer(b.propPy, 0, propPyArr);
+
+  // Upload adjacency (only on first blend or dataset change)
+  if (!cache.adjUploaded) {
+    device.queue.writeBuffer(b.adjOffsets, 0, adjOffsetsArr);
+    device.queue.writeBuffer(b.adjTargets, 0, adjTargetsArr.length > 0 ? adjTargetsArr : new Uint32Array(1));
+    cache.adjUploaded = true;
+  }
+
   // If alpha=0 or passes=0, just return property anchors
   if (alpha === 0 || passes === 0) {
     return { px: propPxArr, py: propPyArr };
   }
 
-  // GPU buffers
-  const createBuf = (data, usage) => {
-    const size = Math.max(256, data.byteLength);
-    const buf = device.createBuffer({ size, usage, mappedAtCreation: true });
-    new Uint8Array(buf.getMappedRange()).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
-    buf.unmap();
-    return buf;
-  };
-
-  const S = GPUBufferUsage.STORAGE;
-  const U = GPUBufferUsage.UNIFORM;
-  const propPxBuf = createBuf(propPxArr, S);
-  const propPyBuf = createBuf(propPyArr, S);
-  const adjOffsetsBuf = createBuf(adjOffsetsArr, S);
-  const adjTargetsBuf = createBuf(adjTargetsArr.length > 0 ? adjTargetsArr : new Uint32Array(1), S);
-
-  // Two position buffers for ping-pong (avoids read-write race within a pass)
-  const posSize = Math.max(256, N * 2 * 4);
+  // Upload initial positions
   const posData = new Float32Array(N * 2);
   for (let i = 0; i < N; i++) { posData[i * 2] = propPxArr[i]; posData[i * 2 + 1] = propPyArr[i]; }
-  const posBufA = createBuf(posData, S | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
-  const posBufB = device.createBuffer({ size: posSize, usage: S | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(b.posA, 0, posData);
 
-  // Params uniform
+  // Upload params
   const paramsData = new ArrayBuffer(16);
   new Float32Array(paramsData, 0, 1)[0] = alpha;
   new Uint32Array(paramsData, 4, 1)[0] = N;
-  const paramsBuf = device.createBuffer({ size: 16, usage: U, mappedAtCreation: true });
-  new Uint8Array(paramsBuf.getMappedRange()).set(new Uint8Array(paramsData));
-  paramsBuf.unmap();
+  device.queue.writeBuffer(b.params, 0, new Uint8Array(paramsData));
 
   // Two bind groups: A→B and B→A for ping-pong
   const bgAtoB = device.createBindGroup({
     layout: blendPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: { buffer: propPxBuf } },
-      { binding: 1, resource: { buffer: propPyBuf } },
-      { binding: 2, resource: { buffer: adjOffsetsBuf } },
-      { binding: 3, resource: { buffer: adjTargetsBuf } },
-      { binding: 4, resource: { buffer: posBufA } },  // read from A
-      { binding: 5, resource: { buffer: posBufB } },  // write to B
-      { binding: 6, resource: { buffer: paramsBuf } },
+      { binding: 0, resource: { buffer: b.propPx } },
+      { binding: 1, resource: { buffer: b.propPy } },
+      { binding: 2, resource: { buffer: b.adjOffsets } },
+      { binding: 3, resource: { buffer: b.adjTargets } },
+      { binding: 4, resource: { buffer: b.posA } },
+      { binding: 5, resource: { buffer: b.posB } },
+      { binding: 6, resource: { buffer: b.params } },
     ],
   });
   const bgBtoA = device.createBindGroup({
     layout: blendPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: { buffer: propPxBuf } },
-      { binding: 1, resource: { buffer: propPyBuf } },
-      { binding: 2, resource: { buffer: adjOffsetsBuf } },
-      { binding: 3, resource: { buffer: adjTargetsBuf } },
-      { binding: 4, resource: { buffer: posBufB } },  // read from B
-      { binding: 5, resource: { buffer: posBufA } },  // write to A
-      { binding: 6, resource: { buffer: paramsBuf } },
+      { binding: 0, resource: { buffer: b.propPx } },
+      { binding: 1, resource: { buffer: b.propPy } },
+      { binding: 2, resource: { buffer: b.adjOffsets } },
+      { binding: 3, resource: { buffer: b.adjTargets } },
+      { binding: 4, resource: { buffer: b.posB } },
+      { binding: 5, resource: { buffer: b.posA } },
+      { binding: 6, resource: { buffer: b.params } },
     ],
   });
 
-  // Dispatch passes with ping-pong
+  // Dispatch all passes + readback in a single command buffer (one GPU sync point)
   const workgroups = Math.ceil(N / 64);
+  const encoder = device.createCommandEncoder();
   for (let pass = 0; pass < passes; pass++) {
-    const bg = (pass % 2 === 0) ? bgAtoB : bgBtoA;
-    const encoder = device.createCommandEncoder();
     const comp = encoder.beginComputePass();
     comp.setPipeline(blendPipeline);
-    comp.setBindGroup(0, bg);
+    comp.setBindGroup(0, (pass % 2 === 0) ? bgAtoB : bgBtoA);
     comp.dispatchWorkgroups(workgroups);
     comp.end();
-    device.queue.submit([encoder.finish()]);
   }
-
-  // Result is in whichever buffer was written last
-  const resultBuf = (passes % 2 === 0) ? posBufA : posBufB; // even passes: still in A (0 passes); odd: in B
-  // Actually: pass 0 writes to B, pass 1 writes to A, ... pass N-1 writes to (N%2==1?B:A)
-  const finalBuf = (passes % 2 === 1) ? posBufB : posBufA;
-
-  // Read back
-  const readSize = Math.max(256, N * 2 * 4);
-  const readBuf = device.createBuffer({ size: readSize, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-  const encoder = device.createCommandEncoder();
-  encoder.copyBufferToBuffer(finalBuf, 0, readBuf, 0, N * 2 * 4);
+  const finalBuf = (passes % 2 === 1) ? b.posB : b.posA;
+  encoder.copyBufferToBuffer(finalBuf, 0, b.read, 0, N * 2 * 4);
   device.queue.submit([encoder.finish()]);
 
-  await readBuf.mapAsync(GPUMapMode.READ);
-  const result = new Float32Array(readBuf.getMappedRange()).slice(0, N * 2);
-  readBuf.unmap();
-
-  // Cleanup
-  propPxBuf.destroy(); propPyBuf.destroy();
-  adjOffsetsBuf.destroy(); adjTargetsBuf.destroy();
-  posBufA.destroy(); posBufB.destroy(); paramsBuf.destroy(); readBuf.destroy();
+  await b.read.mapAsync(GPUMapMode.READ);
+  const result = new Float32Array(b.read.getMappedRange()).slice(0, N * 2);
+  b.read.unmap();
 
   // Deinterleave
   const outPx = new Float32Array(N);
@@ -652,8 +685,8 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
  * GPU-accelerated drop-in replacement for unifiedBlend.
  * Same signature: modifies nodes[i].px, .py, .gx, .gy in place.
  */
-export async function gpuUnifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats) {
-  const result = await gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes);
+export async function gpuUnifiedBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, quantMode, quantStats, propBearings = null) {
+  const result = await gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, propBearings);
 
   // Apply blended positions to nodes
   for (let i = 0; i < nodes.length; i++) {
@@ -661,7 +694,7 @@ export async function gpuUnifiedBlend(nodes, groupNames, propStrengths, smoothAl
     nodes[i].py = result.py[i];
   }
 
-  // Quantize on CPU (fast, not worth GPU-porting)
+  // Quantize on CPU
   if (quantMode === 'gaussian') gaussianQuantize(nodes, quantStats || {});
   else normalizeAndQuantize(nodes);
 }

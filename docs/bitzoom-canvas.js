@@ -371,8 +371,8 @@ export class BitZoomCanvas {
         val => (propColors && propColors[val]) || '#888888'
       );
       this.layoutAll();
-      this._scheduleEdgeBuild(idx);
-    } else if (!this.levels[idx]._edgesReady && !this._edgeBuildRaf) {
+      if (!this._skipEdgeBuild) this._scheduleEdgeBuild(idx);
+    } else if (!this.levels[idx]._edgesReady && !this._edgeBuildRaf && !this._skipEdgeBuild) {
       // Edges were cancelled by a competing build — reschedule
       this._scheduleEdgeBuild(idx);
     }
@@ -411,7 +411,7 @@ export class BitZoomCanvas {
       }
       offset = end;
 
-      if (this.levels[idx] !== levelObj) { this._edgeBuildRaf = null; return; } // level invalidated
+      if (this.levels[idx] !== levelObj || this._skipEdgeBuild) { this._edgeBuildRaf = null; return; } // level invalidated or fast mode
 
       if (offset < edges.length) {
         this._edgeBuildRaf = requestAnimationFrame(processChunk);
@@ -430,30 +430,31 @@ export class BitZoomCanvas {
         levelObj.snEdges = snEdges;
         levelObj._edgesReady = true;
         this._edgeBuildRaf = null;
-        this.render();
+        if (!this._skipEdgeBuild) this.render();
       }
     };
     this._edgeBuildRaf = requestAnimationFrame(processChunk);
   }
 
   layoutAll() { layoutAll(this); }
+
   render() {
     if (this._renderPending) return;
     this._renderPending = true;
+    // Capture edge mode at schedule time, not draw time
+    const edgeModeAtSchedule = this.edgeMode;
     requestAnimationFrame(() => {
       this._renderPending = false;
+      const realEdgeMode = this.edgeMode;
+      this.edgeMode = edgeModeAtSchedule;
       const t0 = performance.now();
       if (this._gl) renderGL(this._gl, this);
       render(this);
+      this.edgeMode = realEdgeMode;
       this._lastFrameMs = performance.now() - t0;
-      this._frameCount = (this._frameCount || 0) + 1;
-      const now = performance.now();
-      if (!this._fpsTime) this._fpsTime = now;
-      if (now - this._fpsTime >= 1000) {
-        this._fps = this._frameCount;
-        this._frameCount = 0;
-        this._fpsTime = now;
-      }
+      // Max FPS: derived from render time, not from how often we're called.
+      // Shows the ceiling — how fast we COULD render if every frame triggered.
+      this._maxFps = this._lastFrameMs > 0 ? Math.round(1000 / this._lastFrameMs) : 999;
       if (this.showFps) this._drawFps();
       this._postRender();
     });
@@ -461,10 +462,11 @@ export class BitZoomCanvas {
 
   _drawFps() {
     const ctx = this.ctx;
-    const fps = this._fps || 0;
+    const maxFps = this._maxFps || 0;
     const ms = this._lastFrameMs || 0;
     const mode = this._gl ? 'GL' : '2D';
-    const text = `${fps} fps · ${ms.toFixed(1)}ms · ${mode}`;
+    const fast = this._fastPassBudget !== undefined ? ` · fast(${this._fastPassBudget}p)` : '';
+    const text = `≤${String(maxFps).padStart(4)} fps · ${ms.toFixed(1)}ms · ${mode}${fast}`;
     ctx.font = '10px JetBrains Mono';
     ctx.fillStyle = this._lightMode ? 'rgba(60,60,80,0.6)' : 'rgba(200,200,220,0.6)';
     ctx.textAlign = 'left';
@@ -775,26 +777,64 @@ export class BitZoomCanvas {
   }
 
   /** Run blend (GPU for large datasets when useGPU, else CPU) */
-  async _blend() {
+  async _blend(fast = false) {
+    // Guard against concurrent blends (previous mapAsync still pending)
+    if (this._blending) return;
+    this._blending = true;
+    try { await this._blendInner(fast); } finally { this._blending = false; }
+  }
+
+  async _blendInner(fast) {
     // Notify listeners that state has changed BEFORE the expensive blend.
     // UI can sync sliders/dials/compass immediately from propStrengths/propBearings.
     this.canvas.dispatchEvent(new Event('statechange'));
-    if (this._useGPU && this.nodes.length > 50000) {
-      try {
-        // NOTE: GPU blend does not yet apply bearings (see Phase 1 GPU work in PLAN-bearings.md).
-        // Fall through to CPU path when any bearing is non-zero.
-        const hasBearings = this._hasAnyBearing();
-        if (!hasBearings) {
-          await gpuUnifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats);
-          this._blendGen++;
-          this.canvas.dispatchEvent(new Event('blend'));
-          return;
+
+    // Adaptive pass count based on last blend time:
+    // - Full blend (not fast): always 5 passes
+    // - Fast + last blend < 50ms: 2 passes (smooth interaction)
+    // - Fast + last blend 50-200ms: 1 pass (reduced topology)
+    // - Fast + last blend > 200ms: 0 passes (property anchors only, skip topology)
+    let passes;
+    if (!fast) {
+      passes = 5;
+      this._fastPassBudget = undefined; // reset adaptive state on full blend
+    } else {
+      // Adaptive pass count: start at 0, try to increase, lock max on failure.
+      // _fastPassMax is the proven-safe ceiling — never exceeds it again this session.
+      if (this._fastPassBudget === undefined) { this._fastPassBudget = 0; this._fastPassMax = 2; this._fastOkCount = 0; }
+      const lastMs = this._lastBlendMs;
+      if (lastMs !== undefined && lastMs > 100) {
+        // This pass count was too slow — lock the ceiling below it
+        this._fastPassMax = Math.max(0, this._fastPassBudget - 1);
+        this._fastPassBudget = this._fastPassMax;
+        this._fastOkCount = 0;
+      } else if (lastMs !== undefined && lastMs < 50 && this._fastPassBudget < this._fastPassMax) {
+        this._fastOkCount++;
+        if (this._fastOkCount >= 3) {
+          this._fastPassBudget++;
+          this._fastOkCount = 0;
         }
+      }
+      passes = this._fastPassBudget;
+    }
+
+    const t0 = performance.now();
+
+    const N = this.nodes.length;
+
+    if (this._useGPU && N > 50000 && passes > 0) {
+      try {
+        await gpuUnifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, passes, this.quantMode, this._quantStats, this.propBearings);
+        this._lastBlendMs = performance.now() - t0;
+        this._blendGen++;
+        this.canvas.dispatchEvent(new Event('blend'));
+        return;
       } catch (e) {
         console.warn('[GPU] Blend failed, falling back to CPU:', e.message);
       }
     }
-    unifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, 5, this.quantMode, this._quantStats, this.propBearings);
+    unifiedBlend(this.nodes, this.groupNames, this.propStrengths, this.smoothAlpha, this.adjList, this.nodeIndexFull, passes, this.quantMode, this._quantStats, this.propBearings);
+    this._lastBlendMs = performance.now() - t0;
     this._blendGen++;
     this.canvas.dispatchEvent(new Event('blend'));
   }
@@ -812,6 +852,7 @@ export class BitZoomCanvas {
   /** Update property strengths and re-blend */
   setStrengths(strengths) {
     Object.assign(this.propStrengths, strengths);
+    this._quantStats = {}; // refreeze Gaussian boundaries from new distribution
     this._refreshPropCache();
     this._blend().then(() => { this.layoutAll(); this.render(); });
   }
@@ -840,6 +881,7 @@ export class BitZoomCanvas {
   /** Update topology alpha and re-blend */
   setAlpha(alpha) {
     this.smoothAlpha = alpha;
+    this._quantStats = {}; // refreeze Gaussian boundaries from new distribution
     this.levels = new Array(ZOOM_LEVELS.length).fill(null);
     this._blend().then(() => { this.layoutAll(); this.render(); });
   }
