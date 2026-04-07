@@ -2,9 +2,9 @@
 // Run: deno test --unstable-webgpu --no-check --allow-read tests/gpu_blend_test.ts
 
 import { assert } from 'https://deno.land/std@0.208.0/assert/assert.ts';
-import { initGPU, gpuBlend } from '../docs/bitzoom-gpu.js';
+import { initGPU, gpuBlend, gpuUnifiedBlend, setGpuBlendProfiling, getLastBlendProfile } from '../docs/bitzoom-gpu.js';
 import { runPipeline } from '../docs/bitzoom-pipeline.js';
-import { unifiedBlend, MINHASH_K, buildGaussianProjection, STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN } from '../docs/bitzoom-algo.js';
+import { unifiedBlend, gaussianQuantize, MINHASH_K, buildGaussianProjection, STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN } from '../docs/bitzoom-algo.js';
 
 Deno.test('GPU blend init', async () => {
   assert(await initGPU(), 'GPU should be available');
@@ -148,5 +148,215 @@ Deno.test('GPU vs CPU blend: MITRE alpha=0.5 weighted', async () => {
 Deno.test('GPU vs CPU blend: Email-EU edge-only alpha=0.75', async () => {
   const { maxDelta } = await compareBlend('Email-EU', 'docs/data/email-eu.edges', null, 0.75);
   assert(maxDelta < 0.01, `Max delta ${maxDelta} should be < 0.01`);
+});
+
+Deno.test('GPU blend profiling: MITRE', async () => {
+  setGpuBlendProfiling(true);
+  const { maxDelta } = await compareBlend('MITRE-profile', 'docs/data/mitre-attack.edges', 'docs/data/mitre-attack.nodes', 0.5,
+    { group: 5, label: 0, structure: 0, neighbors: 0, subtype: 0, killchain: 4, aliases: 0, level: 0, platforms: 6, edgetype: 0 });
+  const profile = getLastBlendProfile();
+  setGpuBlendProfiling(false);
+  assert(maxDelta < 0.01, `Max delta ${maxDelta} should be < 0.01`);
+  assert(profile, 'Profile should exist');
+  assert(profile.totalMs > 0, 'Total should be positive');
+  assert(profile.N === 4736, `N should be 4736, got ${profile.N}`);
+  console.log('Profile:', JSON.stringify(profile, null, 2));
+});
+
+Deno.test('GPU blend: bind group cache (consecutive blends)', async () => {
+  const r1 = await compareBlend('Epstein-cache-1', 'docs/data/epstein.edges', 'docs/data/epstein.nodes', 0.75);
+  const r2 = await compareBlend('Epstein-cache-2', 'docs/data/epstein.edges', 'docs/data/epstein.nodes', 0.75);
+  assert(r1.maxDelta < 0.01, `Blend 1: maxDelta ${r1.maxDelta} should be < 0.01`);
+  assert(r2.maxDelta < 0.01, `Blend 2: maxDelta ${r2.maxDelta} should be < 0.01`);
+});
+
+Deno.test('GPU blend: sequential blends with varying strengths', async () => {
+  for (let i = 0; i < 4; i++) {
+    const { maxDelta } = await compareBlend(`Seq-${i}`, 'docs/data/epstein.edges', 'docs/data/epstein.nodes', 0.75);
+    assert(maxDelta < 0.01, `Blend ${i}: maxDelta ${maxDelta} should be < 0.01`);
+  }
+});
+
+Deno.test('GPU vs CPU full pipeline (blend + quantize): gx/gy match', async () => {
+  assert(await initGPU(), 'GPU should be available');
+  const datasets = [
+    { name: 'Karate', edges: 'docs/data/karate.edges', nodes: 'docs/data/karate.nodes', alpha: 0.5 },
+    { name: 'Epstein', edges: 'docs/data/epstein.edges', nodes: 'docs/data/epstein.nodes', alpha: 0.75 },
+    { name: 'MITRE', edges: 'docs/data/mitre-attack.edges', nodes: 'docs/data/mitre-attack.nodes', alpha: 0.5,
+      strengths: { group: 5, label: 0, structure: 0, neighbors: 0, subtype: 0, killchain: 4, aliases: 0, level: 0, platforms: 6, edgetype: 0 } },
+    { name: 'Amazon', gz: true, edges: 'docs/data/amazon-copurchase.edges.gz', nodes: 'docs/data/amazon-copurchase.nodes.gz', alpha: 0.5 },
+  ];
+
+  async function gunzip(path: string): Promise<string> {
+    const compressed = Deno.readFileSync(path);
+    const ds2 = new DecompressionStream('gzip');
+    const writer = ds2.writable.getWriter();
+    writer.write(compressed);
+    writer.close();
+    const reader = ds2.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const merged = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
+    let off2 = 0;
+    for (const c of chunks) { merged.set(c, off2); off2 += c.length; }
+    return new TextDecoder().decode(merged);
+  }
+  for (const ds of datasets) {
+    const edgesText = (ds as any).gz ? await gunzip(ds.edges) : Deno.readTextFileSync(ds.edges);
+    const nodesText = ds.nodes ? ((ds as any).gz ? await gunzip(ds.nodes) : Deno.readTextFileSync(ds.nodes)) : null;
+    const result = runPipeline(edgesText, nodesText);
+    const G = result.groupNames.length;
+
+    // Build two copies of nodes with projections
+    function buildNodes() {
+      return result.nodeArray.map((n: any, i: number) => {
+        const projections: Record<string, number[]> = {};
+        for (let g = 0; g < G; g++) {
+          const off = (i * G + g) * 2;
+          projections[result.groupNames[g]] = [result.projBuf[off], result.projBuf[off + 1]];
+        }
+        return { ...n, projections, px: 0, py: 0, gx: 0, gy: 0 };
+      });
+    }
+    const cpuNodes = buildNodes();
+    const gpuNodes = buildNodes();
+
+    const adjList: Record<string, string[]> = {};
+    for (const n of cpuNodes) adjList[n.id] = [];
+    for (const e of result.edges) {
+      if (adjList[e.src] && adjList[e.dst]) {
+        adjList[e.src].push(e.dst);
+        adjList[e.dst].push(e.src);
+      }
+    }
+    const cpuNodeIndex: Record<string, any> = {};
+    for (const n of cpuNodes) cpuNodeIndex[n.id] = n;
+    const gpuNodeIndex: Record<string, any> = {};
+    for (const n of gpuNodes) gpuNodeIndex[n.id] = n;
+
+    const propStrengths: Record<string, number> = ds.strengths || {};
+    if (!ds.strengths) {
+      for (const g of result.groupNames) propStrengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+    }
+
+    // CPU: full blend + quantize with fresh quantStats
+    const cpuQuantStats = {};
+    unifiedBlend(cpuNodes, result.groupNames, propStrengths, ds.alpha, adjList, cpuNodeIndex, 5, 'gaussian', cpuQuantStats);
+
+    // GPU: full blend + quantize with fresh quantStats
+    const gpuQuantStats = {};
+    await gpuUnifiedBlend(gpuNodes, result.groupNames, propStrengths, ds.alpha, adjList, gpuNodeIndex, 5, 'gaussian', gpuQuantStats);
+
+    // Compare px/py (pre-quantization values stored by gaussianQuantize)
+    let maxPxDelta = 0;
+    for (let i = 0; i < cpuNodes.length; i++) {
+      const dx = Math.abs(gpuNodes[i].px - cpuNodes[i].px);
+      const dy = Math.abs(gpuNodes[i].py - cpuNodes[i].py);
+      if (dx > maxPxDelta) maxPxDelta = dx;
+      if (dy > maxPxDelta) maxPxDelta = dy;
+    }
+
+    // Compare gx/gy (post-quantization grid positions)
+    let gxMismatches = 0, maxGxDelta = 0;
+    for (let i = 0; i < cpuNodes.length; i++) {
+      const dg = Math.max(Math.abs(gpuNodes[i].gx - cpuNodes[i].gx), Math.abs(gpuNodes[i].gy - cpuNodes[i].gy));
+      if (dg > maxGxDelta) maxGxDelta = dg;
+      if (dg > 0) gxMismatches++;
+    }
+
+    // Compare quantStats
+    const muDelta = Math.abs((gpuQuantStats as any).mx - (cpuQuantStats as any).mx) +
+                    Math.abs((gpuQuantStats as any).my - (cpuQuantStats as any).my);
+    const sigDelta = Math.abs((gpuQuantStats as any).sx - (cpuQuantStats as any).sx) +
+                     Math.abs((gpuQuantStats as any).sy - (cpuQuantStats as any).sy);
+
+    // Log mismatched nodes
+    if (gxMismatches > 0 && gxMismatches <= 30) {
+      for (let i = 0; i < cpuNodes.length; i++) {
+        const dgx = gpuNodes[i].gx - cpuNodes[i].gx;
+        const dgy = gpuNodes[i].gy - cpuNodes[i].gy;
+        if (dgx !== 0 || dgy !== 0) {
+          const dpx = gpuNodes[i].px - cpuNodes[i].px;
+          const dpy = gpuNodes[i].py - cpuNodes[i].py;
+          console.log(`    mismatch ${cpuNodes[i].id}: gx ${cpuNodes[i].gx}→${gpuNodes[i].gx} (Δ${dgx}), gy ${cpuNodes[i].gy}→${gpuNodes[i].gy} (Δ${dgy}), pxΔ=${dpx.toFixed(8)}, pyΔ=${dpy.toFixed(8)}`);
+        }
+      }
+    }
+    console.log(`  ${ds.name}: N=${cpuNodes.length}, maxPxDelta=${maxPxDelta.toFixed(6)}, maxGxDelta=${maxGxDelta}, gxMismatches=${gxMismatches}/${cpuNodes.length}, μΔ=${muDelta.toFixed(6)}, σΔ=${sigDelta.toFixed(6)}`);
+    assert(maxPxDelta < 0.01, `${ds.name}: px delta ${maxPxDelta} should be < 0.01`);
+    assert(gxMismatches < cpuNodes.length * 0.02, `${ds.name}: too many gx mismatches: ${gxMismatches}/${cpuNodes.length}`);
+  }
+});
+
+Deno.test('GPU blend profiling: Amazon (367K nodes)', async () => {
+  // Decompress .gz files
+  async function gunzip(path: string): Promise<string> {
+    const compressed = Deno.readFileSync(path);
+    const ds = new DecompressionStream('gzip');
+    const writer = ds.writable.getWriter();
+    writer.write(compressed);
+    writer.close();
+    const reader = ds.readable.getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const merged = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
+    let off = 0;
+    for (const c of chunks) { merged.set(c, off); off += c.length; }
+    return new TextDecoder().decode(merged);
+  }
+
+  const edgesText = await gunzip('docs/data/amazon-copurchase.edges.gz');
+  const nodesText = await gunzip('docs/data/amazon-copurchase.nodes.gz');
+  const result = runPipeline(edgesText, nodesText);
+
+  const G = result.groupNames.length;
+  const nodes = result.nodeArray.map((n: any, i: number) => {
+    const projections: Record<string, number[]> = {};
+    for (let g = 0; g < G; g++) {
+      const off = (i * G + g) * 2;
+      projections[result.groupNames[g]] = [result.projBuf[off], result.projBuf[off + 1]];
+    }
+    return { ...n, projections, px: 0, py: 0, gx: 0, gy: 0 };
+  });
+
+  const adjList: Record<string, string[]> = {};
+  for (const n of nodes) adjList[n.id] = [];
+  for (const e of result.edges) {
+    if (adjList[e.src] && adjList[e.dst]) {
+      adjList[e.src].push(e.dst);
+      adjList[e.dst].push(e.src);
+    }
+  }
+  const nodeIndexFull: Record<string, any> = {};
+  for (const n of nodes) nodeIndexFull[n.id] = n;
+
+  const propStrengths: Record<string, number> = {};
+  for (const g of result.groupNames) propStrengths[g] = g === 'group' ? 3 : 0;
+
+  console.log(`  Amazon: N=${nodes.length}, E=${result.edges.length}, G=${G}`);
+
+  // Ensure GPU is initialized (may not have run init test when filtered)
+  assert(await initGPU(), 'GPU should be available');
+
+  // Run 3 profiled blends to see warm-cache behavior
+  setGpuBlendProfiling(true);
+  for (let i = 0; i < 3; i++) {
+    await gpuBlend(nodes, result.groupNames, propStrengths, 0.5, adjList, nodeIndexFull, 5);
+    const p = getLastBlendProfile()!;
+    console.log(`  Blend ${i}: total=${p.totalMs.toFixed(1)}ms anchor=${p.anchorComputeMs.toFixed(1)} csr=${p.csrBuildMs.toFixed(1)} upload=${p.bufferUploadMs.toFixed(1)} bind=${p.bindGroupCreateMs.toFixed(1)} dispatch=${p.gpuDispatchMs.toFixed(1)} readback=${p.readbackMs.toFixed(1)} deinterleave=${p.deinterleaveMs.toFixed(1)}`);
+  }
+  setGpuBlendProfiling(false);
+
+  const profile = getLastBlendProfile()!;
+  assert(profile.N > 300000, `Expected >300K nodes, got ${profile.N}`);
+  assert(profile.totalMs > 0, 'Total should be positive');
 });
 

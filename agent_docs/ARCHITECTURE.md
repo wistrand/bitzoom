@@ -250,6 +250,10 @@ Object pipeline (main-thread for CSV/D3/JGF/GraphML/GEXF/Cytoscape/STIX):
 Weight/alpha change (either pipeline):
   → _refreshPropCache → invalidate levels → unifiedBlend → layoutAll → render
 
+GPU/CPU mode switch:
+  → _reloadCPU / _applyGPUToCurrentData → re-project → rebuildProjections
+    (preserves strengths/bearings/alpha/level/zoom, no auto-tune)
+
 Zoom/pan:
   → render (levels cached, just transform + draw)
   → if WebGL2: renderGL (rebuild instance buffers from screen coords) + Canvas 2D text overlay

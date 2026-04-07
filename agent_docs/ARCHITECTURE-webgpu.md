@@ -56,7 +56,7 @@ GPU: MinHash signatures → z-score normalize → 2D Gaussian projection
 CPU: unpack Float32Array result into projBuf
 ```
 
-WGSL shader (`WGSL` constant in bitzoom-gpu.js):
+WGSL shader (`WGSL` constant in bitzoom-gpu.js), workgroup size 256:
 - `mulMod(a, b)`: overflow-safe `(a*b) mod P` via 16-bit half splitting with
   per-addition `mersMod` reduction. Matches CPU `hashSlot` exactly.
 - Standard MinHash for <12 tokens (k hash evaluations per token)
@@ -64,6 +64,7 @@ WGSL shader (`WGSL` constant in bitzoom-gpu.js):
 - Degenerate signature detection (`sd < mean*1e-5 || sd < 1.0` → neutral [0,0])
 - 5 storage buffers: tokens, taskMeta (packed offset+count+group), hashParams
   (A+B concatenated), projMatrix, output
+- Workgroup size 256 supports up to 16.7M tasks (1M nodes × 16 groups) within the 65535 dispatch limit
 
 ### Verified precision
 
@@ -88,12 +89,11 @@ GPU: 5 passes of neighbor averaging with ping-pong buffers
 CPU: quantize (gaussianQuantize or normalizeAndQuantize)
 ```
 
-WGSL shader (`BLEND_WGSL`):
-- Reads property anchors (propPx, propPy), adjacency (CSR), current positions
+WGSL shader (`BLEND_WGSL`), workgroup size 64:
+- Reads interleaved property anchors (propAnchors), adjacency (CSR), current positions
 - Writes blended positions to separate output buffer (no read-write race)
-- Host dispatches one pass per `submit()`, awaits `onSubmittedWorkDone()`
-  between passes for global synchronization
-- 7 bindings: propPx, propPy, adjOffsets, adjTargets, posIn, posOut, params(uniform)
+- All passes batched in a single command encoder (one `submit()` call)
+- 6 bindings: propAnchors, adjOffsets, adjTargets, posIn, posOut, params(uniform)
 
 ### Ping-pong buffers
 
@@ -159,8 +159,9 @@ The GPU button cycles through three states: **Auto** (default) → **GPU** → *
 **GPU/Auto → CPU:**
 ```
 _useGPU = false, v._useGPU = false
-→ _reloadCPU() → loadGraph (workers) → _finalizeLoad (CPU blend)
+→ _reloadCPU() → CPU re-project → await rebuildProjections()
 ```
+Preserves current strengths/bearings/alpha/level/zoom. No auto-tune trigger.
 
 **CPU → Auto/GPU:**
 ```
@@ -168,6 +169,7 @@ await initGPU()
 → _useGPU = true, v._useGPU = true
 → _applyGPUToCurrentData() → GPU re-project → await rebuildProjections()
 ```
+Both paths mirror each other: re-project with the target pipeline, preserve user settings.
 
 **New dataset load while GPU on:**
 ```
@@ -227,10 +229,15 @@ async and properly awaited at every call site:
 
 ## Buffer management
 
-All GPU buffers are created per-operation and destroyed after readback.
-No persistent GPU state between operations (except the device and compiled
-pipelines). Minimum buffer size: 256 bytes (GPU alignment requirement discovered
-during testing — smaller buffers cause silent bind group failures).
+**Projection buffers** are created per-operation and destroyed after readback.
+
+**Blend buffers** are cached across blend calls via `getBlendCache(N, totalEdges)`. Invalidated when dataset changes (different N or edge count). The cache stores:
+- **GPU buffers**: `propAnchors` (interleaved px/py), `adjOffsets`/`adjTargets` (CSR), `posA`/`posB` (ping-pong), `params` (uniform), `read` (MAP_READ)
+- **Bind groups**: `bgAtoB`/`bgBtoA` — cached alongside buffers, only recreated on cache invalidation
+- **CSR arrays**: `csrOffsets`/`csrTargets` — CPU-side typed arrays cached to skip the ~200ms CSR rebuild on subsequent blends with the same dataset
+- **Adjacency upload flag**: `adjUploaded` — adjacency uploaded to GPU once per dataset
+
+Minimum buffer size: 256 bytes (GPU alignment requirement — smaller buffers cause silent bind group failures).
 
 ## Testing
 
@@ -272,7 +279,7 @@ GPU crossover ~400 nodes. GPU time includes CPU-side tokenization and hashing.
 | MITRE ATT&CK  |   4,736 |   13ms  |  34ms  |   0.40x |
 | Amazon         | 367,000 |  1.88s  | 407ms  |   4.6x  |
 
-GPU blend has ~13ms fixed overhead (CSR build, buffer alloc, dispatch, readback).
+GPU blend warm overhead: ~30ms on iGPU (anchor compute + upload + dispatch + readback). CSR build ~200ms on first call, 0ms on subsequent (cached). See [PLAN-gpu-resident.md](PLAN-gpu-resident.md) for full profiling breakdown.
 Crossover between 5K and 367K nodes. Projection benefits first; blend benefits
 only at large scale.
 

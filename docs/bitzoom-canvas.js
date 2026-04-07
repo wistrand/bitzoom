@@ -1583,8 +1583,28 @@ import { initGPU, computeProjectionsGPU, gpuUnifiedBlend } from './bitzoom-gpu.j
 
 // Shared tail: strengths, colors, blend, construct view.
 function _finalize(canvas, nodes, edges, nodeIndexFull, adjList, groupNames, hasEdgeTypes, opts) {
+  // Default strengths: group=3 if it has >1 distinct value, label=1, rest=0.
+  // If group is single-valued (e.g. CSV without a "group" column → all "unknown"),
+  // find the first categorical extra prop with 2-50 distinct values instead.
   const propStrengths = {};
-  for (const g of groupNames) propStrengths[g] = g === 'group' ? 3 : g === 'label' ? 1 : 0;
+  for (const g of groupNames) propStrengths[g] = 0;
+  const groupVals = new Set();
+  for (const n of nodes) { groupVals.add(n.group); if (groupVals.size > 1) break; }
+  if (groupVals.size > 1) {
+    propStrengths['group'] = 3;
+  } else {
+    // Find first useful categorical property
+    for (const g of groupNames) {
+      if (g === 'group' || g === 'label' || g === 'structure' || g === 'neighbors') continue;
+      const vals = new Set();
+      for (const n of nodes) {
+        vals.add(n.extraProps && n.extraProps[g]);
+        if (vals.size > 50) break;
+      }
+      if (vals.size >= 2 && vals.size <= 50) { propStrengths[g] = 3; break; }
+    }
+  }
+  if (groupNames.includes('label')) propStrengths['label'] = 1;
   Object.assign(propStrengths, opts.strengths || opts.weights || {});
 
   const propColors = {};

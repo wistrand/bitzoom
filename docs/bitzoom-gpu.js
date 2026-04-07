@@ -82,7 +82,7 @@ fn hashSlot(a: i32, tv: u32, b: i32) -> u32 {
 fn getParamA(i: u32) -> i32 { return hashParams[i]; }
 fn getParamB(i: u32) -> i32 { return hashParams[K + i]; }
 
-@compute @workgroup_size(64)
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let taskId = gid.x;
   let numTasks = arrayLength(&taskMeta) / 3u;
@@ -273,7 +273,7 @@ export async function gpuMinHashProject(allTokens, taskOffsets, taskCounts, task
   const pass = encoder.beginComputePass();
   pass.setPipeline(pipeline);
   pass.setBindGroup(0, bindGroup);
-  pass.dispatchWorkgroups(Math.ceil(numTasks / 64));
+  pass.dispatchWorkgroups(Math.ceil(numTasks / 256));
   pass.end();
   encoder.copyBufferToBuffer(outputBuf, 0, readBuf, 0, outputSize);
   device.queue.submit([encoder.finish()]);
@@ -408,18 +408,17 @@ export async function computeProjectionsGPU(nodeArray, adjGroups, groupNames, ha
 // ─── GPU Blend ───────────────────────────────────────────────────────────────
 
 const BLEND_WGSL = /* wgsl */ `
-@group(0) @binding(0) var<storage, read> propPx: array<f32>;      // property anchors X
-@group(0) @binding(1) var<storage, read> propPy: array<f32>;      // property anchors Y
-@group(0) @binding(2) var<storage, read> adjOffsets: array<u32>;  // CSR offsets [N+1]
-@group(0) @binding(3) var<storage, read> adjTargets: array<u32>;  // CSR neighbor indices
-@group(0) @binding(4) var<storage, read> posIn: array<f32>;       // read positions from previous pass
-@group(0) @binding(5) var<storage, read_write> posOut: array<f32>; // write new positions
+@group(0) @binding(0) var<storage, read> propAnchors: array<f32>; // interleaved [px0,py0,px1,py1,...]
+@group(0) @binding(1) var<storage, read> adjOffsets: array<u32>;  // CSR offsets [N+1]
+@group(0) @binding(2) var<storage, read> adjTargets: array<u32>;  // CSR neighbor indices
+@group(0) @binding(3) var<storage, read> posIn: array<f32>;       // read positions from previous pass
+@group(0) @binding(4) var<storage, read_write> posOut: array<f32>; // write new positions
 
 struct Params {
   alpha: f32,
   N: u32,
 }
-@group(0) @binding(6) var<uniform> params: Params;
+@group(0) @binding(5) var<uniform> params: Params;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -427,8 +426,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (i >= params.N) { return; }
 
   let alpha = params.alpha;
-  let propX = propPx[i];
-  let propY = propPy[i];
+  let propX = propAnchors[i * 2u];
+  let propY = propAnchors[i * 2u + 1u];
 
   let adjStart = adjOffsets[i];
   let adjEnd = adjOffsets[i + 1u];
@@ -500,8 +499,7 @@ function getBlendCache(N, totalEdges) {
   const S = GPUBufferUsage.STORAGE;
   const posSize = Math.max(256, N * 2 * 4);
   const bufs = {
-    propPx: device.createBuffer({ size: Math.max(256, N * 4), usage: S | GPUBufferUsage.COPY_DST }),
-    propPy: device.createBuffer({ size: Math.max(256, N * 4), usage: S | GPUBufferUsage.COPY_DST }),
+    propAnchors: device.createBuffer({ size: posSize, usage: S | GPUBufferUsage.COPY_DST }),
     adjOffsets: device.createBuffer({ size: Math.max(256, (N + 1) * 4), usage: S | GPUBufferUsage.COPY_DST }),
     adjTargets: device.createBuffer({ size: Math.max(256, Math.max(1, totalEdges) * 4), usage: S | GPUBufferUsage.COPY_DST }),
     posA: device.createBuffer({ size: posSize, usage: S | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }),
@@ -509,17 +507,21 @@ function getBlendCache(N, totalEdges) {
     params: device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
     read: device.createBuffer({ size: Math.max(256, N * 2 * 4), usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
   };
-  _blendCache = { N, totalEdges, bufs, adjUploaded: false };
+  _blendCache = { N, totalEdges, bufs, adjUploaded: false, bgAtoB: null, bgBtoA: null };
   return _blendCache;
 }
 
 export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, adjList, nodeIndexFull, passes, propBearings = null) {
   await ensureBlendPipeline();
+  const prof = _gpuBlendProfiling;
+  const t_total = prof ? performance.now() : 0;
 
   const N = nodes.length;
   const alpha = Math.max(0, Math.min(1, smoothAlpha));
 
-  // Compute effective strengths (same logic as CPU)
+  // ── Anchor computation ──────────────────────────────────────────────────
+  const t_anchor = prof ? performance.now() : 0;
+
   let maxW = 0;
   for (const g of groupNames) { const raw = propStrengths[g] || 0; if (raw > maxW) maxW = raw; }
   const floor = Math.max(maxW * STRENGTH_FLOOR_RATIO, STRENGTH_FLOOR_MIN);
@@ -527,7 +529,6 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
   const effW = {};
   for (const g of groupNames) { effW[g] = Math.max(propStrengths[g] || 0, floor); propTotal += effW[g]; }
 
-  // Precompute per-group cos/sin for bearings
   const G = groupNames.length;
   let cosBearing = null, sinBearing = null, hasAnyBearing = false;
   if (propBearings) {
@@ -543,9 +544,7 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
     }
   }
 
-  // Compute property anchors (with optional bearing rotation)
-  const propPxArr = new Float32Array(N);
-  const propPyArr = new Float32Array(N);
+  const propAnchorsArr = new Float32Array(N * 2);
   for (let i = 0; i < N; i++) {
     const nd = nodes[i];
     let px = 0, py = 0;
@@ -565,95 +564,123 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
         if (p) { px += p[0] * effW[g]; py += p[1] * effW[g]; }
       }
     }
-    propPxArr[i] = px / propTotal;
-    propPyArr[i] = py / propTotal;
+    propAnchorsArr[i * 2] = px / propTotal;
+    propAnchorsArr[i * 2 + 1] = py / propTotal;
   }
+  const anchorComputeMs = prof ? performance.now() - t_anchor : 0;
 
-  // Build CSR adjacency (node index based, not id based)
-  const idToIdx = {};
-  for (let i = 0; i < N; i++) idToIdx[nodes[i].id] = i;
+  // ── CSR adjacency (cached — only rebuilt when dataset changes) ────────
+  const t_csr = prof ? performance.now() : 0;
 
-  const adjOffsetsArr = new Uint32Array(N + 1);
-  let totalEdges = 0;
-  for (let i = 0; i < N; i++) {
-    adjOffsetsArr[i] = totalEdges;
-    const nbrs = adjList[nodes[i].id];
-    if (nbrs) {
-      for (const nid of nbrs) { if (idToIdx[nid] !== undefined) totalEdges++; }
+  let totalEdges, adjOffsetsArr, adjTargetsArr;
+  if (_blendCache && _blendCache.N === N && _blendCache.csrOffsets) {
+    // Reuse cached CSR from previous blend (same nodes/edges, different strengths)
+    totalEdges = _blendCache.totalEdges;
+    adjOffsetsArr = _blendCache.csrOffsets;
+    adjTargetsArr = _blendCache.csrTargets;
+  } else {
+    const idToIdx = {};
+    for (let i = 0; i < N; i++) idToIdx[nodes[i].id] = i;
+
+    adjOffsetsArr = new Uint32Array(N + 1);
+    totalEdges = 0;
+    for (let i = 0; i < N; i++) {
+      adjOffsetsArr[i] = totalEdges;
+      const nbrs = adjList[nodes[i].id];
+      if (nbrs) {
+        for (const nid of nbrs) { if (idToIdx[nid] !== undefined) totalEdges++; }
+      }
     }
-  }
-  adjOffsetsArr[N] = totalEdges;
+    adjOffsetsArr[N] = totalEdges;
 
-  const adjTargetsArr = new Uint32Array(totalEdges);
-  let ei = 0;
-  for (let i = 0; i < N; i++) {
-    const nbrs = adjList[nodes[i].id];
-    if (nbrs) {
-      for (const nid of nbrs) {
-        const j = idToIdx[nid];
-        if (j !== undefined) adjTargetsArr[ei++] = j;
+    adjTargetsArr = new Uint32Array(totalEdges);
+    let ei = 0;
+    for (let i = 0; i < N; i++) {
+      const nbrs = adjList[nodes[i].id];
+      if (nbrs) {
+        for (const nid of nbrs) {
+          const j = idToIdx[nid];
+          if (j !== undefined) adjTargetsArr[ei++] = j;
+        }
       }
     }
   }
+  const csrBuildMs = prof ? performance.now() - t_csr : 0;
 
-  // Get or create cached buffers (reused across blends for same dataset)
+  // ── Buffer upload ─────────────────────────────────────────────────────
+  const t_upload = prof ? performance.now() : 0;
+
   const cache = getBlendCache(N, totalEdges);
+  // Store CSR arrays in cache for reuse on subsequent blends
+  cache.csrOffsets = adjOffsetsArr;
+  cache.csrTargets = adjTargetsArr;
   const b = cache.bufs;
 
-  // Upload property anchors (change every blend)
-  device.queue.writeBuffer(b.propPx, 0, propPxArr);
-  device.queue.writeBuffer(b.propPy, 0, propPyArr);
+  device.queue.writeBuffer(b.propAnchors, 0, propAnchorsArr);
 
-  // Upload adjacency (only on first blend or dataset change)
   if (!cache.adjUploaded) {
     device.queue.writeBuffer(b.adjOffsets, 0, adjOffsetsArr);
     device.queue.writeBuffer(b.adjTargets, 0, adjTargetsArr.length > 0 ? adjTargetsArr : new Uint32Array(1));
     cache.adjUploaded = true;
   }
 
-  // If alpha=0 or passes=0, just return property anchors
   if (alpha === 0 || passes === 0) {
-    return { px: propPxArr, py: propPyArr };
+    if (prof) {
+      _lastBlendProfile = { N, totalEdges, passes, anchorComputeMs, csrBuildMs,
+        bufferUploadMs: performance.now() - t_upload, bindGroupCreateMs: 0,
+        gpuDispatchMs: 0, gpuFenceMs: 0, mapMs: 0, readbackMs: 0, deinterleaveMs: 0,
+        totalMs: performance.now() - t_total };
+      console.log(`[GPU profile] N=${N} E=${totalEdges} p=${passes} — early return (α=0)`);
+    }
+    const outPx = new Float32Array(N);
+    const outPy = new Float32Array(N);
+    for (let i = 0; i < N; i++) { outPx[i] = propAnchorsArr[i * 2]; outPy[i] = propAnchorsArr[i * 2 + 1]; }
+    return { px: outPx, py: outPy };
   }
 
-  // Upload initial positions
-  const posData = new Float32Array(N * 2);
-  for (let i = 0; i < N; i++) { posData[i * 2] = propPxArr[i]; posData[i * 2 + 1] = propPyArr[i]; }
-  device.queue.writeBuffer(b.posA, 0, posData);
+  // Initial positions = property anchors (same interleaved layout as posA)
+  device.queue.writeBuffer(b.posA, 0, propAnchorsArr);
 
-  // Upload params
   const paramsData = new ArrayBuffer(16);
   new Float32Array(paramsData, 0, 1)[0] = alpha;
   new Uint32Array(paramsData, 4, 1)[0] = N;
   device.queue.writeBuffer(b.params, 0, new Uint8Array(paramsData));
+  const bufferUploadMs = prof ? performance.now() - t_upload : 0;
 
-  // Two bind groups: A→B and B→A for ping-pong
-  const bgAtoB = device.createBindGroup({
-    layout: blendPipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: b.propPx } },
-      { binding: 1, resource: { buffer: b.propPy } },
-      { binding: 2, resource: { buffer: b.adjOffsets } },
-      { binding: 3, resource: { buffer: b.adjTargets } },
-      { binding: 4, resource: { buffer: b.posA } },
-      { binding: 5, resource: { buffer: b.posB } },
-      { binding: 6, resource: { buffer: b.params } },
-    ],
-  });
-  const bgBtoA = device.createBindGroup({
-    layout: blendPipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: b.propPx } },
-      { binding: 1, resource: { buffer: b.propPy } },
-      { binding: 2, resource: { buffer: b.adjOffsets } },
-      { binding: 3, resource: { buffer: b.adjTargets } },
-      { binding: 4, resource: { buffer: b.posB } },
-      { binding: 5, resource: { buffer: b.posA } },
-      { binding: 6, resource: { buffer: b.params } },
-    ],
-  });
+  // ── Bind groups ───────────────────────────────────────────────────────
+  const t_bind = prof ? performance.now() : 0;
 
-  // Dispatch all passes + readback in a single command buffer (one GPU sync point)
+  if (!cache.bgAtoB) {
+    cache.bgAtoB = device.createBindGroup({
+      layout: blendPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: b.propAnchors } },
+        { binding: 1, resource: { buffer: b.adjOffsets } },
+        { binding: 2, resource: { buffer: b.adjTargets } },
+        { binding: 3, resource: { buffer: b.posA } },
+        { binding: 4, resource: { buffer: b.posB } },
+        { binding: 5, resource: { buffer: b.params } },
+      ],
+    });
+    cache.bgBtoA = device.createBindGroup({
+      layout: blendPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: b.propAnchors } },
+        { binding: 1, resource: { buffer: b.adjOffsets } },
+        { binding: 2, resource: { buffer: b.adjTargets } },
+        { binding: 3, resource: { buffer: b.posB } },
+        { binding: 4, resource: { buffer: b.posA } },
+        { binding: 5, resource: { buffer: b.params } },
+      ],
+    });
+  }
+  const bgAtoB = cache.bgAtoB;
+  const bgBtoA = cache.bgBtoA;
+  const bindGroupCreateMs = prof ? performance.now() - t_bind : 0;
+
+  // ── GPU dispatch ──────────────────────────────────────────────────────
+  const t_dispatch = prof ? performance.now() : 0;
+
   const workgroups = Math.ceil(N / 64);
   const encoder = device.createCommandEncoder();
   for (let pass = 0; pass < passes; pass++) {
@@ -666,15 +693,40 @@ export async function gpuBlend(nodes, groupNames, propStrengths, smoothAlpha, ad
   const finalBuf = (passes % 2 === 1) ? b.posB : b.posA;
   encoder.copyBufferToBuffer(finalBuf, 0, b.read, 0, N * 2 * 4);
   device.queue.submit([encoder.finish()]);
+  const gpuDispatchMs = prof ? performance.now() - t_dispatch : 0;
 
+  // ── GPU fence + readback ──────────────────────────────────────────────
+  const t_readback = prof ? performance.now() : 0;
+
+  // onSubmittedWorkDone resolves when GPU finishes compute+copy (before DMA to CPU).
+  // Separates GPU kernel time from the mapAsync DMA transfer.
+  let gpuFenceMs = 0;
+  if (prof) {
+    await device.queue.onSubmittedWorkDone();
+    gpuFenceMs = performance.now() - t_readback;
+  }
+
+  const t_map = prof ? performance.now() : 0;
   await b.read.mapAsync(GPUMapMode.READ);
   const result = new Float32Array(b.read.getMappedRange()).slice(0, N * 2);
   b.read.unmap();
+  const mapMs = prof ? performance.now() - t_map : 0;
+  const readbackMs = prof ? gpuFenceMs + mapMs : 0;
 
-  // Deinterleave
+  // ── Deinterleave ──────────────────────────────────────────────────────
+  const t_deinterleave = prof ? performance.now() : 0;
+
   const outPx = new Float32Array(N);
   const outPy = new Float32Array(N);
   for (let i = 0; i < N; i++) { outPx[i] = result[i * 2]; outPy[i] = result[i * 2 + 1]; }
+  const deinterleaveMs = prof ? performance.now() - t_deinterleave : 0;
+
+  if (prof) {
+    const totalMs = performance.now() - t_total;
+    _lastBlendProfile = { N, totalEdges, passes, anchorComputeMs, csrBuildMs,
+      bufferUploadMs, bindGroupCreateMs, gpuDispatchMs, gpuFenceMs, mapMs, readbackMs, deinterleaveMs, totalMs };
+    console.log(`[GPU profile] N=${N} E=${totalEdges} p=${passes} — anchor:${anchorComputeMs.toFixed(1)} csr:${csrBuildMs.toFixed(1)} upload:${bufferUploadMs.toFixed(1)} bind:${bindGroupCreateMs.toFixed(1)} dispatch:${gpuDispatchMs.toFixed(1)} fence:${gpuFenceMs.toFixed(1)} map:${mapMs.toFixed(1)} deinterleave:${deinterleaveMs.toFixed(1)} total:${totalMs.toFixed(1)}ms`);
+  }
 
   return { px: outPx, py: outPy };
 }
@@ -702,3 +754,10 @@ export async function gpuUnifiedBlend(nodes, groupNames, propStrengths, smoothAl
 export function destroyGPU() {
   if (device) { device.destroy(); device = null; pipeline = null; blendPipeline = null; }
 }
+
+// ─── Profiling ──────────────────────────────────────────────────────────────
+
+let _gpuBlendProfiling = false;
+let _lastBlendProfile = null;
+export function setGpuBlendProfiling(enabled) { _gpuBlendProfiling = !!enabled; }
+export function getLastBlendProfile() { return _lastBlendProfile; }
