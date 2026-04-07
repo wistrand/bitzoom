@@ -1,53 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BitZoom — Minimal Example</title>
-<style>
-  body { margin: 0; background: #0a0a0f; color: #c8c8d8; font-family: monospace; }
-  h2 { font-size: 14px; color: #eeeef8; margin: 16px 12px 8px; }
-  canvas { margin: auto; max-width: 600px; width: 80%; height: 400px; display: block; background: #12122a; }
-</style>
+<meta http-equiv="refresh" content="0; url=https://wistrand.github.io/blitzoom/example.html">
+<title>Moved to Blitzoom</title>
 </head>
 <body>
-
-<h2>Epstein (from SNAP files)</h2>
-<canvas id="c1"></canvas>
-
-<h2>Inline graph (from JS objects)</h2>
-<canvas id="c2"></canvas>
-
-<script type="module">
-import { createBitZoomView, createBitZoomFromGraph } from './bitzoom.js';
-
-// Graph 1: load from SNAP files
-const [edges, nodes] = await Promise.all([
-  fetch('data/epstein.edges').then(r => r.text()),
-  fetch('data/epstein.nodes').then(r => r.text()),
-]);
-createBitZoomView(document.getElementById('c1'), edges, nodes, {
-  initialLevel: 3, edgeMode: 'lines', heatmapMode: 'density', showLegend: true,
-  strengths: { group: 5, edgetype: 8 }, labelProps: ['label'],
-});
-
-// Graph 2: inline data
-createBitZoomFromGraph(document.getElementById('c2'),
-  [
-    { id: 'a', group: 'eng', label: 'Alice', lang: 'Go' },
-    { id: 'b', group: 'eng', label: 'Bob',   lang: 'Go' },
-    { id: 'c', group: 'des', label: 'Carol', lang: 'JS' },
-    { id: 'd', group: 'des', label: 'Dave',  lang: 'JS' },
-    { id: 'e', group: 'mgr', label: 'Eve',   lang: 'Py' },
-    { id: 'f', group: 'eng', label: 'Frank', lang: 'Rust' },
-  ],
-  [
-    { src: 'a', dst: 'b' }, { src: 'a', dst: 'c' },
-    { src: 'b', dst: 'f' }, { src: 'c', dst: 'd' },
-    { src: 'e', dst: 'a' }, { src: 'e', dst: 'd' },
-  ],
-  { initialLevel: 2, edgeMode: 'curves', showLegend: true, strengths: { group: 5, lang: 8 } },
-);
-</script>
+<p>Moved to <a href="https://wistrand.github.io/blitzoom/example.html">wistrand.github.io/blitzoom/example.html</a></p>
 </body>
 </html>

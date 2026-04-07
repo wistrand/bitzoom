@@ -1,82 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BitZoom — Bundle Test</title>
-<script type="module" src="dist/bitzoom.bundle.js"></script>
-<style>
-  body { margin: 0; background: #0a0a0f; color: #c8c8d8; font-family: monospace; padding: 16px; }
-  h2 { font-size: 14px; color: #eeeef8; margin: 24px 0 8px; }
-  p { font-size: 11px; color: #8888a0; margin: 0 0 8px; }
-  bz-graph:not(:defined) { visibility: hidden; }
-  bz-graph { height: 300px; max-width: 600px; border: 1px solid #2a2a4a; border-radius: 6px; }
-  canvas { width: 100%; max-width: 600px; height: 300px; display: block; background: #12122a;
-           border: 1px solid #2a2a4a; border-radius: 6px; }
-</style>
+<meta http-equiv="refresh" content="0; url=https://wistrand.github.io/blitzoom/bundle-test.html">
+<title>Moved to Blitzoom</title>
 </head>
 <body>
-
-<h2>&lt;bz-graph&gt; from file URLs</h2>
-<p>Single bundled JS file, no module imports needed.</p>
-<bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
-          level="2" heatmap="density" edge-mode="curves" legend
-          strengths="group:8" label-props="group">
-</bz-graph>
-
-<h2>&lt;bz-graph&gt; inline JSON</h2>
-<bz-graph format="json" level="2" legend color-scheme="6">
-{
-  "nodes": [
-    {"id": "a", "group": "eng", "label": "Alice", "lang": "Go"},
-    {"id": "b", "group": "eng", "label": "Bob",   "lang": "Go"},
-    {"id": "c", "group": "des", "label": "Carol", "lang": "JS"},
-    {"id": "d", "group": "des", "label": "Dave",  "lang": "JS"},
-    {"id": "e", "group": "mgr", "label": "Eve",   "lang": "Py"},
-    {"id": "f", "group": "eng", "label": "Frank", "lang": "Rust"}
-  ],
-  "edges": [
-    {"src": "a", "dst": "b"}, {"src": "a", "dst": "c"},
-    {"src": "b", "dst": "f"}, {"src": "c", "dst": "d"},
-    {"src": "e", "dst": "a"}, {"src": "e", "dst": "d"}
-  ]
-}
-</bz-graph>
-
-<h2>WebGL rendering</h2>
-<bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
-          level="3" heatmap="density" edge-mode="curves" legend webgl
-          strengths="group:5,edgetype:8" label-props="label">
-</bz-graph>
-
-<h2>WebGPU compute (forced)</h2>
-<bz-graph edges="data/epstein.edges" nodes="data/epstein.nodes"
-          level="3" heatmap="density" edge-mode="curves" legend use-gpu
-          strengths="group:5,edgetype:8" label-props="label">
-</bz-graph>
-
-<h2>createBitZoomView from bundle</h2>
-<p>Programmatic API from the same bundle file.</p>
-<canvas id="c1"></canvas>
-
-<h2>Light mode + viridis</h2>
-<bz-graph edges="data/karate.edges" nodes="data/karate.nodes"
-          level="2" heatmap="density" edge-mode="curves" legend
-          light-mode color-scheme="1" strengths="group:8"
-          style="--bz-bg:#e8e8f0;border-color:#c0c0d0">
-</bz-graph>
-
-<script type="module">
-import { createBitZoomView } from './dist/bitzoom.bundle.js';
-
-const [edges, nodes] = await Promise.all([
-  fetch('data/epstein.edges').then(r => r.text()),
-  fetch('data/epstein.nodes').then(r => r.text()),
-]);
-createBitZoomView(document.getElementById('c1'), edges, nodes, {
-  initialLevel: 3, edgeMode: 'curves', heatmapMode: 'density', showLegend: true,
-  strengths: { group: 5, edgetype: 8 }, labelProps: ['label'],
-});
-</script>
+<p>Moved to <a href="https://wistrand.github.io/blitzoom/bundle-test.html">wistrand.github.io/blitzoom/bundle-test.html</a></p>
 </body>
 </html>
